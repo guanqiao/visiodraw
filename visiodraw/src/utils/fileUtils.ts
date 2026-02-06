@@ -85,7 +85,7 @@ export function getFileNameWithoutExtension(filename: string): string {
  */
 export function isSupportedFileType(filename: string): boolean {
   const ext = getFileExtension(filename)
-  const supportedExts = ['vsdx', 'vsd', 'vdx', 'json']
+  const supportedExts = ['vsdx', 'vsd', 'vdx', 'json', 'vssx', 'vstx']
   return supportedExts.includes(ext)
 }
 

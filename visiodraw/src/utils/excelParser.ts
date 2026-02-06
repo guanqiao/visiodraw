@@ -4,6 +4,7 @@
  */
 
 import * as XLSX from 'xlsx'
+import { v4 as uuidv4 } from 'uuid'
 
 export interface ExcelRow {
   [key: string]: string | number | boolean | null

@@ -1,9 +1,11 @@
-import React from 'react'
-import { Collapse } from 'antd'
+import React, { useState } from 'react'
+import { Collapse, Tabs } from 'antd'
 import useCanvasStore from '@stores/canvasStore'
 import { v4 as uuidv4 } from 'uuid'
+import StencilBrowser from './StencilBrowser'
 
 const { Panel } = Collapse
+const { TabPane } = Tabs
 
 // 基础图形
 const basicShapes = [
@@ -175,6 +177,7 @@ const connectorShapes = [
 
 const ShapeLibrary: React.FC = () => {
   const { addShape, setTool } = useCanvasStore()
+  const [activeTab, setActiveTab] = useState('shapes')
 
   const handleShapeClick = (shape: any) => {
     const newShape = {
@@ -204,7 +207,7 @@ const ShapeLibrary: React.FC = () => {
     </div>
   )
 
-  return (
+  const renderBasicShapes = () => (
     <Collapse defaultActiveKey={['basic', 'flowchart']} bordered={false}>
       <Panel header="基础图形" key="basic">
         {renderShapeGrid(basicShapes)}
@@ -216,6 +219,22 @@ const ShapeLibrary: React.FC = () => {
         {renderShapeGrid(connectorShapes)}
       </Panel>
     </Collapse>
+  )
+
+  return (
+    <Tabs
+      activeKey={activeTab}
+      onChange={setActiveTab}
+      size="small"
+      style={{ height: '100%' }}
+    >
+      <TabPane tab="基础图形" key="shapes">
+        {renderBasicShapes()}
+      </TabPane>
+      <TabPane tab="Visio模具" key="stencils">
+        <StencilBrowser visible={activeTab === 'stencils'} />
+      </TabPane>
+    </Tabs>
   )
 }
 
