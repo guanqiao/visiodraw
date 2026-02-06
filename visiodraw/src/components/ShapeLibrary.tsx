@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { Collapse, Tabs, Tooltip } from 'antd'
 import StencilBrowser from './StencilBrowser'
 import { createDragData } from '../types/dragDrop'
@@ -240,53 +240,57 @@ const ShapeItem: React.FC<ShapeItemProps> = ({ shape }) => {
   )
 }
 
+// 图形网格组件
+interface ShapeGridProps {
+  shapes: typeof basicShapes
+}
+
+const ShapeGrid: React.FC<ShapeGridProps> = ({ shapes }) => (
+  <div className="shape-library">
+    {shapes.map((shape) => (
+      <ShapeItem key={shape.type} shape={shape} />
+    ))}
+  </div>
+)
+
 const ShapeLibrary: React.FC = () => {
   const [activeTab, setActiveTab] = useState('shapes')
 
-  const renderShapeGrid = (shapes: typeof basicShapes) => (
-    <div className="shape-library">
-      {shapes.map((shape) => (
-        <ShapeItem key={shape.type} shape={shape} />
-      ))}
-    </div>
-  )
-
-  const renderBasicShapes = () => (
-    <Collapse
-      defaultActiveKey={['basic', 'flowchart']}
-      bordered={false}
-      items={[
-        {
-          key: 'basic',
-          label: '基础图形',
-          children: renderShapeGrid(basicShapes),
-        },
-        {
-          key: 'flowchart',
-          label: '流程图',
-          children: renderShapeGrid(flowchartShapes),
-        },
-        {
-          key: 'connector',
-          label: '连接线',
-          children: renderShapeGrid(connectorShapes),
-        },
-      ]}
-    />
-  )
-
-  const tabItems = [
+  // 使用useMemo缓存tabItems，避免每次渲染都创建新的对象
+  const tabItems = useMemo(() => [
     {
       key: 'shapes',
       label: '基础图形',
-      children: renderBasicShapes(),
+      children: (
+        <Collapse
+          defaultActiveKey={['basic', 'flowchart']}
+          bordered={false}
+          items={[
+            {
+              key: 'basic',
+              label: '基础图形',
+              children: <ShapeGrid shapes={basicShapes} />,
+            },
+            {
+              key: 'flowchart',
+              label: '流程图',
+              children: <ShapeGrid shapes={flowchartShapes} />,
+            },
+            {
+              key: 'connector',
+              label: '连接线',
+              children: <ShapeGrid shapes={connectorShapes} />,
+            },
+          ]}
+        />
+      ),
     },
     {
       key: 'stencils',
       label: 'Visio模具',
       children: <StencilBrowser visible={activeTab === 'stencils'} />,
     },
-  ]
+  ], [activeTab])
 
   return (
     <Tabs
