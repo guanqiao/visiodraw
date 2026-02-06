@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useCallback } from 'react'
 import { Button, Switch, Tooltip, Divider, Slider } from 'antd'
 import {
   EyeOutlined,
@@ -21,6 +21,24 @@ const RulerPanel: React.FC = () => {
     clearAllGuideLines,
     setRulerInterval,
   } = useRulerStore()
+
+  // 使用本地状态来避免Slider拖动时的频繁更新
+  const [localInterval, setLocalInterval] = useState(rulerInterval)
+
+  // 当store中的值变化时，更新本地状态
+  React.useEffect(() => {
+    setLocalInterval(rulerInterval)
+  }, [rulerInterval])
+
+  // 处理Slider变化完成
+  const handleSliderChange = useCallback((value: number) => {
+    setLocalInterval(value)
+  }, [])
+
+  // 处理Slider变化完成
+  const handleSliderChangeComplete = useCallback((value: number) => {
+    setRulerInterval(value)
+  }, [setRulerInterval])
 
   const horizontalGuides = guideLines.filter((g) => g.orientation === 'horizontal')
   const verticalGuides = guideLines.filter((g) => g.orientation === 'vertical')
@@ -58,10 +76,11 @@ const RulerPanel: React.FC = () => {
 
         {/* 标尺设置 */}
         <div className="ruler-control-group">
-          <div className="ruler-control-label">标尺刻度间隔</div>
+          <div className="ruler-control-label">标尺刻度间隔 ({localInterval}px)</div>
           <Slider
-            value={rulerInterval}
-            onChange={setRulerInterval}
+            value={localInterval}
+            onChange={handleSliderChange}
+            onChangeComplete={handleSliderChangeComplete}
             min={10}
             max={100}
             step={10}
