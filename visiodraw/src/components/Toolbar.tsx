@@ -2,8 +2,7 @@ import React, { useState } from 'react'
 import { Button, Tooltip, Space, Divider, Dropdown } from 'antd'
 import {
   SelectOutlined,
-  SquareOutlined,
-  CircleOutlined,
+  BorderOutlined,
   LineOutlined,
   FontSizeOutlined,
   UndoOutlined,
@@ -46,8 +45,8 @@ const Toolbar: React.FC = () => {
 
   const tools = [
     { key: 'select', icon: <SelectOutlined />, title: '选择' },
-    { key: 'rectangle', icon: <SquareOutlined />, title: '矩形' },
-    { key: 'circle', icon: <CircleOutlined />, title: '圆形' },
+    { key: 'rectangle', icon: <BorderOutlined />, title: '矩形' },
+    { key: 'circle', icon: <BorderOutlined />, title: '圆形' },
     { key: 'line', icon: <LineOutlined />, title: '线条' },
     { key: 'text', icon: <FontSizeOutlined />, title: '文本' },
   ]

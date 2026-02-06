@@ -15,7 +15,8 @@ import {
 } from '@ant-design/icons'
 import useTemplateStore from '@stores/templateStore'
 import useCanvasStore from '@stores/canvasStore'
-import { Template, TemplateCategory, TEMPLATE_CATEGORIES } from '@templates/types'
+import { Template, TEMPLATE_CATEGORIES, TemplateCategoryInfo } from '@templates/types'
+import { Shape } from '@stores/canvasStore'
 import { v4 as uuidv4 } from 'uuid'
 
 const { Title, Text } = Typography
@@ -41,7 +42,6 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
   onSelectTemplate,
 }) => {
   const {
-    customTemplates,
     currentCategory,
     setCurrentCategory,
     getAllTemplates,
@@ -82,7 +82,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
     newCanvas()
 
     // 加载模板中的图形
-    template.shapes.forEach((shape) => {
+    template.shapes.forEach((shape: Shape) => {
       const newShape = {
         ...shape,
         id: uuidv4(), // 生成新的ID避免冲突
@@ -145,7 +145,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
               }}
             >
               {iconMap[
-                TEMPLATE_CATEGORIES.find((c) => c.key === template.category)
+                TEMPLATE_CATEGORIES.find((c: TemplateCategoryInfo) => c.key === template.category)
                   ?.icon || 'FileAddOutlined'
               ]}
             </div>
@@ -172,7 +172,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             </Text>
             <div style={{ marginTop: 8 }}>
               <Tag>
-                {TEMPLATE_CATEGORIES.find((c) => c.key === template.category)?.name}
+                {TEMPLATE_CATEGORIES.find((c: TemplateCategoryInfo) => c.key === template.category)?.name}
               </Tag>
               <Text type="secondary" style={{ fontSize: 12 }}>
                 {template.shapes.length} 个图形
@@ -223,7 +223,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
               buttonStyle="solid"
             >
               <Radio.Button value="all">全部</Radio.Button>
-              {TEMPLATE_CATEGORIES.map((category) => (
+              {TEMPLATE_CATEGORIES.map((category: TemplateCategoryInfo) => (
                 <Radio.Button key={category.key} value={category.key}>
                   {category.name}
                 </Radio.Button>
@@ -257,7 +257,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         <div style={{ marginTop: 16, padding: 16, background: '#f5f5f5', borderRadius: 4 }}>
           <Title level={5}>分类说明</Title>
           <Space wrap>
-            {TEMPLATE_CATEGORIES.map((category) => (
+            {TEMPLATE_CATEGORIES.map((category: TemplateCategoryInfo) => (
               <div key={category.key} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 {iconMap[category.icon]}
                 <Text strong>{category.name}</Text>

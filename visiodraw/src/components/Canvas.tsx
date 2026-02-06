@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
-import { fabric } from 'fabric'
 import useCanvasStore from '@stores/canvasStore'
 import { v4 as uuidv4 } from 'uuid'
 import ContextMenu, { ContextMenuItem } from './ContextMenu'
@@ -8,21 +7,25 @@ import {
   CopyOutlined,
   SnippetsOutlined,
   DeleteOutlined,
-  GroupOutlined,
-  UngroupOutlined,
   VerticalAlignTopOutlined,
   VerticalAlignBottomOutlined,
 } from '@ant-design/icons'
-import { throttle, performanceMonitor } from '@utils/performanceUtils'
+import { throttle } from '@utils/performanceUtils'
+import {
+  generateDefaultConnectionPoints,
+  calculateConnectionPointPosition,
+} from '@utils/connectionPoints'
+import { defaultConnectionPointOptions } from '../types/connection'
+import type { ConnectionPoint } from '../types/connection'
 
 const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null)
+  const connectionPointsRef = useRef<fabric.Circle[]>([])
   const {
     setCanvas,
     currentTool,
     gridEnabled,
-    snapToGrid,
     zoom,
     setZoom,
     addShape,
@@ -30,7 +33,6 @@ const Canvas: React.FC = () => {
     selectedShapeId,
     shapes,
     deleteShape,
-    updateShape,
   } = useCanvasStore()
 
   // 右键菜单状态
@@ -39,6 +41,9 @@ const Canvas: React.FC = () => {
     x: number
     y: number
   }>({ visible: false, x: 0, y: 0 })
+
+  // 悬停的图形ID
+  const [, setHoveredShapeId] = useState<string | null>(null)
 
   // 初始化Fabric.js画布
   useEffect(() => {
@@ -63,14 +68,16 @@ const Canvas: React.FC = () => {
     }
 
     // 监听对象选择事件
-    canvas.on('selection:created', (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('selection:created', (e: any) => {
       const activeObject = e.selected?.[0]
       if (activeObject && activeObject.id) {
         selectShape(activeObject.id as string)
       }
     })
 
-    canvas.on('selection:updated', (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('selection:updated', (e: any) => {
       const activeObject = e.selected?.[0]
       if (activeObject && activeObject.id) {
         selectShape(activeObject.id as string)
@@ -82,7 +89,8 @@ const Canvas: React.FC = () => {
     })
 
     // 监听对象修改事件
-    canvas.on('object:modified', (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('object:modified', (e: any) => {
       const obj = e.target
       if (obj && obj.id) {
         // 更新store中的形状数据
@@ -91,22 +99,23 @@ const Canvas: React.FC = () => {
     })
 
     // 监听鼠标点击事件（用于绘制新图形）
-    canvas.on('mouse:down', (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('mouse:down', (e: any) => {
       // 隐藏右键菜单
       setContextMenu((prev) => ({ ...prev, visible: false }))
 
       if (currentTool !== 'select' && e.target === null) {
-        const pointer = canvas.getPointer(e.e)
-        handleDrawShape(pointer.x, pointer.y)
+        const mousePointer = canvas.getPointer(e.e)
+        handleDrawShape(mousePointer.x, mousePointer.y)
       }
     })
 
     // 监听右键点击事件
-    canvas.on('mouse:down', (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('mouse:down', (e: any) => {
       if (e.e.button === 2) {
         // 右键
         e.e.preventDefault()
-        const pointer = canvas.getPointer(e.e)
         setContextMenu({
           visible: true,
           x: e.e.clientX,
@@ -116,7 +125,8 @@ const Canvas: React.FC = () => {
     })
 
     // 监听滚轮缩放（使用节流优化）
-    const throttledZoom = throttle((e: fabric.IEvent<WheelEvent>) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const throttledZoom = throttle((e: any) => {
       const delta = e.e.deltaY
       let newZoom = canvas.getZoom()
       newZoom *= 0.999 ** delta
@@ -125,7 +135,8 @@ const Canvas: React.FC = () => {
       setZoom(newZoom)
     }, 16) // 约60fps
 
-    canvas.on('mouse:wheel', (e) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('mouse:wheel', (e: any) => {
       throttledZoom(e)
       e.e.preventDefault()
       e.e.stopPropagation()
@@ -136,6 +147,7 @@ const Canvas: React.FC = () => {
       canvas.dispose()
       fabricCanvasRef.current = null
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // 处理绘制图形
@@ -196,10 +208,14 @@ const Canvas: React.FC = () => {
 
     if (shape) {
       const id = uuidv4()
-      shape.set('id', id)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(shape as unknown as { id: string }).id = id
       canvas.add(shape)
       canvas.setActiveObject(shape)
       canvas.renderAll()
+
+      // 生成连接点
+      const connectionPoints = generateDefaultConnectionPoints(currentTool)
 
       // 添加到store
       addShape({
@@ -212,6 +228,7 @@ const Canvas: React.FC = () => {
         fill: '#ffffff',
         stroke: '#333333',
         strokeWidth: 2,
+        connectionPoints,
       })
     }
   }
@@ -250,7 +267,7 @@ const Canvas: React.FC = () => {
         case 'start-end':
           shape = new fabric.Circle({
             ...commonProps,
-            radius: (shapeData as any).radius || shapeData.width / 2,
+            radius: (shapeData as unknown as { radius?: number }).radius || shapeData.width / 2,
           })
           break
         case 'triangle':
@@ -261,7 +278,7 @@ const Canvas: React.FC = () => {
             height: shapeData.height,
           })
           break
-        case 'diamond':
+        case 'diamond': {
           // 菱形使用Path绘制
           const halfW = shapeData.width / 2
           const halfH = shapeData.height / 2
@@ -272,6 +289,7 @@ const Canvas: React.FC = () => {
             }
           )
           break
+        }
         case 'line':
           shape = new fabric.Line(
             [shapeData.x, shapeData.y, shapeData.x + shapeData.width, shapeData.y],
@@ -293,7 +311,8 @@ const Canvas: React.FC = () => {
       }
 
       if (shape) {
-        shape.set('id', shapeData.id)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (shape as unknown as { id: string }).id = shapeData.id
         if (shapeData.angle) shape.set('angle', shapeData.angle)
         if (shapeData.scaleX) shape.set('scaleX', shapeData.scaleX)
         if (shapeData.scaleY) shape.set('scaleY', shapeData.scaleY)
@@ -311,7 +330,8 @@ const Canvas: React.FC = () => {
 
     if (selectedShapeId) {
       const objects = canvas.getObjects()
-      const selectedObject = objects.find((obj) => obj.id === selectedShapeId)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const selectedObject = objects.find((obj: any) => obj.id === selectedShapeId)
       if (selectedObject) {
         canvas.setActiveObject(selectedObject)
         canvas.renderAll()
@@ -329,6 +349,124 @@ const Canvas: React.FC = () => {
     canvas.setZoom(zoom)
     canvas.renderAll()
   }, [zoom])
+
+  // 渲染连接点
+  const renderConnectionPoints = useCallback(
+    (shapeId: string | null) => {
+      const canvas = fabricCanvasRef.current
+      if (!canvas) return
+
+      // 清除之前的连接点
+      connectionPointsRef.current.forEach((point) => {
+        canvas.remove(point)
+      })
+      connectionPointsRef.current = []
+
+      if (!shapeId) {
+        canvas.renderAll()
+        return
+      }
+
+      const shape = shapes.find((s) => s.id === shapeId)
+      if (!shape || !shape.connectionPoints) {
+        canvas.renderAll()
+        return
+      }
+
+      // 渲染每个连接点
+      shape.connectionPoints.forEach((point: ConnectionPoint) => {
+        const pos = calculateConnectionPointPosition(shape, point)
+        const isConnected = point.isConnected
+
+        const circle = new fabric.Circle({
+          left: pos.x - defaultConnectionPointOptions.radius,
+          top: pos.y - defaultConnectionPointOptions.radius,
+          radius: defaultConnectionPointOptions.radius,
+          fill: isConnected
+            ? defaultConnectionPointOptions.connectedFill
+            : defaultConnectionPointOptions.fill,
+          stroke: defaultConnectionPointOptions.stroke,
+          strokeWidth: defaultConnectionPointOptions.strokeWidth,
+          selectable: false,
+          evented: true,
+          hoverCursor: 'crosshair',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          connectionPointId: point.id,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          shapeId: shape.id,
+        })
+
+        // 鼠标悬停效果
+        circle.on('mouseover', () => {
+          circle.set('fill', defaultConnectionPointOptions.hoverFill)
+          canvas.renderAll()
+        })
+
+        circle.on('mouseout', () => {
+          circle.set(
+            'fill',
+            isConnected
+              ? defaultConnectionPointOptions.connectedFill
+              : defaultConnectionPointOptions.fill
+          )
+          canvas.renderAll()
+        })
+
+        canvas.add(circle)
+        connectionPointsRef.current.push(circle)
+      })
+
+      canvas.renderAll()
+    },
+    [shapes]
+  )
+
+  // 监听鼠标悬停事件显示连接点
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleMouseOver = (e: any) => {
+      const target = e.target
+      if (target && target.id && target.id !== selectedShapeId) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const shapeId = (target as any).id as string
+        setHoveredShapeId(shapeId)
+        renderConnectionPoints(shapeId)
+      }
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleMouseOut = (e: any) => {
+      const target = e.target
+      if (target && target.id && target.id !== selectedShapeId) {
+        // 延迟清除，避免闪烁
+        setTimeout(() => {
+          setHoveredShapeId((prev) => {
+            if (prev === target.id) {
+              renderConnectionPoints(null)
+              return null
+            }
+            return prev
+          })
+        }, 100)
+      }
+    }
+
+    canvas.on('mouse:over', handleMouseOver)
+    canvas.on('mouse:out', handleMouseOut)
+
+    return () => {
+      canvas.off('mouse:over', handleMouseOver)
+      canvas.off('mouse:out', handleMouseOut)
+    }
+  }, [selectedShapeId, renderConnectionPoints])
+
+  // 选中图形时显示连接点
+  useEffect(() => {
+    renderConnectionPoints(selectedShapeId)
+  }, [selectedShapeId, renderConnectionPoints])
 
   // 生成右键菜单项
   const getContextMenuItems = (): ContextMenuItem[] => {
@@ -398,7 +536,8 @@ const Canvas: React.FC = () => {
         onClick: () => {
           const canvas = fabricCanvasRef.current
           if (canvas && selectedShapeId) {
-            const obj = canvas.getObjects().find((o) => o.id === selectedShapeId)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const obj = canvas.getObjects().find((o: any) => o.id === selectedShapeId)
             if (obj) {
               canvas.bringToFront(obj)
               canvas.renderAll()
@@ -414,7 +553,8 @@ const Canvas: React.FC = () => {
         onClick: () => {
           const canvas = fabricCanvasRef.current
           if (canvas && selectedShapeId) {
-            const obj = canvas.getObjects().find((o) => o.id === selectedShapeId)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const obj = canvas.getObjects().find((o: any) => o.id === selectedShapeId)
             if (obj) {
               canvas.sendToBack(obj)
               canvas.renderAll()

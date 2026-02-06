@@ -1,12 +1,18 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+// 文件过滤器类型
+interface FileFilter {
+  name: string
+  extensions: string[]
+}
+
 // 暴露给渲染进程的API
 contextBridge.exposeInMainWorld('electronAPI', {
   // 对话框
   openFile: () => ipcRenderer.invoke('dialog:openFile'),
-  saveFile: (options?: { defaultPath?: string; filters?: any[] }) =>
+  saveFile: (options?: { defaultPath?: string; filters?: FileFilter[] }) =>
     ipcRenderer.invoke('dialog:saveFile', options),
-  exportFile: (options?: { defaultPath?: string; filters?: any[] }) =>
+  exportFile: (options?: { defaultPath?: string; filters?: FileFilter[] }) =>
     ipcRenderer.invoke('dialog:exportFile', options),
 
   // 菜单事件监听
@@ -43,9 +49,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 declare global {
   interface Window {
     electronAPI: {
-      openFile: () => Promise<any>
-      saveFile: (options?: { defaultPath?: string; filters?: any[] }) => Promise<any>
-      exportFile: (options?: { defaultPath?: string; filters?: any[] }) => Promise<any>
+      openFile: () => Promise<unknown>
+      saveFile: (options?: { defaultPath?: string; filters?: FileFilter[] }) => Promise<unknown>
+      exportFile: (options?: { defaultPath?: string; filters?: FileFilter[] }) => Promise<unknown>
       onMenuNewFile: (callback: () => void) => void
       onMenuOpenFile: (callback: () => void) => void
       onMenuSaveFile: (callback: () => void) => void

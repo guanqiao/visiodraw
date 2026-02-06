@@ -179,6 +179,7 @@ const ShapeLibrary: React.FC = () => {
   const { addShape, setTool } = useCanvasStore()
   const [activeTab, setActiveTab] = useState('shapes')
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleShapeClick = (shape: any) => {
     const newShape = {
       id: uuidv4(),
@@ -192,6 +193,7 @@ const ShapeLibrary: React.FC = () => {
     setTool('select')
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderShapeGrid = (shapes: any[]) => (
     <div className="shape-library">
       {shapes.map((shape) => (

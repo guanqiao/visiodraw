@@ -39,12 +39,12 @@ export async function parseExcel(arrayBuffer: ArrayBuffer): Promise<ExcelRow[]> 
     return []
   }
   
-  const headers = data[0] as string[]
+  const headers = data[0] as unknown as string[]
   const rows: ExcelRow[] = []
   
   for (let i = 1; i < data.length; i++) {
     const row: ExcelRow = {}
-    const rowData = data[i] as (string | number | boolean | null)[]
+    const rowData = data[i] as unknown as (string | number | boolean | null)[]
     
     headers.forEach((header, index) => {
       row[header] = rowData[index] ?? null
@@ -123,11 +123,12 @@ export function convertToOrgData(rows: ExcelRow[]): OrgData[] {
  * 生成组织结构图的形状数据
  */
 export function generateOrgChartShapes(orgData: OrgData[]) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shapes: any[] = []
   const levelWidth = 200
   const nodeHeight = 80
   const levelHeight = 150
-  
+
   // 按层级分组
   const levelGroups = new Map<number, OrgData[]>()
   orgData.forEach((node) => {
@@ -136,19 +137,19 @@ export function generateOrgChartShapes(orgData: OrgData[]) {
     }
     levelGroups.get(node.level)!.push(node)
   })
-  
+
   // 计算每层的节点位置
   const levelCounts = new Map<number, number>()
-  
+
   orgData.forEach((node) => {
     const count = levelCounts.get(node.level) || 0
     levelCounts.set(node.level, count + 1)
-    
+
     const x = 100 + count * levelWidth
     const y = 100 + node.level * levelHeight
-    
+
     shapes.push({
-      id: node.id,
+      id: uuidv4(),
       type: 'rectangle',
       x,
       y,
@@ -161,7 +162,7 @@ export function generateOrgChartShapes(orgData: OrgData[]) {
       orgData: node,
     })
   })
-  
+
   return shapes
 }
 

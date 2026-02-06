@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { optimizeHistory, deepClone, performanceMonitor } from '@utils/performanceUtils'
+import type { ConnectionPoint, Connector } from '../types/connection'
 
 export interface Shape {
   id: string
@@ -16,6 +17,15 @@ export interface Shape {
   angle?: number
   scaleX?: number
   scaleY?: number
+  rotation?: number
+  // 连接点支持
+  connectionPoints?: ConnectionPoint[]
+}
+
+// 连接线存储
+export interface ConnectorState {
+  connectors: Connector[]
+  selectedConnectorId: string | null
 }
 
 export interface CanvasState {
@@ -27,6 +37,13 @@ export interface CanvasState {
   gridEnabled: boolean
   snapToGrid: boolean
   currentTool: string
+
+  // 连接线状态
+  connectors: Connector[]
+  selectedConnectorId: string | null
+  isDrawingConnector: boolean
+  connectorStartShapeId: string | null
+  connectorStartPointId: string | null
 
   // 历史记录
   history: Shape[][]
@@ -46,6 +63,19 @@ export interface CanvasState {
   setTool: (tool: string) => void
   toggleGrid: () => void
   toggleSnapToGrid: () => void
+
+  // 连接点操作
+  updateShapeConnectionPoints: (id: string, connectionPoints: ConnectionPoint[]) => void
+  setConnectionPointsVisibility: (shapeId: string, visible: boolean) => void
+
+  // 连接线操作
+  addConnector: (connector: Connector) => void
+  updateConnector: (id: string, updates: Partial<Connector>) => void
+  deleteConnector: (id: string) => void
+  selectConnector: (id: string | null) => void
+  startDrawingConnector: (shapeId: string, pointId: string) => void
+  endDrawingConnector: (shapeId: string, pointId: string) => void
+  cancelDrawingConnector: () => void
 
   // 历史操作
   undo: () => void
@@ -71,6 +101,14 @@ const useCanvasStore = create<CanvasState>()(
       gridEnabled: true,
       snapToGrid: false,
       currentTool: 'select',
+
+      // 连接线初始状态
+      connectors: [],
+      selectedConnectorId: null,
+      isDrawingConnector: false,
+      connectorStartShapeId: null,
+      connectorStartPointId: null,
+
       history: [[]],
       historyIndex: 0,
       filePath: null,
@@ -141,6 +179,113 @@ const useCanvasStore = create<CanvasState>()(
         set((state) => ({ snapToGrid: !state.snapToGrid }))
       },
 
+      // 更新图形连接点
+      updateShapeConnectionPoints: (id, connectionPoints) => {
+        const { shapes, saveHistory } = get()
+        const newShapes = shapes.map((shape) =>
+          shape.id === id ? { ...shape, connectionPoints } : shape
+        )
+        set({ shapes: newShapes, isModified: true })
+        saveHistory()
+      },
+
+      // 设置连接点可见性
+      setConnectionPointsVisibility: (shapeId, visible) => {
+        const { shapes } = get()
+        const newShapes = shapes.map((shape) => {
+          if (shape.id === shapeId && shape.connectionPoints) {
+            return {
+              ...shape,
+              connectionPoints: shape.connectionPoints.map((point) => ({
+                ...point,
+                isVisible: visible,
+              })),
+            }
+          }
+          return shape
+        })
+        set({ shapes: newShapes })
+      },
+
+      // 添加连接线
+      addConnector: (connector) => {
+        const { connectors, saveHistory } = get()
+        const newConnectors = [...connectors, connector]
+        set({ connectors: newConnectors, isModified: true })
+        saveHistory()
+      },
+
+      // 更新连接线
+      updateConnector: (id, updates) => {
+        const { connectors, saveHistory } = get()
+        const newConnectors = connectors.map((conn) =>
+          conn.id === id ? { ...conn, ...updates } : conn
+        )
+        set({ connectors: newConnectors, isModified: true })
+        saveHistory()
+      },
+
+      // 删除连接线
+      deleteConnector: (id) => {
+        const { connectors, selectedConnectorId, saveHistory } = get()
+        const newConnectors = connectors.filter((conn) => conn.id !== id)
+        set({
+          connectors: newConnectors,
+          selectedConnectorId: selectedConnectorId === id ? null : selectedConnectorId,
+          isModified: true,
+        })
+        saveHistory()
+      },
+
+      // 选择连接线
+      selectConnector: (id) => {
+        set({ selectedConnectorId: id })
+      },
+
+      // 开始绘制连接线
+      startDrawingConnector: (shapeId, pointId) => {
+        set({
+          isDrawingConnector: true,
+          connectorStartShapeId: shapeId,
+          connectorStartPointId: pointId,
+        })
+      },
+
+      // 结束绘制连接线
+      endDrawingConnector: (shapeId, pointId) => {
+        const { connectorStartShapeId, connectorStartPointId } = get()
+        if (connectorStartShapeId && connectorStartPointId) {
+          // 创建连接线
+          const newConnector: Connector = {
+            id: `connector-${Date.now()}`,
+            sourceShapeId: connectorStartShapeId,
+            sourcePointId: connectorStartPointId,
+            targetShapeId: shapeId,
+            targetPointId: pointId,
+            style: 'straight',
+            startStyle: 'none',
+            endStyle: 'arrow',
+            stroke: '#000000',
+            strokeWidth: 1,
+          }
+          get().addConnector(newConnector)
+        }
+        set({
+          isDrawingConnector: false,
+          connectorStartShapeId: null,
+          connectorStartPointId: null,
+        })
+      },
+
+      // 取消绘制连接线
+      cancelDrawingConnector: () => {
+        set({
+          isDrawingConnector: false,
+          connectorStartShapeId: null,
+          connectorStartPointId: null,
+        })
+      },
+
       // 撤销
       undo: () => {
         const { history, historyIndex } = get()
@@ -194,6 +339,11 @@ const useCanvasStore = create<CanvasState>()(
         set({
           shapes: [],
           selectedShapeId: null,
+          connectors: [],
+          selectedConnectorId: null,
+          isDrawingConnector: false,
+          connectorStartShapeId: null,
+          connectorStartPointId: null,
           history: [[]],
           historyIndex: 0,
           filePath: null,

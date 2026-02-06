@@ -6,7 +6,6 @@
  */
 
 import JSZip from 'jszip'
-import { parseVisioDocument } from './vsdxParser'
 
 /**
  * 模具图形定义
@@ -51,8 +50,8 @@ export interface VisioTemplate {
   name: string
   description?: string
   pages: TemplatePage[]
-  styles: Record<string, any>
-  themes?: any[]
+  styles: Record<string, unknown>
+  themes?: unknown[]
 }
 
 /**
@@ -140,7 +139,7 @@ export async function parseVstx(arrayBuffer: ArrayBuffer): Promise<VisioTemplate
     }
     
     // 读取样式信息
-    const styles: Record<string, any> = {}
+    const styles: Record<string, unknown> = {}
     const stylesXml = await zip.file('visio/styles.xml')?.async('text')
     if (stylesXml) {
       Object.assign(styles, parseStyles(stylesXml))
@@ -172,7 +171,7 @@ function extractTitleFromCoreXml(xml?: string): string | null {
 /**
  * 解析Master图形
  */
-function parseMasterShape(xml: string, path: string): StencilShape | null {
+function parseMasterShape(xml: string, _path: string): StencilShape | null {
   try {
     // 提取ID和名称
     const idMatch = xml.match(/ID="([^"]+)"/)
@@ -286,8 +285,8 @@ function parsePageInfo(xml: string, name: string): TemplatePage | null {
 /**
  * 解析样式信息
  */
-function parseStyles(xml: string): Record<string, any> {
-  const styles: Record<string, any> = {}
+function parseStyles(xml: string): Record<string, unknown> {
+  const styles: Record<string, unknown> = {}
   
   // 简单提取样式名称
   const styleRegex = /<StyleSheet[^>]*ID="([^"]+)"[^>]*>/g

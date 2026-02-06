@@ -7,7 +7,7 @@ import { Modal, Button, Space, Select, Radio, Typography, message } from 'antd'
 import { PrinterOutlined, DownloadOutlined } from '@ant-design/icons'
 import useCanvasStore from '@stores/canvasStore'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 const { Option } = Select
 
 interface PrintPreviewProps {

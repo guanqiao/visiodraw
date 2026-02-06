@@ -14,6 +14,17 @@ import './App.css'
 
 const { Header, Sider, Content } = Layout
 
+// Electron API 返回类型
+interface ElectronOpenResult {
+  canceled: boolean
+  filePaths: string[]
+}
+
+interface ElectronSaveResult {
+  canceled: boolean
+  filePath: string
+}
+
 const App: React.FC = () => {
   const {
     newCanvas,
@@ -37,7 +48,7 @@ const App: React.FC = () => {
       },
       onOpen: async () => {
         if (window.electronAPI) {
-          const result = await window.electronAPI.openFile()
+          const result = await window.electronAPI.openFile() as ElectronOpenResult
           if (!result.canceled && result.filePaths.length > 0) {
             await openFile(result.filePaths[0])
             message.success('文件已打开')
@@ -46,7 +57,7 @@ const App: React.FC = () => {
       },
       onSave: async () => {
         if (window.electronAPI) {
-          const result = await window.electronAPI.saveFile()
+          const result = await window.electronAPI.saveFile() as ElectronSaveResult
           if (!result.canceled) {
             await saveFile(result.filePath)
             message.success('文件已保存')
@@ -81,8 +92,10 @@ const App: React.FC = () => {
           canvas.discardActiveObject()
           const objects = canvas.getObjects()
           if (objects.length > 0) {
-            const selection = new fabric.ActiveSelection(objects, { canvas })
-            canvas.setActiveObject(selection)
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const ActiveSelection = (window as unknown as { fabric: { ActiveSelection: new(objects: unknown[], options: { canvas: unknown }) => unknown } }).fabric.ActiveSelection
+            const selection = new ActiveSelection(objects, { canvas })
+            canvas.setActiveObject(selection as unknown as fabric.Object)
             canvas.renderAll()
           }
         }
@@ -116,14 +129,14 @@ const App: React.FC = () => {
       })
 
       window.electronAPI.onMenuOpenFile(async () => {
-        const result = await window.electronAPI.openFile()
+        const result = await window.electronAPI.openFile() as ElectronOpenResult
         if (!result.canceled && result.filePaths.length > 0) {
           await openFile(result.filePaths[0])
         }
       })
 
       window.electronAPI.onMenuSaveFile(async () => {
-        const result = await window.electronAPI.saveFile()
+        const result = await window.electronAPI.saveFile() as ElectronSaveResult
         if (!result.canceled) {
           await saveFile(result.filePath)
         }

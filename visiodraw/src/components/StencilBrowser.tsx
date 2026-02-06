@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { Card, Collapse, Empty, message, Upload, Button, Tabs, Tooltip } from 'antd'
-import { UploadOutlined, AppstoreOutlined, ImportOutlined } from '@ant-design/icons'
+import { UploadOutlined, AppstoreOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import {
   Stencil,
@@ -13,7 +13,6 @@ import {
   getAllStencils,
   parseVssx,
   detectVisioStencilType,
-  builtInVisioStencils,
 } from '@utils/visioStencils'
 import useCanvasStore from '@stores/canvasStore'
 
@@ -66,7 +65,9 @@ const StencilBrowser: React.FC<StencilBrowserProps> = ({ visible = true }) => {
 
   // 从模具添加图形到画布
   const handleAddShape = (shape: StencilShape) => {
+    const { v4: uuidv4 } = require('uuid')
     addShape({
+      id: uuidv4(),
       type: 'rectangle', // 默认类型，实际应根据模具类型
       x: 100 + Math.random() * 100,
       y: 100 + Math.random() * 100,

@@ -29,8 +29,8 @@ export interface VsdxPage {
 
 export interface VsdxDocument {
   pages: VsdxPage[]
-  masters: any[]
-  themes: any[]
+  masters: unknown[]
+  themes: unknown[]
 }
 
 /**
@@ -59,7 +59,6 @@ export async function parseVsdx(arrayBuffer: ArrayBuffer): Promise<VsdxDocument>
       const pageName = pageElement.getAttribute('Name') || `Page ${pageId}`
 
       // 解析页面内容文件
-      const pageContentPath = `visio/pages/_rels/${pageId}.xml.rels`
       const pageContentFile = await findPageContentFile(zip, pageId)
 
       if (pageContentFile) {
@@ -173,8 +172,6 @@ function parseShape(shapeElement: Element): VsdxShape | null {
   let angle = 0
 
   if (xForm) {
-    const pinX = xForm.querySelector('PinX')
-    const pinY = xForm.querySelector('PinY')
     const pinXValue = xForm.querySelector('PinX')
     const pinYValue = xForm.querySelector('PinY')
     const widthEl = xForm.querySelector('Width')
@@ -343,7 +340,7 @@ export async function exportToVsdx(pages: VsdxPage[]): Promise<Blob> {
     <PageHeight>${page.height}</PageHeight>
   </PageSheet>
   <Shapes>
-    ${page.shapes.map((shape, shapeIndex) => `
+    ${page.shapes.map((shape) => `
     <Shape ID="${shape.id}" Type="${shape.type}">
       <XForm>
         <PinX>${shape.x + shape.width / 2}</PinX>

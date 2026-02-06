@@ -2,9 +2,9 @@
  * Excel导入对话框
  */
 
-import React, { useState, useRef } from 'react'
+import React, { useState } from 'react'
 import { Modal, Button, Table, Upload, message, Typography, Radio, Space } from 'antd'
-import { UploadOutlined, FileExcelOutlined } from '@ant-design/icons'
+import { UploadOutlined } from '@ant-design/icons'
 import type { UploadFile } from 'antd/es/upload/interface'
 import {
   parseExcel,
@@ -17,7 +17,7 @@ import {
 } from '@utils/excelParser'
 import useCanvasStore from '@stores/canvasStore'
 
-const { Title, Text } = Typography
+const { Text } = Typography
 
 interface ExcelImportDialogProps {
   visible: boolean
@@ -32,10 +32,10 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({
   const [previewData, setPreviewData] = useState<ExcelRow[]>([])
   const [orgData, setOrgData] = useState<OrgData[]>([])
   const [importType, setImportType] = useState<'org' | 'data'>('org')
-  const [loading, setLoading] = useState(false)
   const { addShape, newCanvas } = useCanvasStore()
 
   // 处理文件上传
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleFileChange = async (info: any) => {
     const { file } = info
     
@@ -54,7 +54,6 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({
     }
 
     setFileList([file])
-    setLoading(true)
 
     try {
       const arrayBuffer = await readExcelFile(file.originFileObj)
@@ -71,8 +70,6 @@ const ExcelImportDialog: React.FC<ExcelImportDialogProps> = ({
     } catch (error) {
       console.error('解析Excel失败:', error)
       message.error('解析Excel文件失败')
-    } finally {
-      setLoading(false)
     }
   }
 

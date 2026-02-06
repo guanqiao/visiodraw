@@ -1,9 +1,8 @@
 import React from 'react'
-import { Form, Input, InputNumber, ColorPicker, Select, Collapse } from 'antd'
+import { Form, Input, InputNumber, ColorPicker, Collapse } from 'antd'
 import useCanvasStore from '@stores/canvasStore'
 
 const { Panel } = Collapse
-const { Option } = Select
 
 const PropertyPanel: React.FC = () => {
   const { shapes, selectedShapeId, updateShape, deleteShape } = useCanvasStore()
@@ -20,6 +19,7 @@ const PropertyPanel: React.FC = () => {
     )
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleChange = (key: string, value: any) => {
     if (selectedShapeId) {
       updateShape(selectedShapeId, { [key]: value })

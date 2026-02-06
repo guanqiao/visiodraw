@@ -6,7 +6,7 @@
  * 这里提供一个基础框架，实际使用时建议转换为VSDX格式。
  */
 
-import { VsdxShape, VsdxPage, VsdxDocument } from './vsdxParser'
+import { VsdxDocument } from './vsdxParser'
 
 /**
  * VSD文件头信息
@@ -159,7 +159,7 @@ function extractTextFromVsd(arrayBuffer: ArrayBuffer): string | null {
  * 尝试将VSD转换为VSDX
  * 注意：这需要服务器端支持或第三方库
  */
-export async function convertVsdToVsdx(arrayBuffer: ArrayBuffer): Promise<ArrayBuffer | null> {
+export async function convertVsdToVsdx(_arrayBuffer: ArrayBuffer): Promise<ArrayBuffer | null> {
   console.warn('VSD到VSDX的转换需要服务器端支持')
   console.warn('建议：使用Microsoft Visio或在线转换工具')
   

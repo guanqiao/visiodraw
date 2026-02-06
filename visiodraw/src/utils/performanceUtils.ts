@@ -87,12 +87,13 @@ export const performanceMonitor = new PerformanceMonitor()
 /**
  * 防抖函数
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function debounce<T extends (...args: any[]) => void>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
   let timeout: ReturnType<typeof setTimeout> | null = null
-  
+
   return (...args: Parameters<T>) => {
     if (timeout) {
       clearTimeout(timeout)
@@ -106,12 +107,13 @@ export function debounce<T extends (...args: any[]) => void>(
 /**
  * 节流函数
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function throttle<T extends (...args: any[]) => void>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
   let inThrottle = false
-  
+
   return (...args: Parameters<T>) => {
     if (!inThrottle) {
       func(...args)
@@ -212,7 +214,11 @@ export function getVisibleShapeIndices(
  */
 export function getMemoryUsage(): { used: number; total: number; limit: number } | null {
   if (typeof performance !== 'undefined' && 'memory' in performance) {
-    const memory = (performance as any).memory
+    const memory = (performance as unknown as { memory: {
+      usedJSHeapSize: number
+      totalJSHeapSize: number
+      jsHeapSizeLimit: number
+    } }).memory
     return {
       used: memory.usedJSHeapSize,
       total: memory.totalJSHeapSize,

@@ -3,19 +3,6 @@
  */
 
 import React, { useEffect, useRef } from 'react'
-import {
-  ScissorOutlined,
-  CopyOutlined,
-  SnippetsOutlined,
-  DeleteOutlined,
-  GroupOutlined,
-  UngroupOutlined,
-  VerticalAlignTopOutlined,
-  VerticalAlignBottomOutlined,
-  AlignLeftOutlined,
-  AlignCenterOutlined,
-  AlignRightOutlined,
-} from '@ant-design/icons'
 
 export interface ContextMenuItem {
   key: string
