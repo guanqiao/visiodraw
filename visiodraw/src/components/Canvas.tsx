@@ -15,6 +15,7 @@ import {
   generateDefaultConnectionPoints,
   calculateConnectionPointPosition,
 } from '@utils/connectionPoints'
+import { createConnectorObjects } from '@utils/connectorRenderer'
 import { defaultConnectionPointOptions } from '../types/connection'
 import type { ConnectionPoint } from '../types/connection'
 import type { DragData, DropPosition } from '../types/dragDrop'
@@ -25,6 +26,7 @@ const Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null)
   const connectionPointsRef = useRef<fabric.Circle[]>([])
+  const connectorsRef = useRef<Map<string, { path: fabric.Object; endPoints: fabric.Object[] }>>(new Map())
   const {
     setCanvas,
     currentTool,
@@ -36,6 +38,7 @@ const Canvas: React.FC = () => {
     selectedShapeId,
     shapes,
     deleteShape,
+    connectors,
   } = useCanvasStore()
 
   // 右键菜单状态
@@ -400,6 +403,29 @@ const Canvas: React.FC = () => {
     handleDropShape(position, dragData)
   }, [handleDropShape])
 
+  // 渲染连接线
+  const renderConnectors = useCallback(() => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    // 清除现有连接线
+    connectorsRef.current.forEach((connector) => {
+      canvas.remove(connector.path)
+      connector.endPoints.forEach((ep) => canvas.remove(ep))
+    })
+    connectorsRef.current.clear()
+
+    // 渲染新连接线
+    connectors.forEach((connector) => {
+      const { path, endPoints } = createConnectorObjects(connector, shapes)
+      if (path) {
+        canvas.add(path)
+        endPoints.forEach((ep) => canvas.add(ep))
+        connectorsRef.current.set(connector.id, { path, endPoints })
+      }
+    })
+  }, [connectors, shapes])
+
   // 同步shapes到画布
   useEffect(() => {
     const canvas = fabricCanvasRef.current
@@ -486,8 +512,11 @@ const Canvas: React.FC = () => {
       }
     })
 
+    // 渲染连接线
+    renderConnectors()
+
     canvas.renderAll()
-  }, [shapes])
+  }, [shapes, renderConnectors])
 
   // 更新选中状态
   useEffect(() => {

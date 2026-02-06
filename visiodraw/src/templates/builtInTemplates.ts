@@ -1,9 +1,12 @@
 /**
  * 内置模板库
+ * @version 1.5.0
+ * @date 2026-02-07
  */
 
 import { Template } from './types'
 import { v4 as uuidv4 } from 'uuid'
+import { Connector } from '../types/connection'
 
 // 简单流程图模板
 export const simpleFlowchartTemplate: Template = {
@@ -11,14 +14,14 @@ export const simpleFlowchartTemplate: Template = {
   name: '简单流程图',
   description: '包含开始、处理、判断、结束的基本流程图',
   category: 'flowchart',
-  version: '1.0.0',
+  version: '1.5.0',
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
   isBuiltIn: true,
   shapes: [
     // 开始
     {
-      id: uuidv4(),
+      id: 'flow-start',
       type: 'start-end',
       x: 350,
       y: 50,
@@ -31,7 +34,7 @@ export const simpleFlowchartTemplate: Template = {
     },
     // 输入
     {
-      id: uuidv4(),
+      id: 'flow-input',
       type: 'input-output',
       x: 320,
       y: 150,
@@ -44,7 +47,7 @@ export const simpleFlowchartTemplate: Template = {
     },
     // 处理
     {
-      id: uuidv4(),
+      id: 'flow-process',
       type: 'process',
       x: 320,
       y: 250,
@@ -57,7 +60,7 @@ export const simpleFlowchartTemplate: Template = {
     },
     // 判断
     {
-      id: uuidv4(),
+      id: 'flow-decision',
       type: 'decision',
       x: 350,
       y: 380,
@@ -70,7 +73,7 @@ export const simpleFlowchartTemplate: Template = {
     },
     // 无效处理
     {
-      id: uuidv4(),
+      id: 'flow-error',
       type: 'process',
       x: 550,
       y: 390,
@@ -83,7 +86,7 @@ export const simpleFlowchartTemplate: Template = {
     },
     // 输出
     {
-      id: uuidv4(),
+      id: 'flow-output',
       type: 'input-output',
       x: 320,
       y: 530,
@@ -96,7 +99,7 @@ export const simpleFlowchartTemplate: Template = {
     },
     // 结束
     {
-      id: uuidv4(),
+      id: 'flow-end',
       type: 'start-end',
       x: 350,
       y: 630,
@@ -108,6 +111,101 @@ export const simpleFlowchartTemplate: Template = {
       text: '结束',
     },
   ],
+  connectors: [
+    // 开始 → 输入数据
+    {
+      id: 'conn-1',
+      sourceShapeId: 'flow-start',
+      sourcePointId: 'bottom',
+      targetShapeId: 'flow-input',
+      targetPointId: 'top',
+      style: 'straight',
+      startStyle: 'none',
+      endStyle: 'arrow',
+      stroke: '#666666',
+      strokeWidth: 1.5,
+    },
+    // 输入数据 → 处理数据
+    {
+      id: 'conn-2',
+      sourceShapeId: 'flow-input',
+      sourcePointId: 'bottom',
+      targetShapeId: 'flow-process',
+      targetPointId: 'top',
+      style: 'straight',
+      startStyle: 'none',
+      endStyle: 'arrow',
+      stroke: '#666666',
+      strokeWidth: 1.5,
+    },
+    // 处理数据 → 判断
+    {
+      id: 'conn-3',
+      sourceShapeId: 'flow-process',
+      sourcePointId: 'bottom',
+      targetShapeId: 'flow-decision',
+      targetPointId: 'top',
+      style: 'straight',
+      startStyle: 'none',
+      endStyle: 'arrow',
+      stroke: '#666666',
+      strokeWidth: 1.5,
+    },
+    // 判断 → 显示错误（否分支）
+    {
+      id: 'conn-4',
+      sourceShapeId: 'flow-decision',
+      sourcePointId: 'right',
+      targetShapeId: 'flow-error',
+      targetPointId: 'left',
+      style: 'orthogonal',
+      startStyle: 'none',
+      endStyle: 'arrow',
+      stroke: '#f5222d',
+      strokeWidth: 1.5,
+      label: '否',
+    },
+    // 判断 → 输出结果（是分支）
+    {
+      id: 'conn-5',
+      sourceShapeId: 'flow-decision',
+      sourcePointId: 'bottom',
+      targetShapeId: 'flow-output',
+      targetPointId: 'top',
+      style: 'straight',
+      startStyle: 'none',
+      endStyle: 'arrow',
+      stroke: '#52c41a',
+      strokeWidth: 1.5,
+      label: '是',
+    },
+    // 显示错误 → 输出结果
+    {
+      id: 'conn-6',
+      sourceShapeId: 'flow-error',
+      sourcePointId: 'bottom',
+      targetShapeId: 'flow-output',
+      targetPointId: 'right',
+      style: 'orthogonal',
+      startStyle: 'none',
+      endStyle: 'arrow',
+      stroke: '#666666',
+      strokeWidth: 1.5,
+    },
+    // 输出结果 → 结束
+    {
+      id: 'conn-7',
+      sourceShapeId: 'flow-output',
+      sourcePointId: 'bottom',
+      targetShapeId: 'flow-end',
+      targetPointId: 'top',
+      style: 'straight',
+      startStyle: 'none',
+      endStyle: 'arrow',
+      stroke: '#666666',
+      strokeWidth: 1.5,
+    },
+  ] as Connector[],
 }
 
 // 组织结构图模板
