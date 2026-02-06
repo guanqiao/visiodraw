@@ -92,7 +92,6 @@ const App: React.FC = () => {
           canvas.discardActiveObject()
           const objects = canvas.getObjects()
           if (objects.length > 0) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const ActiveSelection = (window as unknown as { fabric: { ActiveSelection: new(objects: unknown[], options: { canvas: unknown }) => unknown } }).fabric.ActiveSelection
             const selection = new ActiveSelection(objects, { canvas })
             canvas.setActiveObject(selection as unknown as fabric.Object)

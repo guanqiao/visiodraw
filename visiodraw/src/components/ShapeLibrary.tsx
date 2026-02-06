@@ -1,11 +1,7 @@
 import React, { useState } from 'react'
-import { Collapse, Tabs } from 'antd'
-import useCanvasStore from '@stores/canvasStore'
-import { v4 as uuidv4 } from 'uuid'
+import { Collapse, Tabs, Tooltip } from 'antd'
 import StencilBrowser from './StencilBrowser'
-
-const { Panel } = Collapse
-const { TabPane } = Tabs
+import { createDragData } from '../types/dragDrop'
 
 // 基础图形
 const basicShapes = [
@@ -148,7 +144,7 @@ const connectorShapes = [
         <line x1="5" y1="20" x2="35" y2="20" stroke="#333" strokeWidth="2" />
       </svg>
     ),
-    defaultProps: { stroke: '#333333', strokeWidth: 2 },
+    defaultProps: { width: 100, height: 2, fill: 'transparent', stroke: '#333333', strokeWidth: 2 },
   },
   {
     type: 'arrow',
@@ -159,7 +155,7 @@ const connectorShapes = [
         <polygon points="30,15 35,20 30,25" fill="#333" />
       </svg>
     ),
-    defaultProps: { stroke: '#333333', strokeWidth: 2, arrow: true },
+    defaultProps: { width: 100, height: 2, fill: 'transparent', stroke: '#333333', strokeWidth: 2, arrow: true },
   },
   {
     type: 'double-arrow',
@@ -171,57 +167,126 @@ const connectorShapes = [
         <polygon points="30,15 35,20 30,25" fill="#333" />
       </svg>
     ),
-    defaultProps: { stroke: '#333333', strokeWidth: 2, doubleArrow: true },
+    defaultProps: { width: 100, height: 2, fill: 'transparent', stroke: '#333333', strokeWidth: 2, doubleArrow: true },
   },
 ]
 
-const ShapeLibrary: React.FC = () => {
-  const { addShape, setTool } = useCanvasStore()
-  const [activeTab, setActiveTab] = useState('shapes')
+// 图形项组件
+interface ShapeItemProps {
+  shape: {
+    type: string
+    name: string
+    icon: React.ReactNode
+    defaultProps: Record<string, unknown>
+  }
+}
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const handleShapeClick = (shape: any) => {
-    const newShape = {
-      id: uuidv4(),
-      type: shape.type,
-      x: 100,
-      y: 100,
-      strokeWidth: 2,
-      ...shape.defaultProps,
-    }
-    addShape(newShape)
-    setTool('select')
+const ShapeItem: React.FC<ShapeItemProps> = ({ shape }) => {
+  const [isDragging, setIsDragging] = useState(false)
+
+  const handleDragStart = (e: React.DragEvent) => {
+    setIsDragging(true)
+
+    const dragData = createDragData('shape', {
+      shapeType: shape.type,
+      name: shape.name,
+      defaultProps: shape.defaultProps,
+      width: (shape.defaultProps.width as number) || 100,
+      height: (shape.defaultProps.height as number) || 60,
+    })
+
+    e.dataTransfer.setData('application/x-visiodraw-shape', JSON.stringify(dragData))
+    e.dataTransfer.effectAllowed = 'copy'
+
+    // 创建拖拽预览
+    const dragPreview = document.createElement('div')
+    dragPreview.style.width = '60px'
+    dragPreview.style.height = '60px'
+    dragPreview.style.background = 'rgba(24, 144, 255, 0.2)'
+    dragPreview.style.border = '2px solid #1890ff'
+    dragPreview.style.borderRadius = '4px'
+    dragPreview.style.display = 'flex'
+    dragPreview.style.alignItems = 'center'
+    dragPreview.style.justifyContent = 'center'
+    dragPreview.style.position = 'fixed'
+    dragPreview.style.top = '-100px'
+    dragPreview.innerHTML = `<span style="font-size: 10px; color: #1890ff;">${shape.name.slice(0, 4)}</span>`
+    document.body.appendChild(dragPreview)
+
+    e.dataTransfer.setDragImage(dragPreview, 30, 30)
+
+    // 清理预览元素
+    setTimeout(() => {
+      document.body.removeChild(dragPreview)
+    }, 0)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const renderShapeGrid = (shapes: any[]) => (
+  const handleDragEnd = () => {
+    setIsDragging(false)
+  }
+
+  return (
+    <Tooltip title={`拖拽或点击添加"${shape.name}"`} placement="right">
+      <div
+        className={`shape-item ${isDragging ? 'dragging' : ''}`}
+        draggable
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        {shape.icon}
+        <span>{shape.name}</span>
+      </div>
+    </Tooltip>
+  )
+}
+
+const ShapeLibrary: React.FC = () => {
+  const [activeTab, setActiveTab] = useState('shapes')
+
+  const renderShapeGrid = (shapes: typeof basicShapes) => (
     <div className="shape-library">
       {shapes.map((shape) => (
-        <div
-          key={shape.type}
-          className="shape-item"
-          onClick={() => handleShapeClick(shape)}
-        >
-          {shape.icon}
-          <span>{shape.name}</span>
-        </div>
+        <ShapeItem key={shape.type} shape={shape} />
       ))}
     </div>
   )
 
   const renderBasicShapes = () => (
-    <Collapse defaultActiveKey={['basic', 'flowchart']} bordered={false}>
-      <Panel header="基础图形" key="basic">
-        {renderShapeGrid(basicShapes)}
-      </Panel>
-      <Panel header="流程图" key="flowchart">
-        {renderShapeGrid(flowchartShapes)}
-      </Panel>
-      <Panel header="连接线" key="connector">
-        {renderShapeGrid(connectorShapes)}
-      </Panel>
-    </Collapse>
+    <Collapse
+      defaultActiveKey={['basic', 'flowchart']}
+      bordered={false}
+      items={[
+        {
+          key: 'basic',
+          label: '基础图形',
+          children: renderShapeGrid(basicShapes),
+        },
+        {
+          key: 'flowchart',
+          label: '流程图',
+          children: renderShapeGrid(flowchartShapes),
+        },
+        {
+          key: 'connector',
+          label: '连接线',
+          children: renderShapeGrid(connectorShapes),
+        },
+      ]}
+    />
   )
+
+  const tabItems = [
+    {
+      key: 'shapes',
+      label: '基础图形',
+      children: renderBasicShapes(),
+    },
+    {
+      key: 'stencils',
+      label: 'Visio模具',
+      children: <StencilBrowser visible={activeTab === 'stencils'} />,
+    },
+  ]
 
   return (
     <Tabs
@@ -229,14 +294,8 @@ const ShapeLibrary: React.FC = () => {
       onChange={setActiveTab}
       size="small"
       style={{ height: '100%' }}
-    >
-      <TabPane tab="基础图形" key="shapes">
-        {renderBasicShapes()}
-      </TabPane>
-      <TabPane tab="Visio模具" key="stencils">
-        <StencilBrowser visible={activeTab === 'stencils'} />
-      </TabPane>
-    </Tabs>
+      items={tabItems}
+    />
   )
 }
 

@@ -37,3 +37,75 @@
   position: relative;
   overflow: hidden;
 }
+
+/* 图形库样式 */
+.shape-library {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 8px;
+}
+
+.shape-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fafafa;
+  cursor: grab;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.shape-item:hover {
+  border-color: #1890ff;
+  background: #e6f7ff;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.shape-item:active {
+  cursor: grabbing;
+}
+
+.shape-item.dragging {
+  opacity: 0.6;
+  border-color: #1890ff;
+  background: #e6f7ff;
+}
+
+.shape-item svg {
+  width: 32px;
+  height: 32px;
+  margin-bottom: 4px;
+}
+
+.shape-item span {
+  font-size: 11px;
+  color: #595959;
+  text-align: center;
+}
+
+/* 画布网格背景 */
+.canvas-grid {
+  background-image:
+    linear-gradient(to right, #e8e8e8 1px, transparent 1px),
+    linear-gradient(to bottom, #e8e8e8 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* 拖拽时的全局样式 */
+body.dragging {
+  cursor: grabbing !important;
+}
+
+/* 拖拽预览样式 */
+.drag-preview {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.8;
+}

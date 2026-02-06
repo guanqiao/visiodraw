@@ -1,8 +1,11 @@
 /**
  * 模板系统类型定义
+ * @version 1.5.0
+ * @date 2026-02-07
  */
 
 import { Shape } from '@stores/canvasStore'
+import { Connector } from '../types/connection'
 
 export type TemplateCategory = 'flowchart' | 'org' | 'network' | 'uml' | 'custom'
 
@@ -13,6 +16,7 @@ export interface Template {
   category: TemplateCategory
   thumbnail?: string
   shapes: Shape[]
+  connectors?: Connector[]
   version: string
   createdAt: string
   updatedAt: string

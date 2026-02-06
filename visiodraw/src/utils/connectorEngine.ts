@@ -137,10 +137,11 @@ function calculateCurvedPath(
   start: PathPoint,
   end: PathPoint,
   startPosition: string,
-  _endPosition: string
+  endPosition: string
 ): PathPoint[] {
   // 获取方向向量
   const startDir = getConnectionPointDirection(startPosition as 'top' | 'bottom' | 'left' | 'right' | 'custom');
+  const endDir = getConnectionPointDirection(endPosition as 'top' | 'bottom' | 'left' | 'right' | 'custom');
 
   // 计算控制点距离
   const distance = Math.sqrt(Math.pow(end.x - start.x, 2) + Math.pow(end.y - start.y, 2));

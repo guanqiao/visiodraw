@@ -17,9 +17,12 @@ import {
 } from '@utils/connectionPoints'
 import { defaultConnectionPointOptions } from '../types/connection'
 import type { ConnectionPoint } from '../types/connection'
+import type { DragData, DropPosition } from '../types/dragDrop'
+import { parseDragData } from '../types/dragDrop'
 
 const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null)
   const connectionPointsRef = useRef<fabric.Circle[]>([])
   const {
@@ -44,6 +47,9 @@ const Canvas: React.FC = () => {
 
   // 悬停的图形ID
   const [, setHoveredShapeId] = useState<string | null>(null)
+
+  // 拖拽状态
+  const [isDragOver, setIsDragOver] = useState(false)
 
   // 初始化Fabric.js画布
   useEffect(() => {
@@ -208,7 +214,6 @@ const Canvas: React.FC = () => {
 
     if (shape) {
       const id = uuidv4()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ;(shape as unknown as { id: string }).id = id
       canvas.add(shape)
       canvas.setActiveObject(shape)
@@ -232,6 +237,168 @@ const Canvas: React.FC = () => {
       })
     }
   }
+
+  // 处理从模具拖拽添加图形
+  const handleDropShape = useCallback((position: DropPosition, dragData: DragData) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    const id = uuidv4()
+    const defaultProps = dragData.defaultProps || {}
+
+    // 计算放置位置（考虑画布缩放）
+    const canvasRect = canvasRef.current?.getBoundingClientRect()
+    if (!canvasRect) return
+
+    const zoom = canvas.getZoom()
+    const x = (position.x - canvasRect.left) / zoom
+    const y = (position.y - canvasRect.top) / zoom
+
+    // 根据拖拽数据创建图形
+    const shapeType = dragData.shapeType || 'rectangle'
+    const width = dragData.width || 100
+    const height = dragData.height || 60
+    const fill = (defaultProps.fill as string) || '#e6f7ff'
+    const stroke = (defaultProps.stroke as string) || '#1890ff'
+    const strokeWidth = (defaultProps.strokeWidth as number) || 2
+
+    // 创建 Fabric.js 图形
+    let shape: fabric.Object | null = null
+    const commonProps = {
+      left: x - width / 2,
+      top: y - height / 2,
+      fill,
+      stroke,
+      strokeWidth,
+      selectable: true,
+      evented: true,
+    }
+
+    switch (shapeType) {
+      case 'rectangle':
+      case 'process':
+        shape = new fabric.Rect({
+          ...commonProps,
+          width,
+          height,
+        })
+        break
+      case 'rounded-rectangle':
+        shape = new fabric.Rect({
+          ...commonProps,
+          width,
+          height,
+          rx: (defaultProps.rx as number) || 10,
+          ry: (defaultProps.ry as number) || 10,
+        })
+        break
+      case 'circle':
+      case 'start-end':
+        shape = new fabric.Circle({
+          ...commonProps,
+          radius: (defaultProps.radius as number) || width / 2,
+        })
+        break
+      case 'ellipse':
+        shape = new fabric.Ellipse({
+          ...commonProps,
+          rx: (defaultProps.rx as number) || width / 2,
+          ry: (defaultProps.ry as number) || height / 2,
+        })
+        break
+      case 'triangle':
+      case 'decision':
+        shape = new fabric.Triangle({
+          ...commonProps,
+          width,
+          height,
+        })
+        break
+      case 'diamond': {
+        // 菱形使用Path绘制
+        const halfW = width / 2
+        const halfH = height / 2
+        shape = new fabric.Path(
+          `M ${halfW} 0 L ${width} ${halfH} L ${halfW} ${height} L 0 ${halfH} Z`,
+          {
+            ...commonProps,
+          }
+        )
+        break
+      }
+      case 'line':
+        shape = new fabric.Line([x, y, x + width, y], {
+          stroke,
+          strokeWidth,
+          selectable: true,
+          evented: true,
+        })
+        break
+      default:
+        // 默认矩形
+        shape = new fabric.Rect({
+          ...commonProps,
+          width,
+          height,
+        })
+    }
+
+    if (shape) {
+      (shape as unknown as { id: string }).id = id
+      canvas.add(shape)
+      canvas.setActiveObject(shape)
+      canvas.renderAll()
+
+      // 生成连接点
+      const connectionPoints = generateDefaultConnectionPoints(shapeType)
+
+      // 添加到store
+      addShape({
+        id,
+        type: shapeType,
+        x: x - width / 2,
+        y: y - height / 2,
+        width,
+        height,
+        fill,
+        stroke,
+        strokeWidth,
+        text: dragData.name,
+        connectionPoints,
+      })
+    }
+  }, [addShape])
+
+  // 拖拽事件处理
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'copy'
+    setIsDragOver(true)
+  }, [])
+
+  const handleDragLeave = useCallback(() => {
+    setIsDragOver(false)
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const dragData = parseDragData(e.dataTransfer)
+    if (!dragData) return
+
+    const canvasRect = containerRef.current?.getBoundingClientRect()
+    if (!canvasRect) return
+
+    const position: DropPosition = {
+      x: e.clientX,
+      y: e.clientY,
+      canvasX: e.clientX - canvasRect.left,
+      canvasY: e.clientY - canvasRect.top,
+    }
+
+    handleDropShape(position, dragData)
+  }, [handleDropShape])
 
   // 同步shapes到画布
   useEffect(() => {
@@ -311,7 +478,6 @@ const Canvas: React.FC = () => {
       }
 
       if (shape) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (shape as unknown as { id: string }).id = shapeData.id
         if (shapeData.angle) shape.set('angle', shapeData.angle)
         if (shapeData.scaleX) shape.set('scaleX', shapeData.scaleX)
@@ -390,11 +556,11 @@ const Canvas: React.FC = () => {
           selectable: false,
           evented: true,
           hoverCursor: 'crosshair',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          connectionPointId: point.id,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          shapeId: shape.id,
         })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(circle as any).connectionPointId = point.id
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ;(circle as any).shapeId = shape.id
 
         // 鼠标悬停效果
         circle.on('mouseover', () => {
@@ -567,6 +733,7 @@ const Canvas: React.FC = () => {
 
   return (
     <div
+      ref={containerRef}
       style={{
         width: '100%',
         height: '100%',
@@ -574,18 +741,45 @@ const Canvas: React.FC = () => {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#f0f2f5',
+        backgroundColor: isDragOver ? '#e6f7ff' : '#f0f2f5',
+        transition: 'background-color 0.2s ease',
+        border: isDragOver ? '2px dashed #1890ff' : '2px solid transparent',
       }}
       onContextMenu={(e) => e.preventDefault()}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div
         style={{
           boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
           backgroundColor: '#fff',
+          position: 'relative',
         }}
         className={gridEnabled ? 'canvas-grid' : ''}
       >
         <canvas ref={canvasRef} />
+        
+        {/* 拖拽提示 */}
+        {isDragOver && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              background: 'rgba(24, 144, 255, 0.9)',
+              color: '#fff',
+              padding: '12px 24px',
+              borderRadius: '6px',
+              fontSize: '14px',
+              pointerEvents: 'none',
+              zIndex: 1000,
+            }}
+          >
+            释放鼠标添加图形
+          </div>
+        )}
       </div>
 
       {/* 右键菜单 */}
