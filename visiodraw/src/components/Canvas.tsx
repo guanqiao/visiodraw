@@ -1212,7 +1212,7 @@ const Canvas: React.FC = () => {
         const originalStroke = shapeData.stroke
         const originalStrokeWidth = shapeData.strokeWidth
 
-        shape.on('mouseover', function() {
+        shape.on('mouseover', function(this: fabric.Object) {
           this.set({
             stroke: '#40a9ff',
             strokeWidth: (originalStrokeWidth || 2) + 1,
@@ -1220,7 +1220,7 @@ const Canvas: React.FC = () => {
           canvas.renderAll()
         })
 
-        shape.on('mouseout', function() {
+        shape.on('mouseout', function(this: fabric.Object) {
           // 检查是否被选中
           const isSelected = selectedShapeIds.includes(shapeData.id)
           this.set({

@@ -20,6 +20,7 @@ export interface ClipboardState {
   paste: () => ClipboardItem | null
   clear: () => void
   resetPasteCount: () => void
+  hasItems: () => boolean
 }
 
 const useClipboardStore = create<ClipboardState>()(
@@ -94,6 +95,12 @@ const useClipboardStore = create<ClipboardState>()(
       // 重置粘贴计数
       resetPasteCount: () => {
         set({ pasteCount: 0 })
+      },
+
+      // 检查剪贴板是否有内容
+      hasItems: () => {
+        const { clipboard } = get()
+        return clipboard !== null && clipboard.shapes.length > 0
       },
     }),
     { name: 'clipboard-store' }

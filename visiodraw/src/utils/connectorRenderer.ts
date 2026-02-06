@@ -326,7 +326,7 @@ export function createConnectorObjects(
   }
 
   // 添加悬停效果
-  path.on('mouseover', function() {
+  path.on('mouseover', function(this: fabric.Path | fabric.Line) {
     this.set({
       stroke: '#40a9ff',
       strokeWidth: baseStrokeWidth + 1,
@@ -336,7 +336,7 @@ export function createConnectorObjects(
     if (canvas) canvas.renderAll()
   })
 
-  path.on('mouseout', function() {
+  path.on('mouseout', function(this: fabric.Path | fabric.Line) {
     if (!isSelected) {
       this.set({
         stroke: connector.stroke,
