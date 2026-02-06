@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useRef } from 'react'
 import { Button, Switch, Tooltip, Divider, Slider } from 'antd'
 import {
   EyeOutlined,
@@ -24,24 +24,22 @@ const RulerPanel: React.FC = () => {
 
   // 使用本地状态来避免Slider拖动时的频繁更新
   const [localInterval, setLocalInterval] = useState(rulerInterval)
-
-  // 当store中的值变化时，更新本地状态
-  React.useEffect(() => {
-    setLocalInterval(rulerInterval)
-  }, [rulerInterval])
-
-  // 处理Slider变化完成
-  const handleSliderChange = useCallback((value: number) => {
-    setLocalInterval(value)
-  }, [])
-
-  // 处理Slider变化完成
-  const handleSliderChangeComplete = useCallback((value: number) => {
-    setRulerInterval(value)
-  }, [setRulerInterval])
+  const isDraggingRef = useRef(false)
 
   const horizontalGuides = guideLines.filter((g) => g.orientation === 'horizontal')
   const verticalGuides = guideLines.filter((g) => g.orientation === 'vertical')
+
+  // 处理Slider变化 - 只更新本地状态
+  const handleSliderChange = useCallback((value: number) => {
+    isDraggingRef.current = true
+    setLocalInterval(value)
+  }, [])
+
+  // 处理Slider变化完成 - 更新store
+  const handleSliderAfterChange = useCallback((value: number) => {
+    isDraggingRef.current = false
+    setRulerInterval(value)
+  }, [setRulerInterval])
 
   return (
     <div className="ruler-panel">
@@ -80,7 +78,7 @@ const RulerPanel: React.FC = () => {
           <Slider
             value={localInterval}
             onChange={handleSliderChange}
-            onChangeComplete={handleSliderChangeComplete}
+            onAfterChange={handleSliderAfterChange}
             min={10}
             max={100}
             step={10}
