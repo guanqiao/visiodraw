@@ -268,6 +268,57 @@ const ShapeItem: React.FC<ShapeItemProps> = ({ shape, isFavorite, onToggleFavori
   )
 }
 
+// 图形网格组件
+interface ShapeGridProps {
+  shapes: ShapeDefinition[]
+  searchQuery: string
+  isFavorite: (type: string) => boolean
+  onToggleFavorite: (shape: ShapeDefinition) => void
+  onUseShape: (shape: ShapeDefinition) => void
+  showEmpty?: boolean
+}
+
+const ShapeGrid: React.FC<ShapeGridProps> = ({
+  shapes,
+  searchQuery,
+  isFavorite,
+  onToggleFavorite,
+  onUseShape,
+  showEmpty = true,
+}) => {
+  const filtered = useMemo(() => {
+    if (!searchQuery.trim()) return shapes
+    const query = searchQuery.toLowerCase()
+    return shapes.filter(
+      (shape) =>
+        shape.name.toLowerCase().includes(query) ||
+        shape.type.toLowerCase().includes(query)
+    )
+  }, [shapes, searchQuery])
+
+  if (filtered.length === 0 && showEmpty) {
+    return (
+      <div className="shape-library-empty">
+        {searchQuery ? '未找到匹配的图形' : '暂无图形'}
+      </div>
+    )
+  }
+
+  return (
+    <div className="shape-library-grid">
+      {filtered.map((shape) => (
+        <ShapeItem
+          key={shape.type}
+          shape={shape}
+          isFavorite={isFavorite(shape.type)}
+          onToggleFavorite={onToggleFavorite}
+          onUseShape={onUseShape}
+        />
+      ))}
+    </div>
+  )
+}
+
 const ShapeLibrary: React.FC = () => {
   const [activeTab, setActiveTab] = useState('shapes')
   const [searchQuery, setSearchQuery] = useState('')
@@ -303,84 +354,70 @@ const ShapeLibrary: React.FC = () => {
     })
   }, [])
 
-  // 过滤图形
-  const filterShapes = useCallback((shapes: ShapeDefinition[]) => {
-    if (!searchQuery.trim()) return shapes
-    const query = searchQuery.toLowerCase()
-    return shapes.filter(
-      (shape) =>
-        shape.name.toLowerCase().includes(query) ||
-        shape.type.toLowerCase().includes(query)
-    )
-  }, [searchQuery])
-
   // 获取收藏的图形数据
   const favoriteShapes = useMemo(() => {
     return allShapes.filter((shape) => favorites.includes(shape.type))
   }, [favorites])
 
-  // 渲染图形网格
-  const renderShapeGrid = (shapes: ShapeDefinition[], showEmpty: boolean = true) => {
-    const filtered = filterShapes(shapes)
-    if (filtered.length === 0 && showEmpty) {
-      return (
-        <div className="shape-library-empty">
-          {searchQuery ? '未找到匹配的图形' : '暂无图形'}
-        </div>
-      )
-    }
-    return (
-      <div className="shape-library-grid">
-        {filtered.map((shape) => (
-          <ShapeItem
-            key={shape.type}
-            shape={shape}
-            isFavorite={isFavorite(shape.type)}
-            onToggleFavorite={toggleFavorite}
-            onUseShape={recordUsage}
-          />
-        ))}
-      </div>
-    )
-  }
-
-  // 渲染基础图形面板
-  const renderBasicShapes = () => (
-    <Collapse
-      defaultActiveKey={['basic', 'flowchart', 'connector', 'recent']}
-      bordered={false}
-      className="shape-library-collapse"
-    >
-      {recentlyUsed.length > 0 && (
-        <Collapse.Panel
-          header={
-            <span>
-              <ClockCircleOutlined style={{ marginRight: 8 }} />
-              最近使用
-            </span>
-          }
-          key="recent"
-        >
-          {renderShapeGrid(recentlyUsed)}
-        </Collapse.Panel>
-      )}
-      <Collapse.Panel header="基础图形" key="basic">
-        {renderShapeGrid(basicShapes)}
-      </Collapse.Panel>
-      <Collapse.Panel header="流程图" key="flowchart">
-        {renderShapeGrid(flowchartShapes)}
-      </Collapse.Panel>
-      <Collapse.Panel header="连接线" key="connector">
-        {renderShapeGrid(connectorShapes)}
-      </Collapse.Panel>
-    </Collapse>
-  )
-
-  const tabItems = [
+  // 使用useMemo缓存tabItems，避免每次渲染都创建新的对象
+  const tabItems = useMemo(() => [
     {
       key: 'shapes',
       label: '基础图形',
-      children: renderBasicShapes(),
+      children: (
+        <Collapse
+          defaultActiveKey={['basic', 'flowchart', 'connector', 'recent']}
+          bordered={false}
+          className="shape-library-collapse"
+        >
+          {recentlyUsed.length > 0 && (
+            <Collapse.Panel
+              header={
+                <span>
+                  <ClockCircleOutlined style={{ marginRight: 8 }} />
+                  最近使用
+                </span>
+              }
+              key="recent"
+            >
+              <ShapeGrid
+                shapes={recentlyUsed}
+                searchQuery={searchQuery}
+                isFavorite={isFavorite}
+                onToggleFavorite={toggleFavorite}
+                onUseShape={recordUsage}
+              />
+            </Collapse.Panel>
+          )}
+          <Collapse.Panel header="基础图形" key="basic">
+            <ShapeGrid
+              shapes={basicShapes}
+              searchQuery={searchQuery}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+              onUseShape={recordUsage}
+            />
+          </Collapse.Panel>
+          <Collapse.Panel header="流程图" key="flowchart">
+            <ShapeGrid
+              shapes={flowchartShapes}
+              searchQuery={searchQuery}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+              onUseShape={recordUsage}
+            />
+          </Collapse.Panel>
+          <Collapse.Panel header="连接线" key="connector">
+            <ShapeGrid
+              shapes={connectorShapes}
+              searchQuery={searchQuery}
+              isFavorite={isFavorite}
+              onToggleFavorite={toggleFavorite}
+              onUseShape={recordUsage}
+            />
+          </Collapse.Panel>
+        </Collapse>
+      ),
     },
     {
       key: 'favorites',
@@ -398,7 +435,15 @@ const ShapeLibrary: React.FC = () => {
       label: 'Visio模具',
       children: <StencilBrowser visible={activeTab === 'stencils'} />,
     },
-  ]
+  ], [
+    recentlyUsed,
+    searchQuery,
+    isFavorite,
+    toggleFavorite,
+    recordUsage,
+    favoriteShapes,
+    activeTab,
+  ])
 
   return (
     <div className="shape-library-container">
