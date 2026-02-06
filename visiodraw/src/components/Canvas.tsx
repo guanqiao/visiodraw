@@ -708,7 +708,7 @@ const Canvas: React.FC = () => {
         connectorsRef.current.set(connector.id, { path, endPoints })
       }
     })
-  }, [connectors, shapes, selectedConnectorId])
+  }, [connectors, shapes])
 
   // 同步shapes到画布
   useEffect(() => {

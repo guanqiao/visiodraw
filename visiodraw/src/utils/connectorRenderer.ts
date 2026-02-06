@@ -320,6 +320,7 @@ export function createConnectorObjects(
   }
 
   // 设置连接线ID和类型
+  // eslint-disable-next-line no-extra-semi
   ;(path as unknown as { id: string }).id = connector.id
   ;(path as unknown as { type: string }).type = 'connector'
 
