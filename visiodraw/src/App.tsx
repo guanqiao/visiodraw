@@ -51,20 +51,11 @@ const App: React.FC = () => {
   } = useCanvasStore()
 
   const { copy, cut, paste } = useClipboardStore()
-  const { currentTheme } = useThemeStore()
 
-  // 初始化主题
+  // 初始化主题（只需要执行一次）
   useEffect(() => {
     initTheme()
   }, [])
-
-  // 监听主题变化并应用
-  useEffect(() => {
-    const cssVariables = useThemeStore.getState().getThemeCSSVariables()
-    Object.entries(cssVariables).forEach(([key, value]) => {
-      document.documentElement.style.setProperty(key, value)
-    })
-  }, [currentTheme])
 
   // 注册键盘快捷键
   useKeyboardShortcuts(
