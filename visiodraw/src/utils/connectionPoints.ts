@@ -304,3 +304,133 @@ export function getConnectionPointDirection(position: ConnectionPointPosition): 
       return { x: 0, y: 0 };
   }
 }
+
+/**
+ * 计算鼠标位置到图形边缘的最近点
+ * @param shape 图形对象
+ * @param mouseX 鼠标X坐标
+ * @param mouseY 鼠标Y坐标
+ * @returns 最近边缘点信息
+ */
+export function getNearestEdgePoint(
+  shape: Shape,
+  mouseX: number,
+  mouseY: number
+): { x: number; y: number; position: ConnectionPointPosition; distance: number } {
+  // 计算到四条边的距离
+  const distances = [
+    { position: 'top' as ConnectionPointPosition, distance: Math.abs(mouseY - shape.y), x: mouseX, y: shape.y },
+    { position: 'bottom' as ConnectionPointPosition, distance: Math.abs(mouseY - (shape.y + shape.height)), x: mouseX, y: shape.y + shape.height },
+    { position: 'left' as ConnectionPointPosition, distance: Math.abs(mouseX - shape.x), x: shape.x, y: mouseY },
+    { position: 'right' as ConnectionPointPosition, distance: Math.abs(mouseX - (shape.x + shape.width)), x: shape.x + shape.width, y: mouseY },
+  ];
+
+  // 找到最近的边
+  const nearest = distances.reduce((min, current) => (current.distance < min.distance ? current : min));
+
+  // 限制坐标在图形边缘范围内
+  let finalX = nearest.x;
+  let finalY = nearest.y;
+
+  if (nearest.position === 'top' || nearest.position === 'bottom') {
+    finalX = Math.max(shape.x, Math.min(shape.x + shape.width, mouseX));
+  } else {
+    finalY = Math.max(shape.y, Math.min(shape.y + shape.height, mouseY));
+  }
+
+  return {
+    x: finalX,
+    y: finalY,
+    position: nearest.position,
+    distance: nearest.distance,
+  };
+}
+
+/**
+ * 查找最近的连接点或边缘点（扩大吸附范围）
+ * @param x 目标X坐标
+ * @param y 目标Y坐标
+ * @param shapes 图形数组
+ * @param threshold 距离阈值（默认20px）
+ * @returns 最近的连接点信息或null
+ */
+export function findNearestConnectionPointEnhanced(
+  x: number,
+  y: number,
+  shapes: Shape[],
+  threshold: number = 20
+): { shape: Shape; connectionPoint: ConnectionPoint; distance: number; isEdgePoint: boolean; edgePosition?: ConnectionPointPosition } | null {
+  let nearest: { shape: Shape; connectionPoint: ConnectionPoint; distance: number; isEdgePoint: boolean; edgePosition?: ConnectionPointPosition } | null = null;
+  let minDistance = threshold;
+
+  for (const shape of shapes) {
+    // 首先检查是否有预定义的连接点
+    if (shape.connectionPoints && shape.connectionPoints.length > 0) {
+      for (const point of shape.connectionPoints) {
+        const pos = calculateConnectionPointPosition(shape, point);
+        const distance = Math.sqrt(Math.pow(x - pos.x, 2) + Math.pow(y - pos.y, 2));
+
+        if (distance < minDistance) {
+          minDistance = distance;
+          nearest = { shape, connectionPoint: point, distance, isEdgePoint: false };
+        }
+      }
+    }
+
+    // 如果没有找到预定义连接点，检查图形边缘
+    if (!nearest || minDistance > 10) {
+      const edgePoint = getNearestEdgePoint(shape, x, y);
+      if (edgePoint.distance < minDistance) {
+        // 创建临时连接点
+        const relativeX = (edgePoint.x - shape.x) / shape.width;
+        const relativeY = (edgePoint.y - shape.y) / shape.height;
+        const tempPoint: ConnectionPoint = {
+          id: `temp-${edgePoint.position}`,
+          x: relativeX,
+          y: relativeY,
+          position: edgePoint.position,
+          isVisible: true,
+          isConnected: false,
+          connectedLineIds: [],
+        };
+
+        minDistance = edgePoint.distance;
+        nearest = {
+          shape,
+          connectionPoint: tempPoint,
+          distance: edgePoint.distance,
+          isEdgePoint: true,
+          edgePosition: edgePoint.position,
+        };
+      }
+    }
+  }
+
+  return nearest;
+}
+
+/**
+ * 检查点是否在图形边缘附近
+ * @param shape 图形对象
+ * @param x 点X坐标
+ * @param y 点Y坐标
+ * @param threshold 阈值（像素）
+ * @returns 是否在边缘附近
+ */
+export function isNearShapeEdge(shape: Shape, x: number, y: number, threshold: number = 15): boolean {
+  // 检查是否在图形边界框内
+  const inBounds = x >= shape.x - threshold &&
+    x <= shape.x + shape.width + threshold &&
+    y >= shape.y - threshold &&
+    y <= shape.y + shape.height + threshold;
+
+  if (!inBounds) return false;
+
+  // 检查是否在边缘附近（不在内部太深）
+  const nearEdge = x <= shape.x + threshold ||
+    x >= shape.x + shape.width - threshold ||
+    y <= shape.y + threshold ||
+    y >= shape.y + shape.height - threshold;
+
+  return nearEdge;
+}

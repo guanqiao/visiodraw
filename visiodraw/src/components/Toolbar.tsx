@@ -49,6 +49,7 @@ const Toolbar: React.FC = () => {
     { key: 'circle', icon: <BorderOutlined />, title: '圆形' },
     { key: 'line', icon: <LineOutlined />, title: '线条' },
     { key: 'text', icon: <FontSizeOutlined />, title: '文本' },
+    { key: 'connector', icon: <LineOutlined />, title: '连接线' },
   ]
 
   const handleZoomIn = () => {

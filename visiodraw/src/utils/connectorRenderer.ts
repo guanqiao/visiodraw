@@ -295,28 +295,33 @@ export function createConnectorObjects(
 
   // 创建路径对象
   let path: fabric.Path | fabric.Line
+  const isSelected = connector.isSelected || false
+
   if (connector.style === 'straight' && points.length === 2) {
     // 直线使用Line对象
     path = new fabric.Line([points[0].x, points[0].y, points[1].x, points[1].y], {
-      stroke: connector.stroke,
-      strokeWidth: connector.strokeWidth,
-      selectable: false,
-      evented: false,
+      stroke: isSelected ? '#1890ff' : connector.stroke,
+      strokeWidth: isSelected ? connector.strokeWidth + 1 : connector.strokeWidth,
+      selectable: true,
+      evented: true,
+      hoverCursor: 'pointer',
     })
   } else {
     // 正交线和曲线使用Path对象
     const pathString = pointsToPath(points, connector.style)
     path = new fabric.Path(pathString, {
       fill: '',
-      stroke: connector.stroke,
-      strokeWidth: connector.strokeWidth,
-      selectable: false,
-      evented: false,
+      stroke: isSelected ? '#1890ff' : connector.stroke,
+      strokeWidth: isSelected ? connector.strokeWidth + 1 : connector.strokeWidth,
+      selectable: true,
+      evented: true,
+      hoverCursor: 'pointer',
     })
   }
 
-  // 设置连接线ID
-  (path as unknown as { id: string }).id = connector.id
+  // 设置连接线ID和类型
+  ;(path as unknown as { id: string }).id = connector.id
+  ;(path as unknown as { type: string }).type = 'connector'
 
   // 创建端点
   const endPoints: fabric.Object[] = []

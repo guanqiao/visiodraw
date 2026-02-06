@@ -67,6 +67,8 @@ export interface Connector {
   label?: string;
   /** 路径点（用于正交线和曲线） */
   pathPoints?: { x: number; y: number }[];
+  /** 是否被选中 */
+  isSelected?: boolean;
 }
 
 /**
@@ -91,13 +93,43 @@ export interface ConnectionPointRenderOptions {
  * 默认连接点渲染选项
  */
 export const defaultConnectionPointOptions: ConnectionPointRenderOptions = {
-  radius: 5,
+  radius: 6,
   fill: '#ffffff',
   connectedFill: '#52c41a',
   hoverFill: '#1890ff',
   stroke: '#1890ff',
-  strokeWidth: 1,
+  strokeWidth: 2,
 };
+
+/**
+ * 连接点交互状态
+ */
+export interface ConnectionPointState {
+  /** 是否高亮 */
+  isHighlighted: boolean;
+  /** 是否可吸附 */
+  isSnappable: boolean;
+  /** 吸附距离 */
+  snapDistance: number;
+}
+
+/**
+ * 连接线绘制状态
+ */
+export interface ConnectorDrawingState {
+  /** 是否正在绘制 */
+  isDrawing: boolean;
+  /** 起始图形ID */
+  sourceShapeId: string | null;
+  /** 起始连接点ID */
+  sourcePointId: string | null;
+  /** 起始位置 */
+  startPosition: { x: number; y: number } | null;
+  /** 当前鼠标位置 */
+  currentPosition: { x: number; y: number } | null;
+  /** 当前线型 */
+  style: ConnectorStyle;
+}
 
 /**
  * 图形类型与默认连接点数量的映射

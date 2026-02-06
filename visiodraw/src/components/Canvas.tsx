@@ -14,10 +14,13 @@ import { throttle } from '@utils/performanceUtils'
 import {
   generateDefaultConnectionPoints,
   calculateConnectionPointPosition,
+  findNearestConnectionPointEnhanced,
+  getNearestEdgePoint,
+  isNearShapeEdge,
 } from '@utils/connectionPoints'
-import { createConnectorObjects } from '@utils/connectorRenderer'
+import { createConnectorObjects, calculateStraightPath, calculateOrthogonalPath, calculateCurvedPath, pointsToPath } from '@utils/connectorRenderer'
 import { defaultConnectionPointOptions } from '../types/connection'
-import type { ConnectionPoint } from '../types/connection'
+import type { ConnectionPoint, ConnectorStyle } from '../types/connection'
 import type { DragData, DropPosition } from '../types/dragDrop'
 import { parseDragData } from '../types/dragDrop'
 
@@ -27,6 +30,14 @@ const Canvas: React.FC = () => {
   const fabricCanvasRef = useRef<fabric.Canvas | null>(null)
   const connectionPointsRef = useRef<fabric.Circle[]>([])
   const connectorsRef = useRef<Map<string, { path: fabric.Object; endPoints: fabric.Object[] }>>(new Map())
+
+  // 连接线绘制状态
+  const isDrawingLineRef = useRef(false)
+  const lineStartRef = useRef<{ x: number; y: number; shapeId?: string; pointId?: string } | null>(null)
+  const previewLineRef = useRef<fabric.Path | null>(null)
+  const snapIndicatorRef = useRef<fabric.Circle | null>(null)
+  const currentLineStyleRef = useRef<ConnectorStyle>('straight')
+
   const {
     setCanvas,
     currentTool,
@@ -39,6 +50,8 @@ const Canvas: React.FC = () => {
     shapes,
     deleteShape,
     connectors,
+    addConnector,
+    selectConnector,
   } = useCanvasStore()
 
   // 右键菜单状态
@@ -47,9 +60,6 @@ const Canvas: React.FC = () => {
     x: number
     y: number
   }>({ visible: false, x: 0, y: 0 })
-
-  // 悬停的图形ID
-  const [, setHoveredShapeId] = useState<string | null>(null)
 
   // 拖拽状态
   const [isDragOver, setIsDragOver] = useState(false)
@@ -81,7 +91,15 @@ const Canvas: React.FC = () => {
     canvas.on('selection:created', (e: any) => {
       const activeObject = e.selected?.[0]
       if (activeObject && activeObject.id) {
-        selectShape(activeObject.id as string)
+        // 检查是否是连接线
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((activeObject as any).type === 'connector') {
+          selectConnector(activeObject.id as string)
+          selectShape(null)
+        } else {
+          selectShape(activeObject.id as string)
+          selectConnector(null)
+        }
       }
     })
 
@@ -89,12 +107,21 @@ const Canvas: React.FC = () => {
     canvas.on('selection:updated', (e: any) => {
       const activeObject = e.selected?.[0]
       if (activeObject && activeObject.id) {
-        selectShape(activeObject.id as string)
+        // 检查是否是连接线
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ((activeObject as any).type === 'connector') {
+          selectConnector(activeObject.id as string)
+          selectShape(null)
+        } else {
+          selectShape(activeObject.id as string)
+          selectConnector(null)
+        }
       }
     })
 
     canvas.on('selection:cleared', () => {
       selectShape(null)
+      selectConnector(null)
     })
 
     // 监听对象修改事件
@@ -107,30 +134,153 @@ const Canvas: React.FC = () => {
       }
     })
 
-    // 监听鼠标点击事件（用于绘制新图形）
+    // 监听鼠标按下事件（开始绘制连接线）
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     canvas.on('mouse:down', (e: any) => {
       // 隐藏右键菜单
       setContextMenu((prev) => ({ ...prev, visible: false }))
 
-      if (currentTool !== 'select' && e.target === null) {
-        const mousePointer = canvas.getPointer(e.e)
-        handleDrawShape(mousePointer.x, mousePointer.y)
-      }
-    })
-
-    // 监听右键点击事件
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    canvas.on('mouse:down', (e: any) => {
+      // 处理右键
       if (e.e.button === 2) {
-        // 右键
         e.e.preventDefault()
         setContextMenu({
           visible: true,
           x: e.e.clientX,
           y: e.e.clientY,
         })
+        return
       }
+
+      // 处理左键
+      if (e.e.button === 0) {
+        const pointer = canvas.getPointer(e.e)
+        const target = e.target
+
+        // 连接线工具模式：从图形边缘开始画线
+        if (currentTool === 'connector' && target && target.id) {
+          const shape = shapes.find((s) => s.id === target.id)
+          if (shape) {
+            const edgePoint = getNearestEdgePoint(shape, pointer.x, pointer.y)
+            isDrawingLineRef.current = true
+            lineStartRef.current = { x: edgePoint.x, y: edgePoint.y, shapeId: shape.id }
+            currentLineStyleRef.current = 'straight'
+            createPreviewLine(edgePoint.x, edgePoint.y, edgePoint.x, edgePoint.y)
+            return
+          }
+        }
+
+        // 检查是否点击在连接点上
+        if (target && (target as unknown as { connectionPointId?: string }).connectionPointId) {
+          const connectionPointId = (target as unknown as { connectionPointId: string }).connectionPointId
+          const shapeId = (target as unknown as { shapeId: string }).shapeId
+
+          // 开始绘制连接线
+          isDrawingLineRef.current = true
+          const pos = calculateConnectionPointPosition(
+            shapes.find((s) => s.id === shapeId)!,
+            shapes.find((s) => s.id === shapeId)!.connectionPoints!.find((p) => p.id === connectionPointId)!
+          )
+          lineStartRef.current = { x: pos.x, y: pos.y, shapeId, pointId: connectionPointId }
+          currentLineStyleRef.current = 'straight'
+
+          // 创建预览线
+          createPreviewLine(pos.x, pos.y, pos.x, pos.y)
+          return
+        }
+
+        // 检查是否点击在图形边缘附近
+        if (target && target.id) {
+          const shape = shapes.find((s) => s.id === target.id)
+          if (shape && isNearShapeEdge(shape, pointer.x, pointer.y, 20)) {
+            // 从边缘开始绘制
+            const edgePoint = getNearestEdgePoint(shape, pointer.x, pointer.y)
+            isDrawingLineRef.current = true
+            lineStartRef.current = { x: edgePoint.x, y: edgePoint.y, shapeId: shape.id }
+            currentLineStyleRef.current = 'straight'
+            createPreviewLine(edgePoint.x, edgePoint.y, edgePoint.x, edgePoint.y)
+            return
+          }
+        }
+
+        // 处理绘制新图形
+        if (currentTool !== 'select' && currentTool !== 'connector' && target === null) {
+          handleDrawShape(pointer.x, pointer.y)
+        }
+      }
+    })
+
+    // 监听鼠标移动事件（更新预览线）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const throttledMouseMove = throttle((e: any) => {
+      if (!isDrawingLineRef.current || !lineStartRef.current) return
+
+      const pointer = canvas.getPointer(e.e)
+      const start = lineStartRef.current
+
+      // 查找最近的连接点或边缘点
+      const nearest = findNearestConnectionPointEnhanced(pointer.x, pointer.y, shapes, 25)
+
+      let endX = pointer.x
+      let endY = pointer.y
+
+      // 如果找到可吸附的点，显示吸附指示器
+      if (nearest && nearest.distance < 20) {
+        const pos = calculateConnectionPointPosition(nearest.shape, nearest.connectionPoint)
+        endX = pos.x
+        endY = pos.y
+        showSnapIndicator(pos.x, pos.y)
+      } else {
+        hideSnapIndicator()
+      }
+
+      // 更新预览线
+      updatePreviewLine(start.x, start.y, endX, endY)
+    }, 16)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('mouse:move', (e: any) => {
+      throttledMouseMove(e)
+
+      // 处理鼠标悬停高亮
+      if (!isDrawingLineRef.current) {
+        handleMouseHover(e)
+      }
+    })
+
+    // 监听鼠标释放事件（完成绘制连接线）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('mouse:up', (e: any) => {
+      if (!isDrawingLineRef.current || !lineStartRef.current) return
+
+      const pointer = canvas.getPointer(e.e)
+      const start = lineStartRef.current
+
+      // 查找目标连接点
+      const nearest = findNearestConnectionPointEnhanced(pointer.x, pointer.y, shapes, 25)
+
+      if (nearest && nearest.shape.id !== start.shapeId) {
+        // 创建连接线
+        const newConnector = {
+          id: `connector-${Date.now()}`,
+          sourceShapeId: start.shapeId!,
+          sourcePointId: start.pointId || `edge-${nearest.connectionPoint.position}`,
+          targetShapeId: nearest.shape.id,
+          targetPointId: nearest.connectionPoint.id,
+          style: currentLineStyleRef.current,
+          startStyle: 'none' as const,
+          endStyle: 'arrow' as const,
+          stroke: '#333333',
+          strokeWidth: 2,
+        }
+        addConnector(newConnector)
+      }
+
+      // 清理
+      isDrawingLineRef.current = false
+      lineStartRef.current = null
+      removePreviewLine()
+      hideSnapIndicator()
+      canvas.renderAll()
     })
 
     // 监听滚轮缩放（使用节流优化）
@@ -142,7 +292,7 @@ const Canvas: React.FC = () => {
       newZoom = Math.max(0.1, Math.min(newZoom, 3))
       canvas.zoomToPoint({ x: e.e.offsetX, y: e.e.offsetY }, newZoom)
       setZoom(newZoom)
-    }, 16) // 约60fps
+    }, 16)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     canvas.on('mouse:wheel', (e: any) => {
@@ -157,7 +307,134 @@ const Canvas: React.FC = () => {
       fabricCanvasRef.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [shapes, currentTool])
+
+  // 处理鼠标悬停高亮
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleMouseHover = (e: any) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    const pointer = canvas.getPointer(e.e)
+    const target = e.target
+
+    // 连接线工具模式：高亮图形边缘
+    if (currentTool === 'connector' && target && target.id) {
+      const shape = shapes.find((s) => s.id === target.id)
+      if (shape && isNearShapeEdge(shape, pointer.x, pointer.y, 25)) {
+        const edgePoint = getNearestEdgePoint(shape, pointer.x, pointer.y)
+        showSnapIndicator(edgePoint.x, edgePoint.y, 8, 'rgba(24, 144, 255, 0.5)')
+        canvas.defaultCursor = 'crosshair'
+        return
+      }
+    }
+
+    // 普通模式：高亮连接点
+    const nearest = findNearestConnectionPointEnhanced(pointer.x, pointer.y, shapes, 20)
+
+    if (nearest) {
+      const pos = calculateConnectionPointPosition(nearest.shape, nearest.connectionPoint)
+      showSnapIndicator(pos.x, pos.y, 8, 'rgba(24, 144, 255, 0.3)')
+      canvas.defaultCursor = 'crosshair'
+    } else {
+      hideSnapIndicator()
+      canvas.defaultCursor = currentTool === 'connector' ? 'crosshair' : 'default'
+    }
+  }
+
+  // 创建预览线
+  const createPreviewLine = (x1: number, y1: number, x2: number, y2: number) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    removePreviewLine()
+
+    const pathString = `M ${x1} ${y1} L ${x2} ${y2}`
+    const path = new fabric.Path(pathString, {
+      stroke: '#1890ff',
+      strokeWidth: 2,
+      strokeDashArray: [5, 5],
+      fill: '',
+      selectable: false,
+      evented: false,
+      opacity: 0.8,
+    })
+
+    previewLineRef.current = path
+    canvas.add(path)
+    canvas.renderAll()
+  }
+
+  // 更新预览线
+  const updatePreviewLine = (x1: number, y1: number, x2: number, y2: number) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas || !previewLineRef.current) return
+
+    let pathString: string
+
+    switch (currentLineStyleRef.current) {
+      case 'orthogonal': {
+        const points = calculateOrthogonalPath({ x: x1, y: y1 }, { x: x2, y: y2 })
+        pathString = pointsToPath(points, 'orthogonal')
+        break
+      }
+      case 'curved': {
+        const points = calculateCurvedPath({ x: x1, y: y1 }, { x: x2, y: y2 })
+        pathString = pointsToPath(points, 'curved')
+        break
+      }
+      case 'straight':
+      default: {
+        const points = calculateStraightPath({ x: x1, y: y1 }, { x: x2, y: y2 })
+        pathString = pointsToPath(points, 'straight')
+        break
+      }
+    }
+
+    previewLineRef.current.set({ path: pathString })
+    canvas.renderAll()
+  }
+
+  // 移除预览线
+  const removePreviewLine = () => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas || !previewLineRef.current) return
+
+    canvas.remove(previewLineRef.current)
+    previewLineRef.current = null
+  }
+
+  // 显示吸附指示器
+  const showSnapIndicator = (x: number, y: number, radius: number = 10, color: string = 'rgba(82, 196, 26, 0.4)') => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    if (snapIndicatorRef.current) {
+      snapIndicatorRef.current.set({ left: x - radius, top: y - radius, radius, fill: color })
+    } else {
+      const indicator = new fabric.Circle({
+        left: x - radius,
+        top: y - radius,
+        radius,
+        fill: color,
+        selectable: false,
+        evented: false,
+      })
+      snapIndicatorRef.current = indicator
+      canvas.add(indicator)
+    }
+    canvas.renderAll()
+  }
+
+  // 隐藏吸附指示器
+  const hideSnapIndicator = () => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas || !snapIndicatorRef.current) return
+
+    canvas.remove(snapIndicatorRef.current)
+    snapIndicatorRef.current = null
+    canvas.renderAll()
+  }
 
   // 处理绘制图形
   const handleDrawShape = (x: number, y: number) => {
@@ -330,6 +607,8 @@ const Canvas: React.FC = () => {
         break
       }
       case 'line':
+      case 'arrow':
+      case 'double-arrow':
         shape = new fabric.Line([x, y, x + width, y], {
           stroke,
           strokeWidth,
@@ -417,14 +696,19 @@ const Canvas: React.FC = () => {
 
     // 渲染新连接线
     connectors.forEach((connector) => {
-      const { path, endPoints } = createConnectorObjects(connector, shapes)
+      // 添加选中状态
+      const connectorWithSelection = {
+        ...connector,
+        isSelected: connector.id === selectedConnectorId,
+      }
+      const { path, endPoints } = createConnectorObjects(connectorWithSelection, shapes)
       if (path) {
         canvas.add(path)
         endPoints.forEach((ep) => canvas.add(ep))
         connectorsRef.current.set(connector.id, { path, endPoints })
       }
     })
-  }, [connectors, shapes])
+  }, [connectors, shapes, selectedConnectorId])
 
   // 同步shapes到画布
   useEffect(() => {
@@ -591,19 +875,26 @@ const Canvas: React.FC = () => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ;(circle as any).shapeId = shape.id
 
-        // 鼠标悬停效果
+        // 鼠标悬停效果 - 放大
         circle.on('mouseover', () => {
-          circle.set('fill', defaultConnectionPointOptions.hoverFill)
+          circle.set({
+            fill: defaultConnectionPointOptions.hoverFill,
+            radius: defaultConnectionPointOptions.radius + 2,
+            left: pos.x - defaultConnectionPointOptions.radius - 2,
+            top: pos.y - defaultConnectionPointOptions.radius - 2,
+          })
           canvas.renderAll()
         })
 
         circle.on('mouseout', () => {
-          circle.set(
-            'fill',
-            isConnected
+          circle.set({
+            fill: isConnected
               ? defaultConnectionPointOptions.connectedFill
-              : defaultConnectionPointOptions.fill
-          )
+              : defaultConnectionPointOptions.fill,
+            radius: defaultConnectionPointOptions.radius,
+            left: pos.x - defaultConnectionPointOptions.radius,
+            top: pos.y - defaultConnectionPointOptions.radius,
+          })
           canvas.renderAll()
         })
 
@@ -627,7 +918,6 @@ const Canvas: React.FC = () => {
       if (target && target.id && target.id !== selectedShapeId) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const shapeId = (target as any).id as string
-        setHoveredShapeId(shapeId)
         renderConnectionPoints(shapeId)
       }
     }
@@ -638,13 +928,7 @@ const Canvas: React.FC = () => {
       if (target && target.id && target.id !== selectedShapeId) {
         // 延迟清除，避免闪烁
         setTimeout(() => {
-          setHoveredShapeId((prev) => {
-            if (prev === target.id) {
-              renderConnectionPoints(null)
-              return null
-            }
-            return prev
-          })
+          renderConnectionPoints(null)
         }, 100)
       }
     }
@@ -788,7 +1072,7 @@ const Canvas: React.FC = () => {
         className={gridEnabled ? 'canvas-grid' : ''}
       >
         <canvas ref={canvasRef} />
-        
+
         {/* 拖拽提示 */}
         {isDragOver && (
           <div
