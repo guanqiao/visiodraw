@@ -52,8 +52,15 @@
 }
 
 .right-panel-container .theme-selector {
-  height: 30%;
-  min-height: 150px;
+  height: 25%;
+  min-height: 120px;
+  border-top: 1px solid #e8e8e8;
+  overflow-y: auto;
+}
+
+.right-panel-container .ruler-panel {
+  height: 20%;
+  min-height: 100px;
   border-top: 1px solid #e8e8e8;
   overflow-y: auto;
 }
