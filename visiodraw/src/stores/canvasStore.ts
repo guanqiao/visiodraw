@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
+import { optimizeHistory, deepClone, performanceMonitor } from '@utils/performanceUtils'
 
 export interface Shape {
   id: string
@@ -168,17 +169,18 @@ const useCanvasStore = create<CanvasState>()(
 
       // 保存历史记录
       saveHistory: () => {
+        performanceMonitor.start('saveHistory')
         const { shapes, history, historyIndex } = get()
         const newHistory = history.slice(0, historyIndex + 1)
-        newHistory.push([...shapes])
-        // 限制历史记录长度
-        if (newHistory.length > 50) {
-          newHistory.shift()
-        }
+        // 使用深克隆避免引用问题
+        newHistory.push(deepClone(shapes))
+        // 优化历史记录大小
+        const optimizedHistory = optimizeHistory(newHistory, 50)
         set({
-          history: newHistory,
-          historyIndex: newHistory.length - 1,
+          history: optimizedHistory,
+          historyIndex: optimizedHistory.length - 1,
         })
+        performanceMonitor.end('saveHistory')
       },
 
       // 新建画布

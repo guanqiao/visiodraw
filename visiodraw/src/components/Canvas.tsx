@@ -13,6 +13,7 @@ import {
   VerticalAlignTopOutlined,
   VerticalAlignBottomOutlined,
 } from '@ant-design/icons'
+import { throttle, performanceMonitor } from '@utils/performanceUtils'
 
 const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -114,14 +115,18 @@ const Canvas: React.FC = () => {
       }
     })
 
-    // 监听滚轮缩放
-    canvas.on('mouse:wheel', (e) => {
+    // 监听滚轮缩放（使用节流优化）
+    const throttledZoom = throttle((e: fabric.IEvent<WheelEvent>) => {
       const delta = e.e.deltaY
       let newZoom = canvas.getZoom()
       newZoom *= 0.999 ** delta
       newZoom = Math.max(0.1, Math.min(newZoom, 3))
       canvas.zoomToPoint({ x: e.e.offsetX, y: e.e.offsetY }, newZoom)
       setZoom(newZoom)
+    }, 16) // 约60fps
+
+    canvas.on('mouse:wheel', (e) => {
+      throttledZoom(e)
       e.e.preventDefault()
       e.e.stopPropagation()
     })
