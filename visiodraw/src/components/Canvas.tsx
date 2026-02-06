@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
 import useCanvasStore from '@stores/canvasStore'
+import useClipboardStore from '@stores/clipboardStore'
+import useLayerStore from '@stores/layerStore'
 import { v4 as uuidv4 } from 'uuid'
 import ContextMenu, { ContextMenuItem } from './ContextMenu'
 import {
@@ -22,6 +24,7 @@ import { createConnectorObjects, calculateStraightPath, calculateOrthogonalPath,
 import { defaultConnectionPointOptions } from '../types/connection'
 import type { ConnectionPoint, ConnectorStyle } from '../types/connection'
 import type { DragData, DropPosition } from '../types/dragDrop'
+import type { Shape } from '@stores/canvasStore'
 import { parseDragData } from '../types/dragDrop'
 
 const Canvas: React.FC = () => {
@@ -38,21 +41,57 @@ const Canvas: React.FC = () => {
   const snapIndicatorRef = useRef<fabric.Circle | null>(null)
   const currentLineStyleRef = useRef<ConnectorStyle>('straight')
 
+  // 拖拽绘制状态
+  const isDrawingShapeRef = useRef(false)
+  const shapeStartRef = useRef<{ x: number; y: number } | null>(null)
+  const previewShapeRef = useRef<fabric.Object | null>(null)
+
+  // 框选状态
+  const isBoxSelectingRef = useRef(false)
+  const boxSelectStartRef = useRef<{ x: number; y: number } | null>(null)
+  const selectionRectRef = useRef<fabric.Rect | null>(null)
+
+  // 对齐辅助线状态
+  const alignmentLinesRef = useRef<fabric.Line[]>([])
+  const SNAP_THRESHOLD = 10 // 吸附阈值（像素）
+
   const {
     setCanvas,
     currentTool,
     gridEnabled,
     zoom,
     setZoom,
+    setTool,
     addShape,
+    addShapes,
     selectShape,
+    selectShapes,
     selectedShapeId,
+    selectedShapeIds,
     shapes,
     deleteShape,
+    deleteShapes,
     connectors,
     addConnector,
     selectConnector,
+    selectedConnectorId,
+    smartToolMode,
+    autoSwitchToSelect,
+    toggleShapeSelection,
+    clearSelection,
   } = useCanvasStore()
+
+  const { copy, cut, paste } = useClipboardStore()
+
+  // 图层状态
+  const {
+    getVisibleLayerIds,
+    getLockedLayerIds,
+  } = useLayerStore()
+
+  // 获取可见和锁定的图层ID - 用于后续图层功能扩展
+  getVisibleLayerIds()
+  getLockedLayerIds()
 
   // 右键菜单状态
   const [contextMenu, setContextMenu] = useState<{
@@ -131,10 +170,28 @@ const Canvas: React.FC = () => {
       if (obj && obj.id) {
         // 更新store中的形状数据
         console.log('对象已修改:', obj.id)
+        // 清除对齐辅助线
+        clearAlignmentLines()
       }
     })
 
-    // 监听鼠标按下事件（开始绘制连接线）
+    // 监听对象移动事件（显示对齐辅助线）
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canvas.on('object:moving', (e: any) => {
+      const obj = e.target
+      if (obj && obj.id) {
+        const shape = shapes.find((s) => s.id === obj.id)
+        if (shape) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const left = (obj as any).left as number
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const top = (obj as any).top as number
+          showAlignmentLines(shape, left, top, shape.width, shape.height)
+        }
+      }
+    })
+
+    // 监听鼠标按下事件（开始绘制连接线、框选、多选）
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     canvas.on('mouse:down', (e: any) => {
       // 隐藏右键菜单
@@ -202,39 +259,87 @@ const Canvas: React.FC = () => {
           }
         }
 
-        // 处理绘制新图形
+        // 处理绘制新图形（拖拽绘制模式）
         if (currentTool !== 'select' && currentTool !== 'connector' && target === null) {
-          handleDrawShape(pointer.x, pointer.y)
+          isDrawingShapeRef.current = true
+          shapeStartRef.current = { x: pointer.x, y: pointer.y }
+          createPreviewShape(currentTool, pointer.x, pointer.y, 0, 0)
+          return
+        }
+
+        // 处理选择工具模式下的点击
+        if (currentTool === 'select') {
+          // Ctrl+点击：切换选中状态
+          if (e.e.ctrlKey || e.e.metaKey) {
+            if (target && target.id) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              toggleShapeSelection((target as any).id)
+            }
+            return
+          }
+
+          // 普通点击：单选
+          if (target && target.id) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            selectShape((target as any).id)
+          } else if (!target) {
+            // 点击空白处：开始框选
+            isBoxSelectingRef.current = true
+            boxSelectStartRef.current = { x: pointer.x, y: pointer.y }
+            createSelectionRect(pointer.x, pointer.y, 0, 0)
+          }
         }
       }
     })
 
-    // 监听鼠标移动事件（更新预览线）
+    // 监听鼠标移动事件（更新预览线和预览图形）
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const throttledMouseMove = throttle((e: any) => {
-      if (!isDrawingLineRef.current || !lineStartRef.current) return
-
       const pointer = canvas.getPointer(e.e)
-      const start = lineStartRef.current
 
-      // 查找最近的连接点或边缘点
-      const nearest = findNearestConnectionPointEnhanced(pointer.x, pointer.y, shapes, 25)
+      // 处理连接线绘制
+      if (isDrawingLineRef.current && lineStartRef.current) {
+        const start = lineStartRef.current
 
-      let endX = pointer.x
-      let endY = pointer.y
+        // 查找最近的连接点或边缘点
+        const nearest = findNearestConnectionPointEnhanced(pointer.x, pointer.y, shapes, 25)
 
-      // 如果找到可吸附的点，显示吸附指示器
-      if (nearest && nearest.distance < 20) {
-        const pos = calculateConnectionPointPosition(nearest.shape, nearest.connectionPoint)
-        endX = pos.x
-        endY = pos.y
-        showSnapIndicator(pos.x, pos.y)
-      } else {
-        hideSnapIndicator()
+        let endX = pointer.x
+        let endY = pointer.y
+
+        // 如果找到可吸附的点，显示吸附指示器
+        if (nearest && nearest.distance < 20) {
+          const pos = calculateConnectionPointPosition(nearest.shape, nearest.connectionPoint)
+          endX = pos.x
+          endY = pos.y
+          showSnapIndicator(pos.x, pos.y)
+        } else {
+          hideSnapIndicator()
+        }
+
+        // 更新预览线
+        updatePreviewLine(start.x, start.y, endX, endY)
       }
 
-      // 更新预览线
-      updatePreviewLine(start.x, start.y, endX, endY)
+      // 处理图形拖拽绘制
+      if (isDrawingShapeRef.current && shapeStartRef.current) {
+        const start = shapeStartRef.current
+        const width = Math.abs(pointer.x - start.x)
+        const height = Math.abs(pointer.y - start.y)
+        const left = Math.min(start.x, pointer.x)
+        const top = Math.min(start.y, pointer.y)
+        updatePreviewShape(left, top, width, height)
+      }
+
+      // 处理框选
+      if (isBoxSelectingRef.current && boxSelectStartRef.current) {
+        const start = boxSelectStartRef.current
+        const width = Math.abs(pointer.x - start.x)
+        const height = Math.abs(pointer.y - start.y)
+        const left = Math.min(start.x, pointer.x)
+        const top = Math.min(start.y, pointer.y)
+        updateSelectionRect(left, top, width, height)
+      }
     }, 16)
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -242,45 +347,109 @@ const Canvas: React.FC = () => {
       throttledMouseMove(e)
 
       // 处理鼠标悬停高亮
-      if (!isDrawingLineRef.current) {
+      if (!isDrawingLineRef.current && !isDrawingShapeRef.current && !isBoxSelectingRef.current) {
         handleMouseHover(e)
       }
     })
 
-    // 监听鼠标释放事件（完成绘制连接线）
+    // 监听鼠标释放事件（完成绘制连接线和图形）
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     canvas.on('mouse:up', (e: any) => {
-      if (!isDrawingLineRef.current || !lineStartRef.current) return
-
       const pointer = canvas.getPointer(e.e)
-      const start = lineStartRef.current
 
-      // 查找目标连接点
-      const nearest = findNearestConnectionPointEnhanced(pointer.x, pointer.y, shapes, 25)
+      // 处理连接线绘制完成
+      if (isDrawingLineRef.current && lineStartRef.current) {
+        const start = lineStartRef.current
 
-      if (nearest && nearest.shape.id !== start.shapeId) {
-        // 创建连接线
-        const newConnector = {
-          id: `connector-${Date.now()}`,
-          sourceShapeId: start.shapeId!,
-          sourcePointId: start.pointId || `edge-${nearest.connectionPoint.position}`,
-          targetShapeId: nearest.shape.id,
-          targetPointId: nearest.connectionPoint.id,
-          style: currentLineStyleRef.current,
-          startStyle: 'none' as const,
-          endStyle: 'arrow' as const,
-          stroke: '#333333',
-          strokeWidth: 2,
+        // 查找目标连接点
+        const nearest = findNearestConnectionPointEnhanced(pointer.x, pointer.y, shapes, 25)
+
+        if (nearest && nearest.shape.id !== start.shapeId) {
+          // 创建连接线
+          const newConnector = {
+            id: `connector-${Date.now()}`,
+            sourceShapeId: start.shapeId!,
+            sourcePointId: start.pointId || `edge-${nearest.connectionPoint.position}`,
+            targetShapeId: nearest.shape.id,
+            targetPointId: nearest.connectionPoint.id,
+            style: currentLineStyleRef.current,
+            startStyle: 'none' as const,
+            endStyle: 'arrow' as const,
+            stroke: '#333333',
+            strokeWidth: 2,
+          }
+          addConnector(newConnector)
         }
-        addConnector(newConnector)
+
+        // 清理连接线绘制状态
+        isDrawingLineRef.current = false
+        lineStartRef.current = null
+        removePreviewLine()
+        hideSnapIndicator()
+        canvas.renderAll()
       }
 
-      // 清理
-      isDrawingLineRef.current = false
-      lineStartRef.current = null
-      removePreviewLine()
-      hideSnapIndicator()
-      canvas.renderAll()
+      // 处理图形拖拽绘制完成
+      if (isDrawingShapeRef.current && shapeStartRef.current) {
+        const start = shapeStartRef.current
+        const width = Math.abs(pointer.x - start.x)
+        const height = Math.abs(pointer.y - start.y)
+
+        // 如果拖拽距离太小，使用默认尺寸
+        const finalWidth = width < 10 ? 100 : width
+        const finalHeight = height < 10 ? 60 : height
+        const left = Math.min(start.x, pointer.x)
+        const top = Math.min(start.y, pointer.y)
+
+        // 创建最终图形
+        finalizeDrawShape(currentTool, left, top, finalWidth, finalHeight)
+
+        // 清理图形绘制状态
+        isDrawingShapeRef.current = false
+        shapeStartRef.current = null
+        removePreviewShape()
+        canvas.renderAll()
+
+        // 智能工具模式：单次绘制后自动切换回选择工具
+        if (smartToolMode === 'single' && autoSwitchToSelect) {
+          setTool('select')
+        }
+      }
+
+      // 处理框选完成
+      if (isBoxSelectingRef.current && boxSelectStartRef.current) {
+        const start = boxSelectStartRef.current
+        const left = Math.min(start.x, pointer.x)
+        const top = Math.min(start.y, pointer.y)
+        const right = Math.max(start.x, pointer.x)
+        const bottom = Math.max(start.y, pointer.y)
+
+        // 查找框选区域内的图形
+        const selectedIds = shapes
+          .filter((shape) => {
+            const shapeRight = shape.x + shape.width
+            const shapeBottom = shape.y + shape.height
+            return (
+              shape.x >= left &&
+              shape.y >= top &&
+              shapeRight <= right &&
+              shapeBottom <= bottom
+            )
+          })
+          .map((s) => s.id)
+
+        if (selectedIds.length > 0) {
+          selectShapes(selectedIds)
+        } else {
+          clearSelection()
+        }
+
+        // 清理框选状态
+        isBoxSelectingRef.current = false
+        boxSelectStartRef.current = null
+        removeSelectionRect()
+        canvas.renderAll()
+      }
     })
 
     // 监听滚轮缩放（使用节流优化）
@@ -436,8 +605,268 @@ const Canvas: React.FC = () => {
     canvas.renderAll()
   }
 
-  // 处理绘制图形
-  const handleDrawShape = (x: number, y: number) => {
+  // 创建框选矩形
+  const createSelectionRect = (x: number, y: number, width: number, height: number) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    removeSelectionRect()
+
+    const rect = new fabric.Rect({
+      left: x,
+      top: y,
+      width: width || 1,
+      height: height || 1,
+      fill: 'rgba(24, 144, 255, 0.1)',
+      stroke: '#1890ff',
+      strokeWidth: 1,
+      strokeDashArray: [3, 3],
+      selectable: false,
+      evented: false,
+    })
+
+    selectionRectRef.current = rect
+    canvas.add(rect)
+    canvas.renderAll()
+  }
+
+  // 更新框选矩形
+  const updateSelectionRect = (left: number, top: number, width: number, height: number) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas || !selectionRectRef.current) return
+
+    selectionRectRef.current.set({
+      left,
+      top,
+      width: Math.max(width, 1),
+      height: Math.max(height, 1),
+    })
+    canvas.renderAll()
+  }
+
+  // 移除框选矩形
+  const removeSelectionRect = () => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas || !selectionRectRef.current) return
+
+    canvas.remove(selectionRectRef.current)
+    selectionRectRef.current = null
+  }
+
+  // 对齐辅助线功能
+  const clearAlignmentLines = () => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    alignmentLinesRef.current.forEach((line) => {
+      canvas.remove(line)
+    })
+    alignmentLinesRef.current = []
+  }
+
+  const showAlignmentLines = (
+    targetShape: Shape,
+    newX: number,
+    newY: number,
+    newWidth: number,
+    newHeight: number
+  ) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    clearAlignmentLines()
+
+    const targetCenterX = newX + newWidth / 2
+    const targetCenterY = newY + newHeight / 2
+    const targetRight = newX + newWidth
+    const targetBottom = newY + newHeight
+
+    const lines: fabric.Line[] = []
+    const canvasWidth = canvas.width || 800
+    const canvasHeight = canvas.height || 600
+
+    // 检查与其他图形的对齐
+    shapes.forEach((shape) => {
+      if (shape.id === targetShape.id) return
+
+      const shapeCenterX = shape.x + shape.width / 2
+      const shapeCenterY = shape.y + shape.height / 2
+      const shapeRight = shape.x + shape.width
+      const shapeBottom = shape.y + shape.height
+
+      // 左对齐
+      if (Math.abs(newX - shape.x) < SNAP_THRESHOLD) {
+        lines.push(
+          new fabric.Line([shape.x, 0, shape.x, canvasHeight], {
+            stroke: '#1890ff',
+            strokeWidth: 1,
+            strokeDashArray: [3, 3],
+            selectable: false,
+            evented: false,
+          })
+        )
+      }
+
+      // 水平居中对齐
+      if (Math.abs(targetCenterX - shapeCenterX) < SNAP_THRESHOLD) {
+        lines.push(
+          new fabric.Line([shapeCenterX, 0, shapeCenterX, canvasHeight], {
+            stroke: '#1890ff',
+            strokeWidth: 1,
+            strokeDashArray: [3, 3],
+            selectable: false,
+            evented: false,
+          })
+        )
+      }
+
+      // 右对齐
+      if (Math.abs(targetRight - shapeRight) < SNAP_THRESHOLD) {
+        lines.push(
+          new fabric.Line([shapeRight, 0, shapeRight, canvasHeight], {
+            stroke: '#1890ff',
+            strokeWidth: 1,
+            strokeDashArray: [3, 3],
+            selectable: false,
+            evented: false,
+          })
+        )
+      }
+
+      // 顶对齐
+      if (Math.abs(newY - shape.y) < SNAP_THRESHOLD) {
+        lines.push(
+          new fabric.Line([0, shape.y, canvasWidth, shape.y], {
+            stroke: '#1890ff',
+            strokeWidth: 1,
+            strokeDashArray: [3, 3],
+            selectable: false,
+            evented: false,
+          })
+        )
+      }
+
+      // 垂直居中对齐
+      if (Math.abs(targetCenterY - shapeCenterY) < SNAP_THRESHOLD) {
+        lines.push(
+          new fabric.Line([0, shapeCenterY, canvasWidth, shapeCenterY], {
+            stroke: '#1890ff',
+            strokeWidth: 1,
+            strokeDashArray: [3, 3],
+            selectable: false,
+            evented: false,
+          })
+        )
+      }
+
+      // 底对齐
+      if (Math.abs(targetBottom - shapeBottom) < SNAP_THRESHOLD) {
+        lines.push(
+          new fabric.Line([0, shapeBottom, canvasWidth, shapeBottom], {
+            stroke: '#1890ff',
+            strokeWidth: 1,
+            strokeDashArray: [3, 3],
+            selectable: false,
+            evented: false,
+          })
+        )
+      }
+    })
+
+    // 添加到画布
+    lines.forEach((line) => {
+      canvas.add(line)
+      alignmentLinesRef.current.push(line)
+    })
+
+    canvas.renderAll()
+  }
+
+  // 创建预览图形
+  const createPreviewShape = (tool: string, x: number, y: number, width: number, height: number) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas) return
+
+    removePreviewShape()
+
+    let shape: fabric.Object | null = null
+    const commonProps = {
+      left: x,
+      top: y,
+      fill: 'rgba(24, 144, 255, 0.1)',
+      stroke: '#1890ff',
+      strokeWidth: 2,
+      strokeDashArray: [5, 5],
+      selectable: false,
+      evented: false,
+    }
+
+    switch (tool) {
+      case 'rectangle':
+        shape = new fabric.Rect({
+          ...commonProps,
+          width: width || 1,
+          height: height || 1,
+        })
+        break
+      case 'circle':
+        shape = new fabric.Ellipse({
+          ...commonProps,
+          rx: (width || 2) / 2,
+          ry: (height || 2) / 2,
+        })
+        break
+      case 'triangle':
+        shape = new fabric.Triangle({
+          ...commonProps,
+          width: width || 1,
+          height: height || 1,
+        })
+        break
+      default:
+        return
+    }
+
+    if (shape) {
+      previewShapeRef.current = shape
+      canvas.add(shape)
+      canvas.renderAll()
+    }
+  }
+
+  // 更新预览图形
+  const updatePreviewShape = (left: number, top: number, width: number, height: number) => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas || !previewShapeRef.current) return
+
+    switch (currentTool) {
+      case 'rectangle':
+      case 'triangle':
+        previewShapeRef.current.set({ left, top, width: Math.max(width, 1), height: Math.max(height, 1) })
+        break
+      case 'circle':
+        previewShapeRef.current.set({
+          left: left + width / 2,
+          top: top + height / 2,
+          rx: Math.max(width, 2) / 2,
+          ry: Math.max(height, 2) / 2,
+        })
+        break
+    }
+    canvas.renderAll()
+  }
+
+  // 移除预览图形
+  const removePreviewShape = () => {
+    const canvas = fabricCanvasRef.current
+    if (!canvas || !previewShapeRef.current) return
+
+    canvas.remove(previewShapeRef.current)
+    previewShapeRef.current = null
+  }
+
+  // 完成绘制图形
+  const finalizeDrawShape = (tool: string, x: number, y: number, width: number, height: number) => {
     const canvas = fabricCanvasRef.current
     if (!canvas) return
 
@@ -452,40 +881,26 @@ const Canvas: React.FC = () => {
       evented: true,
     }
 
-    switch (currentTool) {
+    switch (tool) {
       case 'rectangle':
         shape = new fabric.Rect({
           ...commonProps,
-          width: 100,
-          height: 60,
+          width,
+          height,
         })
         break
       case 'circle':
-        shape = new fabric.Circle({
+        shape = new fabric.Ellipse({
           ...commonProps,
-          radius: 40,
+          rx: width / 2,
+          ry: height / 2,
         })
         break
       case 'triangle':
         shape = new fabric.Triangle({
           ...commonProps,
-          width: 80,
-          height: 70,
-        })
-        break
-      case 'line':
-        shape = new fabric.Line([x, y, x + 100, y], {
-          stroke: '#333333',
-          strokeWidth: 2,
-          selectable: true,
-          evented: true,
-        })
-        break
-      case 'text':
-        shape = new fabric.Text('双击编辑文本', {
-          ...commonProps,
-          fontSize: 16,
-          fontFamily: 'Arial',
+          width,
+          height,
         })
         break
       default:
@@ -500,16 +915,16 @@ const Canvas: React.FC = () => {
       canvas.renderAll()
 
       // 生成连接点
-      const connectionPoints = generateDefaultConnectionPoints(currentTool)
+      const connectionPoints = generateDefaultConnectionPoints(tool)
 
       // 添加到store
       addShape({
         id,
-        type: currentTool,
+        type: tool,
         x,
         y,
-        width: 100,
-        height: 60,
+        width,
+        height,
         fill: '#ffffff',
         stroke: '#333333',
         strokeWidth: 2,
@@ -708,7 +1123,7 @@ const Canvas: React.FC = () => {
         connectorsRef.current.set(connector.id, { path, endPoints })
       }
     })
-  }, [connectors, shapes])
+  }, [connectors, shapes, selectedConnectorId])
 
   // 同步shapes到画布
   useEffect(() => {
@@ -792,6 +1207,29 @@ const Canvas: React.FC = () => {
         if (shapeData.angle) shape.set('angle', shapeData.angle)
         if (shapeData.scaleX) shape.set('scaleX', shapeData.scaleX)
         if (shapeData.scaleY) shape.set('scaleY', shapeData.scaleY)
+
+        // 添加悬停效果
+        const originalStroke = shapeData.stroke
+        const originalStrokeWidth = shapeData.strokeWidth
+
+        shape.on('mouseover', function() {
+          this.set({
+            stroke: '#40a9ff',
+            strokeWidth: (originalStrokeWidth || 2) + 1,
+          })
+          canvas.renderAll()
+        })
+
+        shape.on('mouseout', function() {
+          // 检查是否被选中
+          const isSelected = selectedShapeIds.includes(shapeData.id)
+          this.set({
+            stroke: isSelected ? '#1890ff' : originalStroke,
+            strokeWidth: isSelected ? (originalStrokeWidth || 2) + 1 : originalStrokeWidth,
+          })
+          canvas.renderAll()
+        })
+
         canvas.add(shape)
       }
     })
@@ -800,26 +1238,35 @@ const Canvas: React.FC = () => {
     renderConnectors()
 
     canvas.renderAll()
-  }, [shapes, renderConnectors])
+  }, [shapes, renderConnectors, selectedShapeIds])
 
-  // 更新选中状态
+  // 更新选中状态（支持多选）
   useEffect(() => {
     const canvas = fabricCanvasRef.current
     if (!canvas) return
 
-    if (selectedShapeId) {
+    if (selectedShapeIds.length > 0) {
       const objects = canvas.getObjects()
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const selectedObject = objects.find((obj: any) => obj.id === selectedShapeId)
-      if (selectedObject) {
-        canvas.setActiveObject(selectedObject)
-        canvas.renderAll()
+      const selectedObjects = objects.filter((obj: any) => selectedShapeIds.includes(obj.id))
+
+      if (selectedObjects.length === 1) {
+        canvas.setActiveObject(selectedObjects[0])
+      } else if (selectedObjects.length > 1) {
+        // 多选：创建 ActiveSelection
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const ActiveSelection = (window as any).fabric.ActiveSelection
+        if (ActiveSelection) {
+          const selection = new ActiveSelection(selectedObjects, { canvas })
+          canvas.setActiveObject(selection)
+        }
       }
+      canvas.renderAll()
     } else {
       canvas.discardActiveObject()
       canvas.renderAll()
     }
-  }, [selectedShapeId])
+  }, [selectedShapeId, selectedShapeIds])
 
   // 更新缩放
   useEffect(() => {
@@ -951,6 +1398,40 @@ const Canvas: React.FC = () => {
   const getContextMenuItems = (): ContextMenuItem[] => {
     const hasSelection = !!selectedShapeId
 
+    const handleCut = () => {
+      if (selectedShapeId) {
+        const shape = shapes.find((s) => s.id === selectedShapeId)
+        if (shape) {
+          cut([shape], (ids) => {
+            deleteShapes(ids)
+          })
+        }
+      }
+    }
+
+    const handleCopy = () => {
+      if (selectedShapeId) {
+        const shape = shapes.find((s) => s.id === selectedShapeId)
+        if (shape) {
+          copy([shape])
+        }
+      }
+    }
+
+    const handlePaste = () => {
+      const result = paste()
+      if (result && result.shapes.length > 0) {
+        // 为新图形生成新的ID
+        const newShapes = result.shapes.map((shape) => ({
+          ...shape,
+          id: uuidv4(),
+        }))
+        addShapes(newShapes)
+        // 选中新粘贴的最后一个图形
+        selectShape(newShapes[newShapes.length - 1].id)
+      }
+    }
+
     return [
       {
         key: 'cut',
@@ -958,10 +1439,7 @@ const Canvas: React.FC = () => {
         icon: <ScissorOutlined />,
         shortcut: 'Ctrl+X',
         disabled: !hasSelection,
-        onClick: () => {
-          // TODO: 实现剪切功能
-          console.log('剪切')
-        },
+        onClick: handleCut,
       },
       {
         key: 'copy',
@@ -969,20 +1447,14 @@ const Canvas: React.FC = () => {
         icon: <CopyOutlined />,
         shortcut: 'Ctrl+C',
         disabled: !hasSelection,
-        onClick: () => {
-          // TODO: 实现复制功能
-          console.log('复制')
-        },
+        onClick: handleCopy,
       },
       {
         key: 'paste',
         label: '粘贴',
         icon: <SnippetsOutlined />,
         shortcut: 'Ctrl+V',
-        onClick: () => {
-          // TODO: 实现粘贴功能
-          console.log('粘贴')
-        },
+        onClick: handlePaste,
       },
       {
         key: 'divider1',

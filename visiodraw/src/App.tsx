@@ -1,15 +1,20 @@
 import React, { useEffect } from 'react'
 import { Layout, message } from 'antd'
-import Toolbar from '@components/Toolbar'
+import Toolbar from '@components/Toolbar/index'
 import ShapeLibrary from '@components/ShapeLibrary'
 import Canvas from '@components/Canvas'
 import PropertyPanel from '@components/PropertyPanel'
 import StatusBar from '@components/StatusBar'
+import LayerPanel from '@components/LayerPanel'
+import ThemeSelector from '@components/ThemeSelector'
+import useThemeStore, { initTheme } from '@stores/themeStore'
 import useCanvasStore from '@stores/canvasStore'
+import useClipboardStore from '@stores/clipboardStore'
 import {
   useKeyboardShortcuts,
   createDefaultShortcuts,
 } from '@hooks/useKeyboardShortcuts'
+import { v4 as uuidv4 } from 'uuid'
 import './App.css'
 
 const { Header, Sider, Content } = Layout
@@ -33,11 +38,32 @@ const App: React.FC = () => {
     undo,
     redo,
     deleteShape,
+    deleteShapes,
+    addShapes,
+    shapes,
     selectedShapeId,
+    selectShape,
     zoom,
     setZoom,
     canvas,
+    updateShape,
   } = useCanvasStore()
+
+  const { copy, cut, paste } = useClipboardStore()
+  const { currentTheme } = useThemeStore()
+
+  // 初始化主题
+  useEffect(() => {
+    initTheme()
+  }, [])
+
+  // 监听主题变化并应用
+  useEffect(() => {
+    const cssVariables = useThemeStore.getState().getThemeCSSVariables()
+    Object.entries(cssVariables).forEach(([key, value]) => {
+      document.documentElement.style.setProperty(key, value)
+    })
+  }, [currentTheme])
 
   // 注册键盘快捷键
   useKeyboardShortcuts(
@@ -65,13 +91,40 @@ const App: React.FC = () => {
         }
       },
       onCut: () => {
-        message.info('剪切功能开发中')
+        if (selectedShapeId) {
+          const shape = shapes.find((s) => s.id === selectedShapeId)
+          if (shape) {
+            cut([shape], (ids) => {
+              deleteShapes(ids)
+            })
+            message.success('已剪切')
+          }
+        }
       },
       onCopy: () => {
-        message.info('复制功能开发中')
+        if (selectedShapeId) {
+          const shape = shapes.find((s) => s.id === selectedShapeId)
+          if (shape) {
+            copy([shape])
+            message.success('已复制')
+          }
+        }
       },
       onPaste: () => {
-        message.info('粘贴功能开发中')
+        const result = paste()
+        if (result && result.shapes.length > 0) {
+          // 为新图形生成新的ID
+          const newShapes = result.shapes.map((shape) => ({
+            ...shape,
+            id: uuidv4(),
+          }))
+          addShapes(newShapes)
+          // 选中新粘贴的最后一个图形
+          selectShape(newShapes[newShapes.length - 1].id)
+          message.success('已粘贴')
+        } else {
+          message.info('剪贴板为空')
+        }
       },
       onDelete: () => {
         if (selectedShapeId) {
@@ -169,10 +222,190 @@ const App: React.FC = () => {
     }
   }, [newCanvas, openFile, saveFile, undo, redo, deleteShape, selectedShapeId])
 
+  // 对齐功能处理函数
+  const handleAlignLeft = () => {
+    if (!selectedShapeId || !canvas) return
+    const selectedShape = shapes.find((s) => s.id === selectedShapeId)
+    if (!selectedShape) return
+
+    const activeObjects = canvas.getActiveObjects()
+    if (activeObjects.length > 1) {
+      // 多选对齐
+      const minX = Math.min(...activeObjects.map((obj) => (obj as fabric.Object).left || 0))
+      activeObjects.forEach((obj) => {
+        const fabricObj = obj as fabric.Object
+        const shapeId = (fabricObj as unknown as { id?: string }).id
+        if (shapeId) {
+          updateShape(shapeId, { x: minX })
+        }
+      })
+      message.success('左对齐完成')
+    }
+  }
+
+  const handleAlignCenter = () => {
+    if (!selectedShapeId || !canvas) return
+    const activeObjects = canvas.getActiveObjects()
+    if (activeObjects.length > 1) {
+      const centers = activeObjects.map((obj) => {
+        const fabricObj = obj as fabric.Object
+        return (fabricObj.left || 0) + (fabricObj.width || 0) / 2
+      })
+      const avgCenter = centers.reduce((a, b) => a + b, 0) / centers.length
+      activeObjects.forEach((obj) => {
+        const fabricObj = obj as fabric.Object
+        const shapeId = (fabricObj as unknown as { id?: string }).id
+        if (shapeId) {
+          updateShape(shapeId, { x: avgCenter - (fabricObj.width || 0) / 2 })
+        }
+      })
+      message.success('水平居中完成')
+    }
+  }
+
+  const handleAlignRight = () => {
+    if (!selectedShapeId || !canvas) return
+    const activeObjects = canvas.getActiveObjects()
+    if (activeObjects.length > 1) {
+      const maxRight = Math.max(
+        ...activeObjects.map((obj) => {
+          const fabricObj = obj as fabric.Object
+          return (fabricObj.left || 0) + (fabricObj.width || 0)
+        })
+      )
+      activeObjects.forEach((obj) => {
+        const fabricObj = obj as fabric.Object
+        const shapeId = (fabricObj as unknown as { id?: string }).id
+        if (shapeId) {
+          updateShape(shapeId, { x: maxRight - (fabricObj.width || 0) })
+        }
+      })
+      message.success('右对齐完成')
+    }
+  }
+
+  const handleAlignTop = () => {
+    if (!selectedShapeId || !canvas) return
+    const activeObjects = canvas.getActiveObjects()
+    if (activeObjects.length > 1) {
+      const minY = Math.min(...activeObjects.map((obj) => (obj as fabric.Object).top || 0))
+      activeObjects.forEach((obj) => {
+        const fabricObj = obj as fabric.Object
+        const shapeId = (fabricObj as unknown as { id?: string }).id
+        if (shapeId) {
+          updateShape(shapeId, { y: minY })
+        }
+      })
+      message.success('顶端对齐完成')
+    }
+  }
+
+  const handleAlignMiddle = () => {
+    if (!selectedShapeId || !canvas) return
+    const activeObjects = canvas.getActiveObjects()
+    if (activeObjects.length > 1) {
+      const centers = activeObjects.map((obj) => {
+        const fabricObj = obj as fabric.Object
+        return (fabricObj.top || 0) + (fabricObj.height || 0) / 2
+      })
+      const avgCenter = centers.reduce((a, b) => a + b, 0) / centers.length
+      activeObjects.forEach((obj) => {
+        const fabricObj = obj as fabric.Object
+        const shapeId = (fabricObj as unknown as { id?: string }).id
+        if (shapeId) {
+          updateShape(shapeId, { y: avgCenter - (fabricObj.height || 0) / 2 })
+        }
+      })
+      message.success('垂直居中完成')
+    }
+  }
+
+  const handleAlignBottom = () => {
+    if (!selectedShapeId || !canvas) return
+    const activeObjects = canvas.getActiveObjects()
+    if (activeObjects.length > 1) {
+      const maxBottom = Math.max(
+        ...activeObjects.map((obj) => {
+          const fabricObj = obj as fabric.Object
+          return (fabricObj.top || 0) + (fabricObj.height || 0)
+        })
+      )
+      activeObjects.forEach((obj) => {
+        const fabricObj = obj as fabric.Object
+        const shapeId = (fabricObj as unknown as { id?: string }).id
+        if (shapeId) {
+          updateShape(shapeId, { y: maxBottom - (fabricObj.height || 0) })
+        }
+      })
+      message.success('底端对齐完成')
+    }
+  }
+
+  const handleDistributeHorizontal = () => {
+    if (!selectedShapeId || !canvas) return
+    const activeObjects = canvas.getActiveObjects()
+    if (activeObjects.length < 3) {
+      message.info('至少需要选择3个图形才能进行分布')
+      return
+    }
+
+    const sorted = [...activeObjects].sort(
+      (a, b) => ((a as fabric.Object).left || 0) - ((b as fabric.Object).left || 0)
+    )
+    const first = sorted[0] as fabric.Object
+    const last = sorted[sorted.length - 1] as fabric.Object
+    const totalWidth = (last.left || 0) - (first.left || 0)
+    const spacing = totalWidth / (sorted.length - 1)
+
+    sorted.forEach((obj, index) => {
+      const fabricObj = obj as fabric.Object
+      const shapeId = (fabricObj as unknown as { id?: string }).id
+      if (shapeId && index > 0 && index < sorted.length - 1) {
+        updateShape(shapeId, { x: (first.left || 0) + spacing * index })
+      }
+    })
+    message.success('水平分布完成')
+  }
+
+  const handleDistributeVertical = () => {
+    if (!selectedShapeId || !canvas) return
+    const activeObjects = canvas.getActiveObjects()
+    if (activeObjects.length < 3) {
+      message.info('至少需要选择3个图形才能进行分布')
+      return
+    }
+
+    const sorted = [...activeObjects].sort(
+      (a, b) => ((a as fabric.Object).top || 0) - ((b as fabric.Object).top || 0)
+    )
+    const first = sorted[0] as fabric.Object
+    const last = sorted[sorted.length - 1] as fabric.Object
+    const totalHeight = (last.top || 0) - (first.top || 0)
+    const spacing = totalHeight / (sorted.length - 1)
+
+    sorted.forEach((obj, index) => {
+      const fabricObj = obj as fabric.Object
+      const shapeId = (fabricObj as unknown as { id?: string }).id
+      if (shapeId && index > 0 && index < sorted.length - 1) {
+        updateShape(shapeId, { y: (first.top || 0) + spacing * index })
+      }
+    })
+    message.success('垂直分布完成')
+  }
+
   return (
     <Layout className="app-layout">
-      <Header className="app-header">
-        <Toolbar />
+      <Header className="app-header" style={{ height: 'auto', padding: 0, background: '#fff' }}>
+        <Toolbar
+          onAlignLeft={handleAlignLeft}
+          onAlignCenter={handleAlignCenter}
+          onAlignRight={handleAlignRight}
+          onAlignTop={handleAlignTop}
+          onAlignMiddle={handleAlignMiddle}
+          onAlignBottom={handleAlignBottom}
+          onDistributeHorizontal={handleDistributeHorizontal}
+          onDistributeVertical={handleDistributeVertical}
+        />
       </Header>
       <Layout className="app-body">
         <Sider width={200} className="app-sider-left">
@@ -181,8 +414,12 @@ const App: React.FC = () => {
         <Content className="app-content">
           <Canvas />
         </Content>
-        <Sider width={250} className="app-sider-right">
-          <PropertyPanel />
+        <Sider width={280} className="app-sider-right">
+          <div className="right-panel-container">
+            <PropertyPanel />
+            <LayerPanel />
+            <ThemeSelector />
+          </div>
         </Sider>
       </Layout>
       <StatusBar />

@@ -63,8 +63,14 @@ export interface Connector {
   stroke: string;
   /** 线条宽度 */
   strokeWidth: number;
+  /** 透明度 */
+  opacity?: number;
   /** 文本标签 */
   label?: string;
+  /** 标签颜色 */
+  labelColor?: string;
+  /** 标签字体大小 */
+  labelFontSize?: number;
   /** 路径点（用于正交线和曲线） */
   pathPoints?: { x: number; y: number }[];
   /** 是否被选中 */

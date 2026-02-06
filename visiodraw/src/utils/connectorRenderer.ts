@@ -296,15 +296,18 @@ export function createConnectorObjects(
   // 创建路径对象
   let path: fabric.Path | fabric.Line
   const isSelected = connector.isSelected || false
+  const baseStrokeWidth = connector.strokeWidth || 2
 
   if (connector.style === 'straight' && points.length === 2) {
     // 直线使用Line对象
     path = new fabric.Line([points[0].x, points[0].y, points[1].x, points[1].y], {
       stroke: isSelected ? '#1890ff' : connector.stroke,
-      strokeWidth: isSelected ? connector.strokeWidth + 1 : connector.strokeWidth,
+      strokeWidth: isSelected ? baseStrokeWidth + 2 : baseStrokeWidth,
       selectable: true,
       evented: true,
       hoverCursor: 'pointer',
+      // 增加可点击区域
+      strokeLineCap: 'round',
     })
   } else {
     // 正交线和曲线使用Path对象
@@ -312,17 +315,48 @@ export function createConnectorObjects(
     path = new fabric.Path(pathString, {
       fill: '',
       stroke: isSelected ? '#1890ff' : connector.stroke,
-      strokeWidth: isSelected ? connector.strokeWidth + 1 : connector.strokeWidth,
+      strokeWidth: isSelected ? baseStrokeWidth + 2 : baseStrokeWidth,
       selectable: true,
       evented: true,
       hoverCursor: 'pointer',
+      // 增加可点击区域
+      strokeLineCap: 'round',
+      strokeLineJoin: 'round',
     })
   }
 
+  // 添加悬停效果
+  path.on('mouseover', function() {
+    this.set({
+      stroke: '#40a9ff',
+      strokeWidth: baseStrokeWidth + 1,
+    })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const canvas = (this as any).canvas
+    if (canvas) canvas.renderAll()
+  })
+
+  path.on('mouseout', function() {
+    if (!isSelected) {
+      this.set({
+        stroke: connector.stroke,
+        strokeWidth: baseStrokeWidth,
+      })
+    } else {
+      this.set({
+        stroke: '#1890ff',
+        strokeWidth: baseStrokeWidth + 2,
+      })
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const canvas = (this as any).canvas
+    if (canvas) canvas.renderAll()
+  })
+
   // 设置连接线ID和类型
-  // eslint-disable-next-line no-extra-semi
-  ;(path as unknown as { id: string }).id = connector.id
-  ;(path as unknown as { type: string }).type = 'connector'
+  const pathWithId = path as unknown as { id: string; type: string }
+  pathWithId.id = connector.id
+  pathWithId.type = 'connector'
 
   // 创建端点
   const endPoints: fabric.Object[] = []

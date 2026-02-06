@@ -31,6 +31,33 @@
   overflow-y: auto;
 }
 
+/* 右侧面板容器 */
+.right-panel-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.right-panel-container .property-panel {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.right-panel-container .layer-panel {
+  height: 35%;
+  min-height: 180px;
+  border-top: 1px solid #e8e8e8;
+}
+
+.right-panel-container .theme-selector {
+  height: 30%;
+  min-height: 150px;
+  border-top: 1px solid #e8e8e8;
+  overflow-y: auto;
+}
+
 .app-content {
   flex: 1;
   background: #f0f2f5;

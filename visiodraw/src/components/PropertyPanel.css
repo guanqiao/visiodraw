@@ -1,0 +1,202 @@
+/* 属性面板容器 */
+.property-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* 面板标题 */
+.property-panel-title {
+  margin: 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+/* 空状态 */
+.property-panel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  color: #999;
+  text-align: center;
+}
+
+/* 折叠面板 */
+.property-panel .ant-collapse {
+  flex: 1;
+  overflow-y: auto;
+  background: transparent;
+}
+
+.property-panel .ant-collapse-item {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.property-panel .ant-collapse-header {
+  font-weight: 500;
+  color: #333;
+  padding: 12px 16px !important;
+}
+
+.property-panel .ant-collapse-content {
+  background: transparent;
+}
+
+.property-panel .ant-collapse-content-box {
+  padding: 12px 16px;
+}
+
+/* 表单样式 */
+.property-panel .ant-form-item {
+  margin-bottom: 12px;
+}
+
+.property-panel .ant-form-item-label {
+  font-size: 12px;
+  color: #666;
+  padding-bottom: 4px;
+}
+
+.property-panel .ant-form-item-label > label {
+  font-size: 12px;
+}
+
+/* 输入框样式 */
+.property-panel .ant-input-number {
+  width: 100%;
+}
+
+.property-panel .ant-input-number-input {
+  font-size: 12px;
+}
+
+/* 颜色选择器 */
+.property-panel .ant-color-picker {
+  width: 100%;
+}
+
+.property-panel .ant-color-picker-trigger {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 4px 8px;
+}
+
+/* 滑块样式 */
+.property-panel .ant-slider {
+  margin: 8px 0;
+}
+
+.property-panel .ant-slider-track {
+  background: #1890ff;
+}
+
+/* 单选按钮组 */
+.property-panel .ant-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.property-panel .ant-radio-button-wrapper {
+  flex: 1;
+  min-width: 40px;
+  text-align: center;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* 样式预设 */
+.style-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.style-preset-item {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.style-preset-item:hover {
+  transform: scale(1.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* 开关样式 */
+.property-panel .ant-switch {
+  min-width: 36px;
+  height: 18px;
+  line-height: 18px;
+}
+
+.property-panel .ant-switch-handle {
+  width: 14px;
+  height: 14px;
+}
+
+/* 选择器样式 */
+.property-panel .ant-select {
+  font-size: 12px;
+}
+
+/* 按钮样式 */
+.property-panel .ant-btn {
+  font-size: 12px;
+}
+
+/* 文本域样式 */
+.property-panel .ant-input-textarea {
+  font-size: 12px;
+}
+
+/* 链接样式 */
+.property-panel a {
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.property-panel a:hover {
+  text-decoration: underline;
+}
+
+/* 滚动条样式 */
+.property-panel .ant-collapse::-webkit-scrollbar {
+  width: 6px;
+}
+
+.property-panel .ant-collapse::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.property-panel .ant-collapse::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 3px;
+}
+
+.property-panel .ant-collapse::-webkit-scrollbar-thumb:hover {
+  background: #bfbfbf;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .style-presets {
+    justify-content: flex-start;
+  }
+  
+  .style-preset-item {
+    width: 28px;
+    height: 28px;
+  }
+}

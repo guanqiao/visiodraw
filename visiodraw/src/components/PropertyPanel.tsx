@@ -2,6 +2,7 @@ import React from 'react'
 import { Form, Input, InputNumber, ColorPicker, Collapse, Select, Radio } from 'antd'
 import useCanvasStore from '@stores/canvasStore'
 import type { ConnectorStyle } from '../types/connection'
+import './PropertyPanel.css'
 
 const PropertyPanel: React.FC = () => {
   const {
