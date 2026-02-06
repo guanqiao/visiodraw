@@ -1,0 +1,262 @@
+import { create } from 'zustand'
+import { devtools } from 'zustand/middleware'
+
+export interface Shape {
+  id: string
+  type: string
+  x: number
+  y: number
+  width: number
+  height: number
+  fill: string
+  stroke: string
+  strokeWidth: number
+  text?: string
+  angle?: number
+  scaleX?: number
+  scaleY?: number
+}
+
+export interface CanvasState {
+  // 画布状态
+  canvas: fabric.Canvas | null
+  shapes: Shape[]
+  selectedShapeId: string | null
+  zoom: number
+  gridEnabled: boolean
+  snapToGrid: boolean
+  currentTool: string
+
+  // 历史记录
+  history: Shape[][]
+  historyIndex: number
+
+  // 文件状态
+  filePath: string | null
+  isModified: boolean
+
+  // Actions
+  setCanvas: (canvas: fabric.Canvas) => void
+  addShape: (shape: Shape) => void
+  updateShape: (id: string, updates: Partial<Shape>) => void
+  deleteShape: (id: string) => void
+  selectShape: (id: string | null) => void
+  setZoom: (zoom: number) => void
+  setTool: (tool: string) => void
+  toggleGrid: () => void
+  toggleSnapToGrid: () => void
+
+  // 历史操作
+  undo: () => void
+  redo: () => void
+  saveHistory: () => void
+
+  // 文件操作
+  newCanvas: () => void
+  openFile: (path: string) => Promise<void>
+  saveFile: (path?: string) => Promise<void>
+  exportToPng: (path: string) => Promise<void>
+  exportToPdf: (path: string) => Promise<void>
+}
+
+const useCanvasStore = create<CanvasState>()(
+  devtools(
+    (set, get) => ({
+      // 初始状态
+      canvas: null,
+      shapes: [],
+      selectedShapeId: null,
+      zoom: 1,
+      gridEnabled: true,
+      snapToGrid: false,
+      currentTool: 'select',
+      history: [[]],
+      historyIndex: 0,
+      filePath: null,
+      isModified: false,
+
+      // 设置画布
+      setCanvas: (canvas) => {
+        set({ canvas })
+      },
+
+      // 添加图形
+      addShape: (shape) => {
+        const { shapes, saveHistory } = get()
+        const newShapes = [...shapes, shape]
+        set({ shapes: newShapes, isModified: true })
+        saveHistory()
+      },
+
+      // 更新图形
+      updateShape: (id, updates) => {
+        const { shapes, saveHistory } = get()
+        const newShapes = shapes.map((shape) =>
+          shape.id === id ? { ...shape, ...updates } : shape
+        )
+        set({ shapes: newShapes, isModified: true })
+        saveHistory()
+      },
+
+      // 删除图形
+      deleteShape: (id) => {
+        const { shapes, selectedShapeId, saveHistory } = get()
+        const newShapes = shapes.filter((shape) => shape.id !== id)
+        set({
+          shapes: newShapes,
+          selectedShapeId: selectedShapeId === id ? null : selectedShapeId,
+          isModified: true,
+        })
+        saveHistory()
+      },
+
+      // 选择图形
+      selectShape: (id) => {
+        set({ selectedShapeId: id })
+      },
+
+      // 设置缩放
+      setZoom: (zoom) => {
+        const { canvas } = get()
+        if (canvas) {
+          canvas.setZoom(zoom)
+          canvas.renderAll()
+        }
+        set({ zoom })
+      },
+
+      // 设置工具
+      setTool: (tool) => {
+        set({ currentTool: tool })
+      },
+
+      // 切换网格
+      toggleGrid: () => {
+        set((state) => ({ gridEnabled: !state.gridEnabled }))
+      },
+
+      // 切换吸附到网格
+      toggleSnapToGrid: () => {
+        set((state) => ({ snapToGrid: !state.snapToGrid }))
+      },
+
+      // 撤销
+      undo: () => {
+        const { history, historyIndex } = get()
+        if (historyIndex > 0) {
+          const newIndex = historyIndex - 1
+          set({
+            shapes: history[newIndex],
+            historyIndex: newIndex,
+            isModified: true,
+          })
+        }
+      },
+
+      // 重做
+      redo: () => {
+        const { history, historyIndex } = get()
+        if (historyIndex < history.length - 1) {
+          const newIndex = historyIndex + 1
+          set({
+            shapes: history[newIndex],
+            historyIndex: newIndex,
+            isModified: true,
+          })
+        }
+      },
+
+      // 保存历史记录
+      saveHistory: () => {
+        const { shapes, history, historyIndex } = get()
+        const newHistory = history.slice(0, historyIndex + 1)
+        newHistory.push([...shapes])
+        // 限制历史记录长度
+        if (newHistory.length > 50) {
+          newHistory.shift()
+        }
+        set({
+          history: newHistory,
+          historyIndex: newHistory.length - 1,
+        })
+      },
+
+      // 新建画布
+      newCanvas: () => {
+        const { canvas } = get()
+        if (canvas) {
+          canvas.clear()
+          canvas.backgroundColor = '#ffffff'
+          canvas.renderAll()
+        }
+        set({
+          shapes: [],
+          selectedShapeId: null,
+          history: [[]],
+          historyIndex: 0,
+          filePath: null,
+          isModified: false,
+        })
+      },
+
+      // 打开文件
+      openFile: async (path: string) => {
+        try {
+          // TODO: 实现文件读取逻辑
+          console.log('打开文件:', path)
+          set({ filePath: path, isModified: false })
+        } catch (error) {
+          console.error('打开文件失败:', error)
+          throw error
+        }
+      },
+
+      // 保存文件
+      saveFile: async (path?: string) => {
+        try {
+          const { shapes, filePath } = get()
+          const savePath = path || filePath
+          if (!savePath) {
+            throw new Error('未指定保存路径')
+          }
+          // TODO: 实现文件保存逻辑
+          const data = JSON.stringify({ shapes }, null, 2)
+          console.log('保存文件:', savePath, data)
+          set({ filePath: savePath, isModified: false })
+        } catch (error) {
+          console.error('保存文件失败:', error)
+          throw error
+        }
+      },
+
+      // 导出为PNG
+      exportToPng: async (path: string) => {
+        try {
+          const { canvas } = get()
+          if (!canvas) {
+            throw new Error('画布未初始化')
+          }
+          // TODO: 实现PNG导出逻辑
+          console.log('导出PNG:', path)
+        } catch (error) {
+          console.error('导出PNG失败:', error)
+          throw error
+        }
+      },
+
+      // 导出为PDF
+      exportToPdf: async (path: string) => {
+        try {
+          // TODO: 实现PDF导出逻辑
+          console.log('导出PDF:', path)
+        } catch (error) {
+          console.error('导出PDF失败:', error)
+          throw error
+        }
+      },
+    }),
+    { name: 'canvas-store' }
+  )
+)
+
+export default useCanvasStore
