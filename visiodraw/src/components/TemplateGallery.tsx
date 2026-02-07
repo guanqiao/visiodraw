@@ -2,7 +2,7 @@
  * 模板库组件
  */
 
-import React, { useState } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
 import { Modal, Card, Button, Tag, Empty, Input, Radio, Space, Typography } from 'antd'
 import {
   PartitionOutlined,
@@ -55,8 +55,8 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
   const [templateName, setTemplateName] = useState('')
   const [templateDescription, setTemplateDescription] = useState('')
 
-  // 获取当前显示的模板列表
-  const getDisplayedTemplates = (): Template[] => {
+  // 获取当前显示的模板列表 - 使用 useMemo 缓存
+  const displayedTemplates = useMemo((): Template[] => {
     let templates: Template[]
     if (currentCategory === 'all') {
       templates = getAllTemplates()
@@ -74,10 +74,10 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
     }
 
     return templates
-  }
+  }, [currentCategory, getAllTemplates, getTemplatesByCategory, searchText])
 
-  // 选择模板
-  const handleSelectTemplate = (template: Template) => {
+  // 选择模板 - 使用 useCallback 缓存
+  const handleSelectTemplate = useCallback((template: Template) => {
     // 清空当前画布
     newCanvas()
 
@@ -92,10 +92,10 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
 
     onSelectTemplate?.(template)
     onClose()
-  }
+  }, [addShape, newCanvas, onClose, onSelectTemplate])
 
-  // 保存当前文档为模板
-  const handleSaveAsTemplate = () => {
+  // 保存当前文档为模板 - 使用 useCallback 缓存
+  const handleSaveAsTemplate = useCallback(() => {
     if (!templateName.trim()) {
       return
     }
@@ -111,10 +111,10 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
     setIsSaveModalVisible(false)
     setTemplateName('')
     setTemplateDescription('')
-  }
+  }, [templateName, templateDescription, shapes])
 
-  // 渲染模板卡片
-  const renderTemplateCard = (template: Template) => (
+  // 渲染模板卡片 - 使用 useCallback 缓存
+  const renderTemplateCard = useCallback((template: Template) => (
     <Card
       key={template.id}
       hoverable
@@ -182,9 +182,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
         }
       />
     </Card>
-  )
-
-  const displayedTemplates = getDisplayedTemplates()
+  ), [handleSelectTemplate])
 
   return (
     <>
