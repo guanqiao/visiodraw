@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useCallback, useMemo } from 'react'
 import {
   Button,
   Card,
@@ -23,6 +23,74 @@ import {
 import useThemeStore, { presetThemes, type ThemeConfig, type ThemeType } from '../stores/themeStore'
 import './ThemeSelector.css'
 
+// 主题卡片组件
+const ThemeCard: React.FC<{
+  theme: ThemeConfig
+  isCustom: boolean
+  isActive: boolean
+  onThemeChange: (themeType: ThemeType) => void
+  onEdit: (theme: ThemeConfig) => void
+  onDelete: (themeName: string) => void
+}> = ({ theme, isCustom, isActive, onThemeChange, onEdit, onDelete }) => {
+  return (
+    <Card
+      className={`theme-card ${isActive ? 'active' : ''}`}
+      onClick={() => onThemeChange(theme.type)}
+      style={{
+        background: theme.canvasBackground,
+        borderColor: isActive ? theme.primaryColor : undefined,
+      }}
+    >
+      <div className="theme-preview">
+        <div
+          className="theme-preview-shape"
+          style={{
+            background: theme.defaultFill,
+            border: `2px solid ${theme.defaultStroke}`,
+          }}
+        />
+        <div
+          className="theme-preview-connector"
+          style={{ background: theme.defaultConnectorColor }}
+        />
+      </div>
+      <div className="theme-info">
+        <span className="theme-name" style={{ color: theme.defaultTextColor }}>
+          {theme.name}
+        </span>
+        {isCustom && (
+          <Space className="theme-actions">
+            <Tooltip title="编辑">
+              <Button
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit(theme)
+                }}
+              />
+            </Tooltip>
+            <Tooltip title="删除">
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete(theme.name)
+                  message.success('主题已删除')
+                }}
+              />
+            </Tooltip>
+          </Space>
+        )}
+      </div>
+    </Card>
+  )
+}
+
 const ThemeSelector: React.FC = () => {
   const {
     currentTheme,
@@ -41,13 +109,13 @@ const ThemeSelector: React.FC = () => {
   const [editingTheme, setEditingTheme] = useState<Partial<ThemeConfig>>({})
 
   // 处理主题切换
-  const handleThemeChange = (themeType: ThemeType) => {
+  const handleThemeChange = useCallback((themeType: ThemeType) => {
     setTheme(themeType)
     message.success(`已切换到${presetThemes[themeType]?.name || '自定义'}主题`)
-  }
+  }, [setTheme])
 
   // 打开自定义主题编辑器
-  const openCustomThemeEditor = (theme?: ThemeConfig) => {
+  const openCustomThemeEditor = useCallback((theme?: ThemeConfig) => {
     if (theme) {
       setEditingTheme({ ...theme })
       setIsEditing(true)
@@ -69,10 +137,10 @@ const ThemeSelector: React.FC = () => {
       setIsEditing(false)
     }
     setIsModalVisible(true)
-  }
+  }, [])
 
   // 保存自定义主题
-  const saveCustomTheme = () => {
+  const saveCustomTheme = useCallback(() => {
     if (!editingTheme.name) {
       message.error('请输入主题名称')
       return
@@ -92,10 +160,10 @@ const ThemeSelector: React.FC = () => {
     }
 
     setIsModalVisible(false)
-  }
+  }, [editingTheme, isEditing, setTheme, addCustomTheme])
 
   // 导出当前主题
-  const handleExportTheme = () => {
+  const handleExportTheme = useCallback(() => {
     const themeJson = exportTheme()
     const blob = new Blob([themeJson], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
@@ -105,10 +173,10 @@ const ThemeSelector: React.FC = () => {
     a.click()
     URL.revokeObjectURL(url)
     message.success('主题已导出')
-  }
+  }, [currentTheme, exportTheme])
 
   // 导入主题
-  const handleImportTheme = () => {
+  const handleImportTheme = useCallback(() => {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = '.json'
@@ -128,75 +196,48 @@ const ThemeSelector: React.FC = () => {
       }
     }
     input.click()
-  }
+  }, [importTheme])
 
-  // 渲染主题预览卡片
-  const renderThemeCard = (
-    key: string,
-    theme: ThemeConfig,
-    isCustom: boolean = false
-  ) => {
-    const isActive = currentTheme.name === theme.name
+  // 处理删除主题
+  const handleDeleteTheme = useCallback((themeName: string) => {
+    removeCustomTheme(themeName)
+  }, [removeCustomTheme])
 
-    return (
-      <Card
-        key={key}
-        className={`theme-card ${isActive ? 'active' : ''}`}
-        onClick={() => handleThemeChange(theme.type)}
-        style={{
-          background: theme.canvasBackground,
-          borderColor: isActive ? theme.primaryColor : undefined,
-        }}
-      >
-        <div className="theme-preview">
-          <div
-            className="theme-preview-shape"
-            style={{
-              background: theme.defaultFill,
-              border: `2px solid ${theme.defaultStroke}`,
-            }}
-          />
-          <div
-            className="theme-preview-connector"
-            style={{ background: theme.defaultConnectorColor }}
-          />
-        </div>
-        <div className="theme-info">
-          <span className="theme-name" style={{ color: theme.defaultTextColor }}>
-            {theme.name}
-          </span>
-          {isCustom && (
-            <Space className="theme-actions">
-              <Tooltip title="编辑">
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    openCustomThemeEditor(theme)
-                  }}
-                />
-              </Tooltip>
-              <Tooltip title="删除">
-                <Button
-                  type="text"
-                  size="small"
-                  danger
-                  icon={<DeleteOutlined />}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeCustomTheme(theme.name)
-                    message.success('主题已删除')
-                  }}
-                />
-              </Tooltip>
-            </Space>
-          )}
-        </div>
-      </Card>
-    )
-  }
+  // 缓存预设主题渲染
+  const renderedPresetThemes = useMemo(() => {
+    return Object.entries(presetThemes).map(([key, theme]) => {
+      const isActive = currentTheme.name === theme.name
+      return (
+        <ThemeCard
+          key={key}
+          theme={theme}
+          isCustom={false}
+          isActive={isActive}
+          onThemeChange={handleThemeChange}
+          onEdit={openCustomThemeEditor}
+          onDelete={handleDeleteTheme}
+        />
+      )
+    })
+  }, [currentTheme, handleThemeChange, openCustomThemeEditor, handleDeleteTheme])
+
+  // 缓存自定义主题渲染
+  const renderedCustomThemes = useMemo(() => {
+    return customThemes.map((theme, index) => {
+      const isActive = currentTheme.name === theme.name
+      return (
+        <ThemeCard
+          key={`custom-${index}`}
+          theme={theme}
+          isCustom={true}
+          isActive={isActive}
+          onThemeChange={handleThemeChange}
+          onEdit={openCustomThemeEditor}
+          onDelete={handleDeleteTheme}
+        />
+      )
+    })
+  }, [customThemes, currentTheme, handleThemeChange, openCustomThemeEditor, handleDeleteTheme])
 
   return (
     <div className="theme-selector">
@@ -229,9 +270,7 @@ const ThemeSelector: React.FC = () => {
         <div className="theme-section">
           <h5>预设主题</h5>
           <div className="theme-grid">
-            {Object.entries(presetThemes).map(([key, theme]) =>
-              renderThemeCard(key, theme)
-            )}
+            {renderedPresetThemes}
           </div>
         </div>
 
@@ -240,9 +279,7 @@ const ThemeSelector: React.FC = () => {
           <div className="theme-section">
             <h5>自定义主题</h5>
             <div className="theme-grid">
-              {customThemes.map((theme, index) =>
-                renderThemeCard(`custom-${index}`, theme, true)
-              )}
+              {renderedCustomThemes}
             </div>
           </div>
         )}

@@ -8,7 +8,7 @@ import StatusBar from '@components/StatusBar'
 import LayerPanel from '@components/LayerPanel'
 import ThemeSelector from '@components/ThemeSelector'
 import RulerPanel from '@components/RulerPanel'
-import useThemeStore, { initTheme } from '@stores/themeStore'
+import { initTheme } from '@stores/themeStore'
 import useCanvasStore from '@stores/canvasStore'
 import useClipboardStore from '@stores/clipboardStore'
 import {

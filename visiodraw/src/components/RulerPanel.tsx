@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useCallback, useState, useMemo } from 'react'
 import { Button, Switch, Tooltip, Divider, Slider } from 'antd'
 import {
   EyeOutlined,
@@ -22,24 +22,26 @@ const RulerPanel: React.FC = () => {
     setRulerInterval,
   } = useRulerStore()
 
-  // 使用本地状态来避免Slider拖动时的频繁更新
   const [localInterval, setLocalInterval] = useState(rulerInterval)
-  const isDraggingRef = useRef(false)
 
-  const horizontalGuides = guideLines.filter((g) => g.orientation === 'horizontal')
-  const verticalGuides = guideLines.filter((g) => g.orientation === 'vertical')
-
-  // 处理Slider变化 - 只更新本地状态
-  const handleSliderChange = useCallback((value: number) => {
-    isDraggingRef.current = true
+  const handleIntervalChange = useCallback((value: number) => {
     setLocalInterval(value)
   }, [])
 
-  // 处理Slider变化完成 - 更新store
-  const handleSliderAfterChange = useCallback((value: number) => {
-    isDraggingRef.current = false
+  const handleIntervalAfterChange = useCallback((value: number) => {
     setRulerInterval(value)
   }, [setRulerInterval])
+
+  // Memoize marks to prevent infinite re-renders
+  const sliderMarks = useMemo(() => ({
+    10: '10px',
+    50: '50px',
+    100: '100px',
+  }), [])
+
+  // 计算水平和垂直参考线数量
+  const horizontalGuides = guideLines.filter(line => line.orientation === 'horizontal')
+  const verticalGuides = guideLines.filter(line => line.orientation === 'vertical')
 
   return (
     <div className="ruler-panel">
@@ -77,16 +79,12 @@ const RulerPanel: React.FC = () => {
           <div className="ruler-control-label">标尺刻度间隔 ({localInterval}px)</div>
           <Slider
             value={localInterval}
-            onChange={handleSliderChange}
-            onAfterChange={handleSliderAfterChange}
+            onChange={handleIntervalChange}
+            onAfterChange={handleIntervalAfterChange}
             min={10}
             max={100}
             step={10}
-            marks={{
-              10: '10px',
-              50: '50px',
-              100: '100px',
-            }}
+            marks={sliderMarks}
           />
         </div>
 

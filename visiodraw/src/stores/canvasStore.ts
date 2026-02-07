@@ -83,7 +83,7 @@ export interface CanvasState {
   selectShapes: (ids: string[]) => void
   toggleShapeSelection: (id: string) => void
   clearSelection: () => void
-  setZoom: (zoom: number) => void
+  setZoom: (zoom: number | ((prevZoom: number) => number)) => void
   setTool: (tool: string) => void
   toggleGrid: () => void
   toggleSnapToGrid: () => void
@@ -252,13 +252,14 @@ const useCanvasStore = create<CanvasState>()(
       },
 
       // 设置缩放
-      setZoom: (zoom) => {
-        const { canvas } = get()
+      setZoom: (zoomOrFn: number | ((prevZoom: number) => number)) => {
+        const { canvas, zoom: currentZoom } = get()
+        const newZoom = typeof zoomOrFn === 'function' ? zoomOrFn(currentZoom) : zoomOrFn
         if (canvas) {
-          canvas.setZoom(zoom)
+          canvas.setZoom(newZoom)
           canvas.renderAll()
         }
-        set({ zoom })
+        set({ zoom: newZoom })
       },
 
       // 设置工具
