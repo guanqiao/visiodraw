@@ -534,6 +534,8 @@ const X6Canvas: React.FC = () => {
   return (
     <div
       ref={containerRef}
+      className="x6-graph"
+      data-testid="x6-canvas"
       style={{
         width: '100%',
         height: '100%',
