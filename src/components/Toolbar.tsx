@@ -2,7 +2,7 @@ import React from 'react'
 import {
   SelectOutlined,
   BorderOutlined,
-  CircleOutlined,
+  Loading3QuartersOutlined,
   WarningOutlined,
   DeleteOutlined,
   CopyOutlined,
@@ -141,7 +141,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
                 <Button
                   data-testid="tool-circle"
                   type={currentTool === 'circle' ? 'primary' : 'default'}
-                  icon={<CircleOutlined />}
+                  icon={<Loading3QuartersOutlined style={{ transform: 'rotate(45deg)' }} />}
                   onClick={() => handleToolClick('circle')}
                 />
               </Tooltip>

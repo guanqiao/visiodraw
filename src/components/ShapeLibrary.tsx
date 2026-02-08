@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Card, Tabs, Input, Space, Tooltip } from 'antd'
 import {
   BorderOutlined,
-  CircleOutlined,
+  Loading3QuartersOutlined,
   WarningOutlined,
   GatewayOutlined,
   FileTextOutlined,
@@ -40,7 +40,7 @@ const basicShapes: ShapeItem[] = [
     id: 'circle',
     name: '圆形',
     type: 'circle',
-    icon: <CircleOutlined style={{ fontSize: 24 }} />,
+    icon: <Loading3QuartersOutlined style={{ fontSize: 24, transform: 'rotate(45deg)' }} />,
     width: 80,
     height: 80,
   },
