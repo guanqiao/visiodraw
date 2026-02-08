@@ -1,0 +1,38 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100vw;
+  height: 100vh;
+}
+
+/* X6 Graph Styles */
+.x6-graph {
+  width: 100%;
+  height: 100%;
+}
+
+.x6-node:hover {
+  cursor: move;
+}
+
+.x6-edge:hover {
+  cursor: pointer;
+}
+
+.x6-port-body {
+  visibility: hidden;
+}
+
+.x6-node:hover .x6-port-body {
+  visibility: visible;
+}
