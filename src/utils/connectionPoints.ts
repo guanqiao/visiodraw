@@ -12,10 +12,8 @@ export function getRelativePosition(position: ConnectionPointPosition | string):
       return { x: 0, y: 0.5 }
     case 'right':
       return { x: 1, y: 0.5 }
-    case 'bottom-left':
-      return { x: 0, y: 1 }
-    case 'bottom-right':
-      return { x: 1, y: 1 }
+    case 'center':
+      return { x: 0.5, y: 0.5 }
     case 'custom':
     default:
       return { x: 0.5, y: 0.5 }
@@ -35,6 +33,7 @@ export function generateDefaultConnectionPoints(shapeType: string): ConnectionPo
       isVisible: false,
       isConnected: false,
       connectedLineIds: [],
+      isDynamic: false,
     }
   })
 }
@@ -107,6 +106,7 @@ export function createConnectionPoint(
     isVisible: false,
     isConnected: false,
     connectedLineIds: [],
+    isDynamic: false,
   }
 }
 
@@ -176,6 +176,7 @@ export function findNearestConnectionPointEnhanced(
           isVisible: true,
           isConnected: false,
           connectedLineIds: [],
+          isDynamic: true,
         }
 
         minDistance = edgePoint.distance
@@ -238,6 +239,7 @@ export function createDynamicConnectionPoint(
     isVisible: false,
     isConnected: true,
     connectedLineIds: [],
+    isDynamic: true,
   }
 }
 
@@ -246,4 +248,103 @@ export function isPointInsideShape(shape: any, x: number, y: number): boolean {
     x <= shape.x + shape.width &&
     y >= shape.y &&
     y <= shape.y + shape.height
+}
+
+export function getPortIdFromPosition(position: ConnectionPointPosition): string {
+  return position
+}
+
+export function getPositionFromPortId(portId: string): ConnectionPointPosition {
+  if (['top', 'bottom', 'left', 'right', 'center'].includes(portId)) {
+    return portId as ConnectionPointPosition
+  }
+  return 'custom'
+}
+
+export function updateConnectionPointConnectionStatus(
+  connectionPoint: ConnectionPoint,
+  lineId: string,
+  isConnected: boolean
+): ConnectionPoint {
+  const newConnectedLineIds = isConnected
+    ? [...connectionPoint.connectedLineIds, lineId]
+    : connectionPoint.connectedLineIds.filter(id => id !== lineId)
+
+  return {
+    ...connectionPoint,
+    isConnected: newConnectedLineIds.length > 0,
+    connectedLineIds: newConnectedLineIds,
+  }
+}
+
+export function getConnectionPointsForX6Ports(shapeType: string): { id: string; group: string }[] {
+  const positions = defaultConnectionPointsConfig[shapeType] || ['top', 'bottom', 'left', 'right']
+  return positions.map(pos => ({
+    id: pos,
+    group: pos,
+  }))
+}
+
+export function getX6PortGroups() {
+  return {
+    top: {
+      position: 'top',
+      attrs: {
+        circle: {
+          r: 6,
+          magnet: true,
+          stroke: '#1890ff',
+          strokeWidth: 2,
+          fill: '#fff',
+          opacity: 0.3,
+        },
+      },
+    },
+    bottom: {
+      position: 'bottom',
+      attrs: {
+        circle: {
+          r: 6,
+          magnet: true,
+          stroke: '#1890ff',
+          strokeWidth: 2,
+          fill: '#fff',
+          opacity: 0.3,
+        },
+      },
+    },
+    left: {
+      position: 'left',
+      attrs: {
+        circle: {
+          r: 6,
+          magnet: true,
+          stroke: '#1890ff',
+          strokeWidth: 2,
+          fill: '#fff',
+          opacity: 0.3,
+        },
+      },
+    },
+    right: {
+      position: 'right',
+      attrs: {
+        circle: {
+          r: 6,
+          magnet: true,
+          stroke: '#1890ff',
+          strokeWidth: 2,
+          fill: '#fff',
+          opacity: 0.3,
+        },
+      },
+    },
+  }
+}
+
+export function showPorts(node: any, visible: boolean) {
+  const ports = node.getPorts()
+  ports.forEach((port: any) => {
+    node.portProp(port.id, 'attrs/circle/opacity', visible ? 1 : 0.3)
+  })
 }

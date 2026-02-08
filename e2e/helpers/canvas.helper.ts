@@ -80,14 +80,14 @@ export class CanvasHelper {
   /**
    * Get all nodes on canvas
    */
-  async getNodes() {
+  getNodes(): Locator {
     return this.page.locator('.x6-node')
   }
 
   /**
    * Get all edges on canvas
    */
-  async getEdges() {
+  getEdges(): Locator {
     return this.page.locator('.x6-edge')
   }
 

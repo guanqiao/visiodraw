@@ -1,6 +1,13 @@
 import React from 'react'
 import { Space, Button, Slider } from 'antd'
-import { ZoomInOutlined, ZoomOutOutlined } from '@ant-design/icons'
+import {
+  ZoomInOutlined,
+  ZoomOutOutlined,
+  BorderOuterOutlined,
+  GatewayOutlined,
+  SelectOutlined,
+  BorderOutlined,
+} from '@ant-design/icons'
 import useX6GraphStore from '@stores/x6GraphStore'
 
 const StatusBar: React.FC = () => {
@@ -43,9 +50,11 @@ const StatusBar: React.FC = () => {
       {/* 左侧信息 */}
       <Space size={24}>
         <span data-testid="selection-count">
+          <SelectOutlined style={{ marginRight: 4, opacity: 0.6 }} />
           选中: {selectedNodeIds.length} 个对象
         </span>
         <span>
+          <BorderOutlined style={{ marginRight: 4, opacity: 0.6 }} />
           图形: {nodes.length} 个
         </span>
       </Space>
@@ -55,6 +64,7 @@ const StatusBar: React.FC = () => {
         <Button
           size="small"
           type={gridEnabled ? 'primary' : 'default'}
+          icon={<BorderOuterOutlined />}
           onClick={toggleGrid}
         >
           网格
@@ -62,6 +72,7 @@ const StatusBar: React.FC = () => {
         <Button
           size="small"
           type={snapToGrid ? 'primary' : 'default'}
+          icon={<GatewayOutlined />}
           onClick={toggleSnapToGrid}
         >
           吸附

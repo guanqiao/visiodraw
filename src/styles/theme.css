@@ -1,0 +1,103 @@
+/* Theme System CSS Variables */
+
+/* Light Theme (Default) */
+:root {
+  /* Background Colors */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f5f5f5;
+  --bg-tertiary: #fafafa;
+  --bg-hover: #f0f0f0;
+  --bg-active: #e6f7ff;
+
+  /* Border Colors */
+  --border-color: #d9d9d9;
+  --border-color-light: #f0f0f0;
+  --border-color-dark: #bfbfbf;
+
+  /* Text Colors */
+  --text-primary: #333333;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --text-disabled: #bfbfbf;
+
+  /* Accent Colors */
+  --accent-color: #1890ff;
+  --accent-hover: #40a9ff;
+  --accent-active: #096dd9;
+
+  /* Status Colors */
+  --success-color: #52c41a;
+  --warning-color: #fa8c16;
+  --error-color: #f5222d;
+  --info-color: #1890ff;
+
+  /* Canvas Colors */
+  --canvas-bg: #f0f2f5;
+  --canvas-grid: #e0e0e0;
+  --canvas-dot: #d0d0d0;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark Theme - for both #root and body */
+[data-theme="dark"],
+body[data-theme="dark"] {
+  /* Background Colors */
+  --bg-primary: #2c2c2c;
+  --bg-secondary: #1e1e1e;
+  --bg-tertiary: #252525;
+  --bg-hover: #3a3a3a;
+  --bg-active: #1f4a75;
+
+  /* Border Colors */
+  --border-color: #3e3e3e;
+  --border-color-light: #4a4a4a;
+  --border-color-dark: #2a2a2a;
+
+  /* Text Colors */
+  --text-primary: #e0e0e0;
+  --text-secondary: #b0b0b0;
+  --text-tertiary: #808080;
+  --text-disabled: #606060;
+
+  /* Accent Colors */
+  --accent-color: #18a0fb;
+  --accent-hover: #4db8ff;
+  --accent-active: #0d80d8;
+
+  /* Status Colors */
+  --success-color: #4caf50;
+  --warning-color: #ff9800;
+  --error-color: #f44336;
+  --info-color: #2196f3;
+
+  /* Canvas Colors */
+  --canvas-bg: #1e1e1e;
+  --canvas-grid: #3a3a3a;
+  --canvas-dot: #404040;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.5);
+}
+
+/* Apply theme to root element */
+#root {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  min-height: 100vh;
+}
+
+/* Apply theme to body as fallback */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  margin: 0;
+  padding: 0;
+}

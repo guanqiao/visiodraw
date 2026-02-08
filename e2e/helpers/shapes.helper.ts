@@ -123,8 +123,14 @@ export class ShapesHelper {
   /**
    * Drag shape to new position
    */
-  async dragShape(index: number, deltaX: number, deltaY: number) {
-    const shape = await this.getShape(index)
+  async dragShape(shapeOrIndex: Locator | number, deltaX: number, deltaY: number) {
+    let shape: Locator
+    if (typeof shapeOrIndex === 'number') {
+      shape = await this.getShape(shapeOrIndex)
+    } else {
+      shape = shapeOrIndex
+    }
+    
     const box = await shape.boundingBox()
     if (!box) throw new Error('Shape not found')
     
@@ -138,9 +144,9 @@ export class ShapesHelper {
   }
 
   /**
-   * Resize shape
+   * Resize shape using resize handle
    */
-  async resizeShape(index: number, handle: 'se' | 'sw' | 'ne' | 'nw', deltaX: number, deltaY: number) {
+  async resizeShapeByHandle(index: number, handle: 'se' | 'sw' | 'ne' | 'nw', deltaX: number, deltaY: number) {
     const shape = await this.getShape(index)
     const resizeHandle = shape.locator(`.x6-resize-${handle}`)
     
@@ -148,6 +154,36 @@ export class ShapesHelper {
       targetPosition: { x: deltaX, y: deltaY },
     })
     await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Resize shape to specific dimensions
+   */
+  async resizeShape(shapeOrIndex: Locator | number, newWidth: number, newHeight: number) {
+    let shape: Locator
+    if (typeof shapeOrIndex === 'number') {
+      shape = await this.getShape(shapeOrIndex)
+    } else {
+      shape = shapeOrIndex
+    }
+    
+    const box = await shape.boundingBox()
+    if (!box) throw new Error('Shape not found')
+    
+    // Calculate resize handle position (southeast corner)
+    const handleX = box.x + box.width
+    const handleY = box.y + box.height
+    
+    // Calculate new handle position
+    const newHandleX = box.x + newWidth
+    const newHandleY = box.y + newHeight
+    
+    // Move to handle and drag to new position
+    await this.page.mouse.move(handleX, handleY)
+    await this.page.mouse.down()
+    await this.page.mouse.move(newHandleX, newHandleY, { steps: 3 })
+    await this.page.mouse.up()
+    await this.page.waitForTimeout(300)
   }
 
   /**

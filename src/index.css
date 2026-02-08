@@ -21,6 +21,15 @@ body {
   height: 100%;
 }
 
+/* Hand tool cursor styles */
+.x6-graph.x6-panning {
+  cursor: grabbing !important;
+}
+
+.x6-graph[data-tool="hand"] {
+  cursor: grab;
+}
+
 .x6-node:hover {
   cursor: move;
 }
@@ -29,10 +38,18 @@ body {
   cursor: pointer;
 }
 
+/* Connection points (ports) - always visible but semi-transparent */
 .x6-port-body {
-  visibility: hidden;
+  visibility: visible;
+  opacity: 0.3;
+  transition: opacity 0.2s;
 }
 
 .x6-node:hover .x6-port-body {
-  visibility: visible;
+  opacity: 1;
+}
+
+/* Ensure ports are clickable */
+.x6-port {
+  pointer-events: all;
 }

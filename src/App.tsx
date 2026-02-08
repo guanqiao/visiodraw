@@ -7,16 +7,25 @@ import PropertyPanel from '@components/PropertyPanel'
 import ShapeLibrary from '@components/ShapeLibrary'
 import LayerPanel from '@components/LayerPanel'
 import TemplateGallery from '@components/TemplateGallery'
+import CanvasHistoryPanel from '@components/CanvasHistoryPanel'
+import SequenceScriptEditor from '@components/SequenceScriptEditor'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
+import { useTheme } from '@hooks/useTheme'
 import { v4 as uuidv4 } from 'uuid'
+import './styles/theme.css'
 
 const { Content, Sider } = Layout
 const { TabPane } = Tabs
 
 const App: React.FC = () => {
   const [showTemplates, setShowTemplates] = useState(false)
-  const [showStencils, setShowStencils] = useState(false)
+  const [, setShowStencils] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
+  const [showScriptEditor, setShowScriptEditor] = useState(false)
+
+  // Initialize theme system
+  useTheme()
 
   const {
     newGraph,
@@ -151,23 +160,56 @@ const App: React.FC = () => {
         onSaveFile={handleSaveFile}
         onShowTemplates={() => setShowTemplates(true)}
         onShowStencils={() => setShowStencils(true)}
+        onShowHistory={() => setShowHistory(true)}
+        onShowScriptEditor={() => setShowScriptEditor(true)}
       />
       
       <Layout style={{ flex: 1, overflow: 'hidden' }}>
-        <Sider width={280} style={{ background: '#fff', borderRight: '1px solid #f0f0f0', overflow: 'auto' }}>
+        <Sider
+          width={280}
+          style={{
+            background: 'var(--bg-primary)',
+            borderRight: '1px solid var(--border-color)',
+            overflow: 'auto',
+          }}
+        >
           <ShapeLibrary />
         </Sider>
-        
-        <Content style={{ position: 'relative', overflow: 'hidden' }}>
+
+        <Content style={{ position: 'relative', overflow: 'hidden', flex: 1, height: '100%' }}>
           <X6Canvas />
         </Content>
-        
-        <Sider width={300} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0', overflow: 'hidden' }}>
+
+        <Sider
+          width={300}
+          style={{
+            background: 'var(--bg-primary)',
+            borderLeft: '1px solid var(--border-color)',
+            overflow: 'hidden',
+          }}
+        >
           <Tabs defaultActiveKey="properties" size="small" style={{ height: '100%' }}>
-            <TabPane tab="属性" key="properties" style={{ height: 'calc(100% - 40px)', overflow: 'auto', padding: '16px' }}>
+            <TabPane
+              tab="属性"
+              key="properties"
+              style={{
+                height: 'calc(100% - 40px)',
+                overflow: 'auto',
+                padding: '16px',
+                background: 'var(--bg-primary)',
+              }}
+            >
               <PropertyPanel />
             </TabPane>
-            <TabPane tab="图层" key="layers" style={{ height: 'calc(100% - 40px)', overflow: 'auto' }}>
+            <TabPane
+              tab="图层"
+              key="layers"
+              style={{
+                height: 'calc(100% - 40px)',
+                overflow: 'auto',
+                background: 'var(--bg-primary)',
+              }}
+            >
               <LayerPanel />
             </TabPane>
           </Tabs>
@@ -177,6 +219,8 @@ const App: React.FC = () => {
       <StatusBar />
       
       <TemplateGallery visible={showTemplates} onClose={() => setShowTemplates(false)} />
+      <CanvasHistoryPanel visible={showHistory} onClose={() => setShowHistory(false)} />
+      <SequenceScriptEditor visible={showScriptEditor} onClose={() => setShowScriptEditor(false)} />
     </Layout>
   )
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback } from 'react'
+import React, { useEffect, useRef, useCallback, useState } from 'react'
 import { Graph, Node, Edge } from '@antv/x6'
 import { Snapline } from '@antv/x6-plugin-snapline'
 import { Transform } from '@antv/x6-plugin-transform'
@@ -8,14 +8,36 @@ import { History } from '@antv/x6-plugin-history'
 import { Selection } from '@antv/x6-plugin-selection'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
+import useFormatPainterStore from '@stores/formatPainterStore'
+import { THEME_CHANGE_EVENT } from '@hooks/useTheme'
 import { v4 as uuidv4 } from 'uuid'
-import type { DragData, DropPosition } from '../types/dragDrop'
 import { parseDragData } from '../types/dragDrop'
-import { generateDefaultConnectionPoints } from '@utils/connectionPoints'
+import { generateDefaultConnectionPoints, showPorts } from '@utils/connectionPoints'
+import { ConnectorRenderer } from '@utils/connectorRenderer'
+import { renderShape } from '@utils/shapeRenderers'
 
 const X6Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
   const graphRef = useRef<Graph | null>(null)
+
+  // Get current theme from DOM
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === 'undefined') return false
+    const root = document.getElementById('root')
+    return root?.getAttribute('data-theme') === 'dark'
+  })
+
+  // Listen to theme changes
+  useEffect(() => {
+    const handleThemeChange = (e: CustomEvent) => {
+      setIsDark(e.detail === 'dark')
+    }
+
+    window.addEventListener(THEME_CHANGE_EVENT as any, handleThemeChange as any)
+    return () => {
+      window.removeEventListener(THEME_CHANGE_EVENT as any, handleThemeChange as any)
+    }
+  }, [])
 
   // Store selectors
   const setGraph = useX6GraphStore((state) => state.setGraph)
@@ -25,44 +47,65 @@ const X6Canvas: React.FC = () => {
   const deleteNode = useX6GraphStore((state) => state.deleteNode)
   const deleteNodes = useX6GraphStore((state) => state.deleteNodes)
   const selectNode = useX6GraphStore((state) => state.selectNode)
-  const selectNodes = useX6GraphStore((state) => state.selectNodes)
   const clearSelection = useX6GraphStore((state) => state.clearSelection)
   const addEdge = useX6GraphStore((state) => state.addEdge)
+  const updateEdge = useX6GraphStore((state) => state.updateEdge)
   const deleteEdge = useX6GraphStore((state) => state.deleteEdge)
   const selectEdge = useX6GraphStore((state) => state.selectEdge)
   const nodes = useX6GraphStore((state) => state.nodes)
   const edges = useX6GraphStore((state) => state.edges)
-  const selectedNodeIds = useX6GraphStore((state) => state.selectedNodeIds)
-  const selectedEdgeId = useX6GraphStore((state) => state.selectedEdgeId)
   const currentTool = useX6GraphStore((state) => state.currentTool)
   const setTool = useX6GraphStore((state) => state.setTool)
   const gridEnabled = useX6GraphStore((state) => state.gridEnabled)
-  const zoom = useX6GraphStore((state) => state.zoom)
+  const gridType = useX6GraphStore((state) => state.gridType)
+  const gridSize = useX6GraphStore((state) => state.gridSize)
+  const canvasBgColor = useX6GraphStore((state) => state.canvasBgColor)
   const setZoom = useX6GraphStore((state) => state.setZoom)
+  const autoSaveToHistory = useX6GraphStore((state) => state.autoSaveToHistory)
 
   const copy = useClipboardStore((state) => state.copy)
-  const cut = useClipboardStore((state) => state.cut)
   const paste = useClipboardStore((state) => state.paste)
+
+  // Format painter store
+  const copiedNodeStyle = useFormatPainterStore((state) => state.copiedNodeStyle)
+  const copiedEdgeStyle = useFormatPainterStore((state) => state.copiedEdgeStyle)
+  const copyNodeStyle = useFormatPainterStore((state) => state.copyNodeStyle)
+  const copyEdgeStyle = useFormatPainterStore((state) => state.copyEdgeStyle)
+  const pasteNodeStyle = useFormatPainterStore((state) => state.pasteNodeStyle)
+  const pasteEdgeStyle = useFormatPainterStore((state) => state.pasteEdgeStyle)
+  const isPersistentMode = useFormatPainterStore((state) => state.isPersistentMode)
+  const setPersistentMode = useFormatPainterStore((state) => state.setPersistentMode)
 
   // Initialize X6 Graph
   useEffect(() => {
     if (!containerRef.current) return
 
-    const graph = new Graph({
+    // 根据主题获取默认画布背景色
+    const defaultBgColor = isDark ? '#1e1e1e' : '#f0f2f5'
+    const bgColor = canvasBgColor || defaultBgColor
+
+    // 根据主题获取网格颜色
+    const gridColor = isDark
+      ? (gridType === 'line' ? '#3a3a3a' : '#404040')
+      : (gridType === 'line' ? '#e0e0e0' : '#d0d0d0')
+
+    const graph: Graph = new Graph({
       container: containerRef.current,
-      width: 1200,
-      height: 800,
+      autoResize: true,
       background: {
-        color: '#ffffff',
+        color: bgColor,
       },
       grid: {
-        visible: gridEnabled,
-        size: 10,
-        type: 'dot',
+        visible: gridEnabled && gridType !== 'none',
+        size: gridSize,
+        type: gridType === 'line' ? 'mesh' : 'dot',
+        args: {
+          color: gridColor,
+          thickness: 1,
+        },
       },
       panning: {
-        enabled: true,
-        eventTypes: ['leftMouseDown', 'mouseWheel'],
+        enabled: false,
       },
       mousewheel: {
         enabled: true,
@@ -71,17 +114,18 @@ const X6Canvas: React.FC = () => {
         maxScale: 3,
       },
       connecting: {
-        enabled: true,
         allowBlank: false,
         allowMulti: true,
         allowLoop: false,
-        allowNode: false,
+        allowNode: true,
         allowEdge: false,
         highlight: true,
+        anchor: 'center',
+        connectionPoint: 'anchor',
         snap: {
           radius: 20,
         },
-        createEdge() {
+        createEdge(): Edge {
           return graph.createEdge({
             attrs: {
               line: {
@@ -101,27 +145,10 @@ const X6Canvas: React.FC = () => {
             },
           })
         },
-        validateConnection({ sourceCell, targetCell }) {
-          return sourceCell !== targetCell
+        validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell }) {
+          // 确保从连接点(magnet)开始，且不是同一个节点
+          return !!sourceMagnet && !!targetMagnet && sourceCell !== targetCell
         },
-      },
-      selecting: {
-        enabled: true,
-        multiple: true,
-        rubberband: true,
-        movable: true,
-        showNodeSelectionBox: true,
-        showEdgeSelectionBox: true,
-      },
-      keyboard: {
-        enabled: true,
-        global: true,
-      },
-      clipboard: {
-        enabled: true,
-      },
-      history: {
-        enabled: true,
       },
     })
 
@@ -169,10 +196,34 @@ const X6Canvas: React.FC = () => {
       })
     )
 
+    // Event handlers for connection points visibility
+    graph.on('node:mouseenter', ({ node }: { node: Node }) => {
+      showPorts(node, true)
+    })
+
+    graph.on('node:mouseleave', ({ node }: { node: Node }) => {
+      showPorts(node, false)
+    })
+
+    // Debug connecting events
+    graph.on('edge:connected', ({ edge, type }: { edge: Edge; type: string }) => {
+      console.log('Edge connected:', type, edge.id)
+    })
+
+    graph.on('edge:created', ({ edge }: { edge: Edge }) => {
+      console.log('Edge created:', edge.id)
+    })
+
     // Event handlers
-    graph.on('node:added', ({ node }) => {
+    graph.on('node:added', ({ node }: { node: Node }) => {
       const data = node.getData() as any
       if (data?.fromStore) return
+
+      // Check if node already exists in store (prevent duplicate)
+      const existingNodes = useX6GraphStore.getState().nodes
+      if (existingNodes.find(n => n.id === node.id)) {
+        return
+      }
 
       const nodeData = {
         id: node.id,
@@ -181,31 +232,31 @@ const X6Canvas: React.FC = () => {
         y: node.position().y,
         width: node.size().width,
         height: node.size().height,
-        fill: node.attr('body/fill') || '#ffffff',
-        stroke: node.attr('body/stroke') || '#333333',
-        strokeWidth: node.attr('body/strokeWidth') || 2,
-        text: node.attr('label/text') || '',
+        fill: (node.attr('body/fill') as string) || '#ffffff',
+        stroke: (node.attr('body/stroke') as string) || '#333333',
+        strokeWidth: (node.attr('body/strokeWidth') as number) || 2,
+        text: (node.attr('label/text') as string) || '',
         connectionPoints: generateDefaultConnectionPoints(node.shape || 'rect'),
       }
       node.setData({ fromStore: true })
       addNode(nodeData)
     })
 
-    graph.on('node:moved', ({ node }) => {
+    graph.on('node:moved', ({ node }: { node: Node }) => {
       updateNode(node.id, {
         x: node.position().x,
         y: node.position().y,
       })
     })
 
-    graph.on('node:resized', ({ node }) => {
+    graph.on('node:resized', ({ node }: { node: Node }) => {
       updateNode(node.id, {
         width: node.size().width,
         height: node.size().height,
       })
     })
 
-    graph.on('node:selected', ({ node }) => {
+    graph.on('node:selected', ({ node }: { node: Node }) => {
       selectNode(node.id)
     })
 
@@ -213,7 +264,86 @@ const X6Canvas: React.FC = () => {
       clearSelection()
     })
 
-    graph.on('edge:added', ({ edge }) => {
+    // Double click to edit node text
+    graph.on('node:dblclick', ({ node, e }: { node: Node; e: any }) => {
+      e.stopPropagation()
+      
+      // Get current text
+      const currentText = (node.attr('label/text') as string) || ''
+      
+      // Create inline editor
+      const editor = document.createElement('div')
+      editor.contentEditable = 'true'
+      editor.innerText = currentText
+      // 根据主题设置编辑器样式
+      const editorBgColor = isDark ? '#2c2c2c' : '#ffffff'
+      const editorTextColor = isDark ? '#e0e0e0' : '#333333'
+      const editorBorderColor = isDark ? '#18a0fb' : '#1890ff'
+      editor.style.cssText = `
+        position: fixed;
+        background: ${editorBgColor};
+        color: ${editorTextColor};
+        border: 2px solid ${editorBorderColor};
+        padding: 4px 8px;
+        border-radius: 4px;
+        outline: none;
+        min-width: 60px;
+        text-align: center;
+        font-size: 14px;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      `
+      
+      // Get node's position on screen using X6's localToClient method
+      const position = node.getPosition()
+      const size = node.getSize()
+      
+      // Convert local coordinates to client coordinates
+      const clientPoint = graph.localToClient(
+        position.x + size.width / 2,
+        position.y + size.height / 2
+      )
+      
+      // Center the editor on the node
+      editor.style.left = `${clientPoint.x - 30}px`
+      editor.style.top = `${clientPoint.y - 15}px`
+      
+      document.body.appendChild(editor)
+      editor.focus()
+      
+      // Select all text
+      const range = document.createRange()
+      range.selectNodeContents(editor)
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+      
+      // Handle save
+      const save = () => {
+        const newText = editor.innerText.trim()
+        // Always update text, even if empty (use empty string instead of undefined)
+        updateNode(node.id, { text: newText })
+        node.attr('label/text', newText || '')
+        document.body.removeChild(editor)
+      }
+      
+      // Handle cancel
+      const cancel = () => {
+        document.body.removeChild(editor)
+      }
+      
+      editor.addEventListener('blur', save)
+      editor.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter') {
+          evt.preventDefault()
+          editor.blur()
+        } else if (evt.key === 'Escape') {
+          cancel()
+        }
+      })
+    })
+
+    graph.on('edge:added', ({ edge }: { edge: Edge }) => {
       const data = edge.getData() as any
       if (data?.fromStore) return
 
@@ -221,45 +351,23 @@ const X6Canvas: React.FC = () => {
       const target = edge.getTarget()
 
       if (source && target) {
-        const edgeData = {
-          id: edge.id,
-          sourceShapeId: (source as any).cell,
-          sourcePointId: (source as any).port || 'default',
-          targetShapeId: (target as any).cell,
-          targetPointId: (target as any).port || 'default',
-          style: 'orthogonal' as const,
-          startStyle: 'none' as const,
-          endStyle: 'arrow' as const,
-          stroke: edge.attr('line/stroke') || '#333333',
-          strokeWidth: edge.attr('line/strokeWidth') || 2,
-        }
+        const connector = ConnectorRenderer.fromX6Edge(edge)
         edge.setData({ fromStore: true })
-        addEdge(edgeData)
+        addEdge(connector)
       }
     })
 
-    graph.on('edge:connected', ({ edge }) => {
+    graph.on('edge:connected', ({ edge }: { edge: Edge }) => {
       const source = edge.getSource()
       const target = edge.getTarget()
 
       if (source && target) {
-        const edgeData = {
-          id: edge.id,
-          sourceShapeId: (source as any).cell,
-          sourcePointId: (source as any).port || 'default',
-          targetShapeId: (target as any).cell,
-          targetPointId: (target as any).port || 'default',
-          style: 'orthogonal' as const,
-          startStyle: 'none' as const,
-          endStyle: 'arrow' as const,
-          stroke: '#333333',
-          strokeWidth: 2,
-        }
-        addEdge(edgeData)
+        const connector = ConnectorRenderer.fromX6Edge(edge)
+        addEdge(connector)
       }
     })
 
-    graph.on('edge:selected', ({ edge }) => {
+    graph.on('edge:selected', ({ edge }: { edge: Edge }) => {
       selectEdge(edge.id)
     })
 
@@ -267,25 +375,133 @@ const X6Canvas: React.FC = () => {
       clearSelection()
     })
 
+    // Double click to edit edge label
+    graph.on('edge:dblclick', ({ edge, e }: { edge: Edge; e: any }) => {
+      e.stopPropagation()
+      
+      // Get current labels
+      const labels = edge.getLabels()
+      const hasExistingLabel = labels && labels.length > 0
+      const currentText = hasExistingLabel 
+        ? ((labels[0].attrs?.text?.text as string) || '') 
+        : ''
+      
+      // Create inline editor
+      const editor = document.createElement('div')
+      editor.contentEditable = 'true'
+      editor.innerText = currentText
+      // 根据主题设置编辑器样式
+      const editorBgColor = isDark ? '#2c2c2c' : '#ffffff'
+      const editorTextColor = isDark ? '#e0e0e0' : '#333333'
+      const editorBorderColor = isDark ? '#18a0fb' : '#1890ff'
+      editor.style.cssText = `
+        position: absolute;
+        background: ${editorBgColor};
+        color: ${editorTextColor};
+        border: 2px solid ${editorBorderColor};
+        padding: 4px 8px;
+        border-radius: 4px;
+        outline: none;
+        min-width: 60px;
+        text-align: center;
+        font-size: 12px;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      `
+      
+      // Position editor at mouse position
+      editor.style.left = `${e.clientX - 30}px`
+      editor.style.top = `${e.clientY - 15}px`
+      
+      document.body.appendChild(editor)
+      editor.focus()
+      
+      // Select all text
+      const range = document.createRange()
+      range.selectNodeContents(editor)
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+      
+      // Handle save
+      const save = () => {
+        const newText = editor.innerText.trim()
+        
+        if (hasExistingLabel) {
+          // Update existing label
+          const connector = ConnectorRenderer.fromX6Edge(edge)
+          const updatedLabels = connector.labels?.map((label: any, index: number) => {
+            if (index === 0) {
+              return { ...label, text: newText }
+            }
+            return label
+          }) || []
+          updateEdge(edge.id, { labels: updatedLabels })
+          
+          // Update X6 edge
+          const labelConfig = {
+            attrs: {
+              text: {
+                text: newText,
+              },
+            },
+          }
+          edge.setLabelAt(0, labelConfig)
+        } else {
+          // Add new label
+          const newLabel = {
+            id: uuidv4(),
+            text: newText,
+            position: 0.5,
+            fontSize: 12,
+            color: '#333333',
+          }
+          const connector = ConnectorRenderer.fromX6Edge(edge)
+          const updatedLabels = [...(connector.labels || []), newLabel]
+          updateEdge(edge.id, { labels: updatedLabels })
+          
+          // Update X6 edge
+          ConnectorRenderer.updateEdgeLabel(edge, newLabel, 0)
+        }
+        
+        document.body.removeChild(editor)
+      }
+      
+      // Handle cancel
+      const cancel = () => {
+        document.body.removeChild(editor)
+      }
+      
+      editor.addEventListener('blur', save)
+      editor.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter') {
+          evt.preventDefault()
+          editor.blur()
+        } else if (evt.key === 'Escape') {
+          cancel()
+        }
+      })
+    })
+
     graph.on('blank:click', () => {
       clearSelection()
     })
 
-    graph.on('scale', ({ sx }) => {
+    graph.on('scale', ({ sx }: { sx: number }) => {
       setZoom(sx)
     })
 
     // Keyboard shortcuts
     graph.bindKey(['delete', 'backspace'], () => {
-      const selectedNodes = graph.getSelectedCells().filter(cell => cell.isNode())
-      const selectedEdges = graph.getSelectedCells().filter(cell => cell.isEdge())
+      const selectedNodes = graph.getSelectedCells().filter((cell: any) => cell.isNode())
+      const selectedEdges = graph.getSelectedCells().filter((cell: any) => cell.isEdge())
       
-      selectedNodes.forEach(node => {
+      selectedNodes.forEach((node: any) => {
         deleteNode(node.id)
         graph.removeCell(node.id)
       })
       
-      selectedEdges.forEach(edge => {
+      selectedEdges.forEach((edge: any) => {
         deleteEdge(edge.id)
         graph.removeCell(edge.id)
       })
@@ -296,8 +512,8 @@ const X6Canvas: React.FC = () => {
       if (selectedCells.length > 0) {
         graph.copy(selectedCells)
         const selectedNodes = selectedCells
-          .filter(cell => cell.isNode())
-          .map(cell => nodes.find(n => n.id === cell.id))
+          .filter((cell: any) => cell.isNode())
+          .map((cell: any) => nodes.find(n => n.id === cell.id))
           .filter(Boolean)
         copy(selectedNodes as any[])
       }
@@ -308,8 +524,8 @@ const X6Canvas: React.FC = () => {
       if (selectedCells.length > 0) {
         graph.cut(selectedCells)
         const selectedNodeIds = selectedCells
-          .filter(cell => cell.isNode())
-          .map(cell => cell.id)
+          .filter((cell: any) => cell.isNode())
+          .map((cell: any) => cell.id)
         deleteNodes(selectedNodeIds)
       }
     })
@@ -342,10 +558,164 @@ const X6Canvas: React.FC = () => {
       graph.select(graph.getCells())
     })
 
+    // Duplicate (Ctrl+D) - Copy and paste in place
+    graph.bindKey(['ctrl+d', 'meta+d'], () => {
+      const selectedCells = graph.getSelectedCells()
+      if (selectedCells.length === 0) return
+
+      graph.copy(selectedCells)
+      graph.paste({ offset: 20 })
+    })
+
+    // Zoom shortcuts
+    graph.bindKey(['ctrl+0', 'meta+0'], () => {
+      graph.zoomTo(1)
+      setZoom(1)
+    })
+
+    graph.bindKey(['ctrl+1', 'meta+1'], () => {
+      graph.zoomToFit({ padding: 20 })
+      setZoom(graph.zoom())
+    })
+
+    graph.bindKey(['ctrl+=', 'meta+='], () => {
+      const newZoom = Math.min(graph.zoom() + 0.1, 3)
+      graph.zoomTo(newZoom)
+      setZoom(newZoom)
+    })
+
+    graph.bindKey(['ctrl+-', 'meta+-'], () => {
+      const newZoom = Math.max(graph.zoom() - 0.1, 0.1)
+      graph.zoomTo(newZoom)
+      setZoom(newZoom)
+    })
+
+    // Layer ordering shortcuts
+    graph.bindKey(['ctrl+]', 'meta+]'], () => {
+      const selectedCells = graph.getSelectedCells()
+      selectedCells.forEach((cell: any) => {
+        if (cell.isNode()) {
+          cell.toFront()
+        }
+      })
+    })
+
+    graph.bindKey(['ctrl+[', 'meta+['], () => {
+      const selectedCells = graph.getSelectedCells()
+      selectedCells.forEach((cell: any) => {
+        if (cell.isNode()) {
+          cell.toBack()
+        }
+      })
+    })
+
+    // Escape to clear selection
+    graph.bindKey('esc', () => {
+      clearSelection()
+      graph.cleanSelection()
+    })
+
+    // Format painter: Copy style (Ctrl+Shift+C)
+    graph.bindKey(['ctrl+shift+c', 'meta+shift+c'], () => {
+      const selectedCells = graph.getSelectedCells()
+      if (selectedCells.length === 0) return
+
+      // Copy style from the first selected node or edge
+      const firstCell = selectedCells[0]
+      if (firstCell.isNode()) {
+        const node = firstCell as Node
+        const style = {
+          fill: (node.attr('body/fill') as string) || '#ffffff',
+          stroke: (node.attr('body/stroke') as string) || '#333333',
+          strokeWidth: (node.attr('body/strokeWidth') as number) || 2,
+          fontSize: (node.attr('label/fontSize') as number) || 14,
+          fontColor: (node.attr('label/fill') as string) || '#333333',
+        }
+        copyNodeStyle(style)
+        console.log('Node style copied:', style)
+      } else if (firstCell.isEdge()) {
+        const edge = firstCell as Edge
+        const lineStyle: 'solid' | 'dashed' | 'dotted' = (edge.attr('line/style/animation') as string) === 'dash' ? 'dashed' : 'solid'
+        const style = {
+          stroke: (edge.attr('line/stroke') as string) || '#333333',
+          strokeWidth: (edge.attr('line/strokeWidth') as number) || 2,
+          lineStyle,
+          sourceMarker: (edge.attr('line/sourceMarker/name') as string) || 'none',
+          targetMarker: (edge.attr('line/targetMarker/name') as string) || 'classic',
+          router: (edge.getRouter() as any)?.name || 'normal',
+        }
+        copyEdgeStyle(style)
+        console.log('Edge style copied:', style)
+      }
+    })
+
+    // Format painter: Paste style (Ctrl+Shift+V)
+    graph.bindKey(['ctrl+shift+v', 'meta+shift+v'], () => {
+      const selectedCells = graph.getSelectedCells()
+      if (selectedCells.length === 0) return
+
+      selectedCells.forEach((cell) => {
+        if (cell.isNode()) {
+          const style = pasteNodeStyle()
+          if (style) {
+            const node = cell as Node
+            node.attr({
+              body: {
+                fill: style.fill,
+                stroke: style.stroke,
+                strokeWidth: style.strokeWidth,
+              },
+              label: {
+                fontSize: style.fontSize,
+                fill: style.fontColor,
+              },
+            })
+            // Update store
+            updateNode(node.id, {
+              fill: style.fill,
+              stroke: style.stroke,
+              strokeWidth: style.strokeWidth,
+              fontSize: style.fontSize,
+              fontColor: style.fontColor,
+            })
+          }
+        } else if (cell.isEdge()) {
+          const style = pasteEdgeStyle()
+          if (style) {
+            const edge = cell as Edge
+            edge.attr({
+              line: {
+                stroke: style.stroke,
+                strokeWidth: style.strokeWidth,
+                sourceMarker: style.sourceMarker !== 'none' ? { name: style.sourceMarker, size: 10 } : null,
+                targetMarker: style.targetMarker !== 'none' ? { name: style.targetMarker, size: 10 } : null,
+              },
+            })
+            // Update router if needed
+            if (style.router && style.router !== 'normal') {
+              edge.setRouter(style.router)
+            }
+            // Update store
+            updateEdge(edge.id, {
+              stroke: style.stroke,
+              strokeWidth: style.strokeWidth,
+              lineStyle: style.lineStyle,
+            })
+          }
+        }
+      })
+    })
+
     graphRef.current = graph
     setGraph(graph)
 
+    // Set up auto save interval (check every minute)
+    const autoSaveInterval = setInterval(() => {
+      autoSaveToHistory()
+    }, 60000)
+
     return () => {
+      clearInterval(autoSaveInterval)
       graph.dispose()
       graphRef.current = null
     }
@@ -372,13 +742,14 @@ const X6Canvas: React.FC = () => {
 
     // Add or update nodes from store
     nodes.forEach(node => {
-      const existingNode = graph.getCellById(node.id) as Node
-      if (!existingNode) {
+      const existingCell = graph.getCellById(node.id)
+      if (!existingCell) {
         // Node doesn't exist in graph, create it
         const x6Node = createX6NodeFromData(node)
         graph.addNode(x6Node)
-      } else {
+      } else if (existingCell.isNode()) {
         // Update existing node
+        const existingNode = existingCell as Node
         existingNode.position(node.x, node.y)
         existingNode.size(node.width, node.height)
         existingNode.attr({
@@ -413,15 +784,50 @@ const X6Canvas: React.FC = () => {
       }
     })
 
-    // Add edges from store
+    // Add or update edges from store
     edges.forEach(edge => {
       const existingEdge = graph.getCellById(edge.id) as Edge
       if (!existingEdge) {
-        const x6Edge = createX6EdgeFromData(edge)
-        graph.addEdge(x6Edge)
+        const x6EdgeConfig = ConnectorRenderer.toX6Edge(edge)
+        graph.addEdge(x6EdgeConfig)
+      } else {
+        // Update existing edge if needed
+        ConnectorRenderer.updateEdgeStyle(existingEdge, edge.style)
+        ConnectorRenderer.updateEdgeMarkers(existingEdge, edge.startStyle, edge.endStyle)
+        ConnectorRenderer.updateEdgeAppearance(existingEdge, {
+          stroke: edge.stroke,
+          strokeWidth: edge.strokeWidth,
+          lineStyle: edge.lineStyle,
+        })
       }
     })
   }, [edges])
+
+  // Handle theme changes - update canvas background and grid
+  useEffect(() => {
+    const graph = graphRef.current
+    if (!graph) return
+
+    // 根据主题更新画布背景
+    const defaultBgColor = isDark ? '#1e1e1e' : '#f0f2f5'
+    const bgColor = canvasBgColor || defaultBgColor
+    graph.drawBackground({ color: bgColor })
+
+    // 根据主题更新网格颜色
+    if (gridEnabled && gridType !== 'none') {
+      const gridColor = isDark
+        ? (gridType === 'line' ? '#3a3a3a' : '#404040')
+        : (gridType === 'line' ? '#e0e0e0' : '#d0d0d0')
+      graph.clearGrid()
+      graph.drawGrid({
+        type: gridType === 'line' ? 'mesh' : 'dot',
+        args: {
+          color: gridColor,
+          thickness: 1,
+        },
+      })
+    }
+  }, [isDark, canvasBgColor, gridEnabled, gridType])
 
   // Handle tool changes
   useEffect(() => {
@@ -429,12 +835,16 @@ const X6Canvas: React.FC = () => {
     if (!graph) return
 
     // Reset interaction mode
-    graph.enablePanning()
+    graph.disablePanning()
     graph.disableRubberband()
 
     switch (currentTool) {
       case 'select':
         graph.enableRubberband()
+        break
+      case 'hand':
+        // Enable panning with left mouse button for hand tool
+        graph.enablePanning()
         break
       case 'connector':
         // Enable connecting mode
@@ -462,14 +872,8 @@ const X6Canvas: React.FC = () => {
     const graph = graphRef.current
     if (!graph) return
 
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-
-    // Convert to local coordinates
-    const localPoint = graph.pageToLocal(x, y)
+    // Convert to local coordinates directly from client coordinates
+    const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
 
     const id = uuidv4()
     const shapeType = dragData.shapeType || 'rectangle'
@@ -501,12 +905,8 @@ const X6Canvas: React.FC = () => {
     const graph = graphRef.current
     if (!graph) return
 
-    const rect = containerRef.current?.getBoundingClientRect()
-    if (!rect) return
-
-    const x = e.clientX - rect.left
-    const y = e.clientY - rect.top
-    const localPoint = graph.pageToLocal(x, y)
+    // Convert to local coordinates directly from client coordinates
+    const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
 
     const id = uuidv4()
     const width = 100
@@ -531,17 +931,35 @@ const X6Canvas: React.FC = () => {
     setTool('select')
   }, [currentTool, addNode, setTool])
 
+  // Get cursor style based on current tool
+  const getCursorStyle = () => {
+    switch (currentTool) {
+      case 'select':
+        return 'default'
+      case 'hand':
+        return 'grab'
+      case 'rectangle':
+      case 'circle':
+      case 'triangle':
+        return 'crosshair'
+      default:
+        return 'default'
+    }
+  }
+
   return (
     <div
       ref={containerRef}
       className="x6-graph"
       data-testid="x6-canvas"
+      data-grid-type={gridType}
+      data-tool={currentTool}
       style={{
         width: '100%',
         height: '100%',
         overflow: 'hidden',
-        backgroundColor: '#f0f2f5',
-        cursor: currentTool === 'select' ? 'default' : 'crosshair',
+        backgroundColor: canvasBgColor,
+        cursor: getCursorStyle(),
       }}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -552,124 +970,18 @@ const X6Canvas: React.FC = () => {
 
 // Helper function to create X6 node from data
 function createX6NodeFromData(node: any): Node {
-  const baseConfig = {
+  return renderShape(node.type, {
     id: node.id,
     x: node.x,
     y: node.y,
     width: node.width,
     height: node.height,
-    attrs: {
-      body: {
-        fill: node.fill || '#ffffff',
-        stroke: node.stroke || '#333333',
-        strokeWidth: node.strokeWidth || 2,
-      },
-      label: {
-        text: node.text || '',
-        fontSize: 14,
-        fill: '#333333',
-      },
-    },
-    ports: {
-      groups: {
-        top: { position: 'top', attrs: { circle: { r: 4, magnet: true, stroke: '#1890ff', fill: '#fff' } } },
-        bottom: { position: 'bottom', attrs: { circle: { r: 4, magnet: true, stroke: '#1890ff', fill: '#fff' } } },
-        left: { position: 'left', attrs: { circle: { r: 4, magnet: true, stroke: '#1890ff', fill: '#fff' } } },
-        right: { position: 'right', attrs: { circle: { r: 4, magnet: true, stroke: '#1890ff', fill: '#fff' } } },
-      },
-      items: [
-        { id: 'top', group: 'top' },
-        { id: 'bottom', group: 'bottom' },
-        { id: 'left', group: 'left' },
-        { id: 'right', group: 'right' },
-      ],
-    },
-    data: { fromStore: true },
-  }
-
-  switch (node.type) {
-    case 'circle':
-    case 'start-end':
-      return new Node({
-        ...baseConfig,
-        shape: 'circle',
-      })
-    case 'ellipse':
-      return new Node({
-        ...baseConfig,
-        shape: 'ellipse',
-      })
-    case 'triangle':
-    case 'decision':
-      return new Node({
-        ...baseConfig,
-        shape: 'polygon',
-        attrs: {
-          ...baseConfig.attrs,
-          body: {
-            ...baseConfig.attrs.body,
-            refPoints: '0,100 50,0 100,100',
-          },
-        },
-      })
-    case 'diamond':
-      return new Node({
-        ...baseConfig,
-        shape: 'polygon',
-        attrs: {
-          ...baseConfig.attrs,
-          body: {
-            ...baseConfig.attrs.body,
-            refPoints: '50,0 100,50 50,100 0,50',
-          },
-        },
-      })
-    case 'rounded-rectangle':
-      return new Node({
-        ...baseConfig,
-        shape: 'rect',
-        attrs: {
-          ...baseConfig.attrs,
-          body: {
-            ...baseConfig.attrs.body,
-            rx: 10,
-            ry: 10,
-          },
-        },
-      })
-    case 'rectangle':
-    case 'process':
-    default:
-      return new Node({
-        ...baseConfig,
-        shape: 'rect',
-      })
-  }
-}
-
-// Helper function to create X6 edge from data
-function createX6EdgeFromData(edge: any): Edge {
-  return new Edge({
-    id: edge.id,
-    source: { cell: edge.sourceShapeId, port: edge.sourcePointId },
-    target: { cell: edge.targetShapeId, port: edge.targetPointId },
-    router: { name: edge.style === 'orthogonal' ? 'manhattan' : 'normal' },
-    connector: { name: 'rounded' },
-    attrs: {
-      line: {
-        stroke: edge.stroke || '#333333',
-        strokeWidth: edge.strokeWidth || 2,
-        targetMarker: edge.endStyle === 'arrow' ? {
-          name: 'classic',
-          size: 10,
-        } : null,
-        sourceMarker: edge.startStyle === 'arrow' ? {
-          name: 'classic',
-          size: 10,
-        } : null,
-      },
-    },
-    data: { fromStore: true },
+    fill: node.fill,
+    stroke: node.stroke,
+    strokeWidth: node.strokeWidth,
+    text: node.text,
+    rx: node.rx,
+    ry: node.ry,
   })
 }
 

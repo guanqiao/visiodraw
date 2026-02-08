@@ -39,7 +39,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) =
   const [searchText, setSearchText] = useState('')
   const [activeTab, setActiveTab] = useState<TemplateCategory | 'custom'>('flowchart')
 
-  const { nodes, edges, addNodes, addEdges, newGraph } = useX6GraphStore()
+  const { nodes, edges, addNodes, addEdge, newGraph } = useX6GraphStore()
 
   useEffect(() => {
     if (visible) {
@@ -59,7 +59,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) =
 
     // Add template connectors
     if (template.connectors && template.connectors.length > 0) {
-      addEdges(template.connectors)
+      template.connectors.forEach((connector) => addEdge(connector))
     }
 
     message.success(`已应用模板: ${template.name}`)

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
-import type { Template, TemplateCategory } from '../types/template'
+import type { Template } from '../types/template'
 
 const CUSTOM_TEMPLATES_KEY = 'visiodraw_custom_templates'
 

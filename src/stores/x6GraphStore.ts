@@ -2,6 +2,9 @@ import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { Graph, Node, Edge, Shape } from '@antv/x6'
 import type { ConnectionPoint, Connector } from '../types/connection'
+import { renderShape } from '../utils/shapeRenderers'
+import useCanvasHistoryStore from './canvasHistoryStore'
+import dayjs from 'dayjs'
 
 export interface ShapeData {
   id: string
@@ -22,7 +25,12 @@ export interface ShapeData {
   fontSize?: number
   fontColor?: string
   textAlign?: 'left' | 'center' | 'right'
+  zIndex?: number
+  visible?: boolean
+  locked?: boolean
 }
+
+export type GridType = 'dot' | 'line' | 'none'
 
 export interface X6GraphState {
   graph: Graph | null
@@ -32,6 +40,9 @@ export interface X6GraphState {
   selectedEdgeId: string | null
   zoom: number
   gridEnabled: boolean
+  gridType: GridType
+  gridSize: number
+  canvasBgColor: string
   snapToGrid: boolean
   currentTool: string
   isModified: boolean
@@ -51,6 +62,9 @@ export interface X6GraphState {
   setTool: (tool: string) => void
   toggleGrid: () => void
   toggleSnapToGrid: () => void
+  setGridType: (type: GridType) => void
+  setGridSize: (size: number) => void
+  setCanvasBgColor: (color: string) => void
 
   // Edge operations
   addEdge: (edge: Connector) => void
@@ -79,9 +93,19 @@ export interface X6GraphState {
   // File operations
   newGraph: () => void
   exportToPng: () => Promise<string>
+  exportToSvg: (options?: { transparent?: boolean; padding?: number }) => Promise<string>
   exportToJson: () => string
   importFromJson: (json: string) => void
+
+  // Auto save
+  autoSaveEnabled: boolean
+  lastAutoSaveTime: number
+  toggleAutoSave: () => void
+  autoSaveToHistory: () => void
 }
+
+// Auto save interval in milliseconds (5 minutes)
+const AUTO_SAVE_INTERVAL = 5 * 60 * 1000
 
 const useX6GraphStore = create<X6GraphState>()(
   devtools(
@@ -93,9 +117,14 @@ const useX6GraphStore = create<X6GraphState>()(
       selectedEdgeId: null,
       zoom: 1,
       gridEnabled: true,
+      gridType: 'dot',
+      gridSize: 10,
+      canvasBgColor: '#f0f2f5',
       snapToGrid: false,
       currentTool: 'select',
       isModified: false,
+      autoSaveEnabled: true,
+      lastAutoSaveTime: 0,
 
       setGraph: (graph) => {
         set({ graph })
@@ -306,6 +335,41 @@ const useX6GraphStore = create<X6GraphState>()(
 
       toggleSnapToGrid: () => {
         set((state) => ({ snapToGrid: !state.snapToGrid }))
+      },
+
+      setGridType: (type) => {
+        const { graph, canvasBgColor } = get()
+        set({ gridType: type })
+        if (graph) {
+          // Update grid visualization based on type
+          graph.clearGrid()
+          if (type !== 'none') {
+            // 根据画布背景色判断当前主题
+            const isDarkTheme = canvasBgColor === '#1e1e1e' || canvasBgColor === '#2c2c2c'
+            const gridColor = isDarkTheme
+              ? (type === 'line' ? '#3a3a3a' : '#404040')
+              : (type === 'line' ? '#e0e0e0' : '#d0d0d0')
+            graph.drawGrid({
+              type: type === 'line' ? 'mesh' : 'dot',
+              args: {
+                color: gridColor,
+                thickness: 1,
+              },
+            })
+          }
+        }
+      },
+
+      setGridSize: (size) => {
+        const { graph } = get()
+        set({ gridSize: size })
+        if (graph) {
+          graph.setGridSize(size)
+        }
+      },
+
+      setCanvasBgColor: (color) => {
+        set({ canvasBgColor: color })
       },
 
       addEdge: (edge) => {
@@ -555,7 +619,94 @@ const useX6GraphStore = create<X6GraphState>()(
         if (!graph) {
           throw new Error('Graph not initialized')
         }
-        return graph.toPNG()
+        return (graph as any).toPNG()
+      },
+
+      exportToSvg: async (options?: { transparent?: boolean; padding?: number }) => {
+        const { graph } = get()
+        if (!graph) {
+          throw new Error('Graph not initialized')
+        }
+
+        const { transparent = false, padding = 10 } = options || {}
+
+        // Get graph content bounds
+        const cells = graph.getCells()
+        if (cells.length === 0) {
+          throw new Error('No content to export')
+        }
+
+        // Calculate bounds
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+        cells.forEach((cell: any) => {
+          if (cell.isNode()) {
+            const pos = cell.position()
+            const size = cell.size()
+            minX = Math.min(minX, pos.x)
+            minY = Math.min(minY, pos.y)
+            maxX = Math.max(maxX, pos.x + size.width)
+            maxY = Math.max(maxY, pos.y + size.height)
+          } else if (cell.isEdge()) {
+            const bbox = cell.getBBox()
+            if (bbox) {
+              minX = Math.min(minX, bbox.x)
+              minY = Math.min(minY, bbox.y)
+              maxX = Math.max(maxX, bbox.x + bbox.width)
+              maxY = Math.max(maxY, bbox.y + bbox.height)
+            }
+          }
+        })
+
+        // Add padding
+        minX -= padding
+        minY -= padding
+        maxX += padding
+        maxY += padding
+
+        const width = maxX - minX
+        const height = maxY - minY
+
+        // Get SVG content from graph
+        const svgContent = (graph as any).toSVG()
+        if (!svgContent) {
+          throw new Error('Failed to generate SVG')
+        }
+
+        // Parse and modify SVG
+        const parser = new DOMParser()
+        const svgDoc = parser.parseFromString(svgContent, 'image/svg+xml')
+        const svgElement = svgDoc.querySelector('svg')
+
+        if (!svgElement) {
+          throw new Error('Invalid SVG content')
+        }
+
+        // Set viewBox and dimensions
+        svgElement.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`)
+        svgElement.setAttribute('width', `${width}`)
+        svgElement.setAttribute('height', `${height}`)
+
+        // Handle background
+        if (!transparent) {
+          const { canvasBgColor } = get()
+          const existingRect = svgElement.querySelector('rect[data-bg="true"]')
+          if (!existingRect) {
+            const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
+            bgRect.setAttribute('x', `${minX}`)
+            bgRect.setAttribute('y', `${minY}`)
+            bgRect.setAttribute('width', `${width}`)
+            bgRect.setAttribute('height', `${height}`)
+            bgRect.setAttribute('fill', canvasBgColor)
+            bgRect.setAttribute('data-bg', 'true')
+            svgElement.insertBefore(bgRect, svgElement.firstChild)
+          }
+        }
+
+        // Serialize back to string
+        const serializer = new XMLSerializer()
+        const svgString = serializer.serializeToString(svgElement)
+
+        return svgString
       },
 
       exportToJson: () => {
@@ -601,6 +752,7 @@ const useX6GraphStore = create<X6GraphState>()(
                 targetShapeId: cell.target?.cell,
                 targetPointId: cell.target?.port || 'default',
                 style: cell.router?.name === 'manhattan' ? 'orthogonal' : 'straight',
+                lineStyle: 'solid',
                 startStyle: 'none',
                 endStyle: cell.attrs?.line?.targetMarker ? 'arrow' : 'none',
                 stroke: cell.attrs?.line?.stroke || '#333333',
@@ -614,6 +766,43 @@ const useX6GraphStore = create<X6GraphState>()(
           console.error('Failed to import JSON:', error)
         }
       },
+
+      toggleAutoSave: () => {
+        const { autoSaveEnabled } = get()
+        set({ autoSaveEnabled: !autoSaveEnabled })
+      },
+
+      autoSaveToHistory: () => {
+        const { graph, autoSaveEnabled, lastAutoSaveTime, nodes, edges } = get()
+        
+        // Check if auto save is enabled
+        if (!autoSaveEnabled) return
+        
+        // Check if there's anything to save
+        if (nodes.length === 0 && edges.length === 0) return
+        
+        // Check if enough time has passed since last auto save
+        const now = Date.now()
+        if (now - lastAutoSaveTime < AUTO_SAVE_INTERVAL) return
+        
+        if (!graph) return
+        
+        try {
+          const data = JSON.stringify(graph.toJSON())
+          const timestamp = dayjs().format('YYYY-MM-DD HH:mm:ss')
+          
+          // Add to history without thumbnail for auto save
+          useCanvasHistoryStore.getState().addToHistory(
+            `自动保存 ${timestamp}`,
+            data
+          )
+          
+          set({ lastAutoSaveTime: now })
+          console.log('Auto saved to history at', timestamp)
+        } catch (error) {
+          console.error('Auto save failed:', error)
+        }
+      },
     }),
     { name: 'x6-graph-store' }
   )
@@ -621,74 +810,19 @@ const useX6GraphStore = create<X6GraphState>()(
 
 // Helper function to create X6 node
 function createX6Node(node: ShapeData): Node {
-  const baseConfig = {
+  return renderShape(node.type, {
     id: node.id,
     x: node.x,
     y: node.y,
     width: node.width,
     height: node.height,
-    attrs: {
-      body: {
-        fill: node.fill || '#ffffff',
-        stroke: node.stroke || '#333333',
-        strokeWidth: node.strokeWidth || 2,
-      },
-      label: {
-        text: node.text || '',
-        fontSize: node.fontSize || 14,
-        fill: node.fontColor || '#333333',
-      },
-    },
-    ports: {
-      groups: {
-        top: { position: 'top', attrs: { circle: { r: 4, magnet: true, stroke: '#1890ff', fill: '#fff' } } },
-        bottom: { position: 'bottom', attrs: { circle: { r: 4, magnet: true, stroke: '#1890ff', fill: '#fff' } } },
-        left: { position: 'left', attrs: { circle: { r: 4, magnet: true, stroke: '#1890ff', fill: '#fff' } } },
-        right: { position: 'right', attrs: { circle: { r: 4, magnet: true, stroke: '#1890ff', fill: '#fff' } } },
-      },
-      items: [
-        { id: 'top', group: 'top' },
-        { id: 'bottom', group: 'bottom' },
-        { id: 'left', group: 'left' },
-        { id: 'right', group: 'right' },
-      ],
-    },
-  }
-
-  switch (node.type) {
-    case 'circle':
-    case 'start-end':
-      return new Shape.Circle(baseConfig)
-    case 'ellipse':
-      return new Shape.Ellipse(baseConfig)
-    case 'triangle':
-    case 'decision':
-      return new Shape.Polygon({
-        ...baseConfig,
-        points: '0,100 50,0 100,100',
-      })
-    case 'diamond':
-      return new Shape.Polygon({
-        ...baseConfig,
-        points: '50,0 100,50 50,100 0,50',
-      })
-    case 'rounded-rectangle':
-      return new Shape.Rect({
-        ...baseConfig,
-        attrs: {
-          ...baseConfig.attrs,
-          body: {
-            ...baseConfig.attrs.body,
-            rx: node.rx || 10,
-            ry: node.ry || 10,
-          },
-        },
-      })
-    case 'rectangle':
-    case 'process':
-    default:
-      return new Shape.Rect(baseConfig)
-  }
+    fill: node.fill,
+    stroke: node.stroke,
+    strokeWidth: node.strokeWidth,
+    text: node.text,
+    rx: node.rx,
+    ry: node.ry,
+  })
 }
 
 // Helper function to create X6 edge

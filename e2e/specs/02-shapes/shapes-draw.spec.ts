@@ -80,20 +80,22 @@ test.describe('Shapes Drawing', () => {
 
   test('should switch between drawing tools', async ({ page }) => {
     const shapesHelper = new ShapesHelper(page)
-    
+
     // Select rectangle tool
     await shapesHelper.selectRectangleTool()
-    let rectTool = page.locator('[data-testid="tool-rectangle"]')
-    await expect(rectTool).toHaveClass(/active/)
-    
+    const rectTool = page.locator('[data-testid="tool-rectangle"]')
+    await expect(rectTool).toHaveAttribute('type', 'button')
+    // Check if the button has primary type (Ant Design uses type attribute for styling)
+    await expect(rectTool).toHaveClass(/ant-btn-primary/)
+
     // Select circle tool
     await shapesHelper.selectCircleTool()
-    let circleTool = page.locator('[data-testid="tool-circle"]')
-    await expect(circleTool).toHaveClass(/active/)
-    
+    const circleTool = page.locator('[data-testid="tool-circle"]')
+    await expect(circleTool).toHaveClass(/ant-btn-primary/)
+
     // Select select tool
     await shapesHelper.selectSelectTool()
-    let selectTool = page.locator('[data-testid="tool-select"]')
-    await expect(selectTool).toHaveClass(/active/)
+    const selectTool = page.locator('[data-testid="tool-select"]')
+    await expect(selectTool).toHaveClass(/ant-btn-primary/)
   })
 })
