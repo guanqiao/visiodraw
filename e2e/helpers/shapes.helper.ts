@@ -1,0 +1,197 @@
+import { Page, Locator, expect } from '@playwright/test'
+import { CanvasHelper } from './canvas.helper'
+
+/**
+ * Shapes helper for e2e tests
+ */
+export class ShapesHelper {
+  readonly page: Page
+  readonly canvas: CanvasHelper
+
+  constructor(page: Page) {
+    this.page = page
+    this.canvas = new CanvasHelper(page)
+  }
+
+  /**
+   * Select rectangle tool
+   */
+  async selectRectangleTool() {
+    await this.page.locator('[data-testid="tool-rectangle"]').click()
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Select circle tool
+   */
+  async selectCircleTool() {
+    await this.page.locator('[data-testid="tool-circle"]').click()
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Select triangle tool
+   */
+  async selectTriangleTool() {
+    await this.page.locator('[data-testid="tool-triangle"]').click()
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Select select tool
+   */
+  async selectSelectTool() {
+    await this.page.locator('[data-testid="tool-select"]').click()
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Draw rectangle at position
+   */
+  async drawRectangle(x: number, y: number, width: number, height: number) {
+    await this.selectRectangleTool()
+    
+    const bounds = await this.canvas.getCanvasBounds()
+    if (!bounds) throw new Error('Canvas not found')
+    
+    // Click to start drawing
+    await this.canvas.clickAt(x, y)
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Draw circle at position
+   */
+  async drawCircle(x: number, y: number, radius: number) {
+    await this.selectCircleTool()
+    
+    await this.canvas.clickAt(x, y)
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Draw triangle at position
+   */
+  async drawTriangle(x: number, y: number, size: number) {
+    await this.selectTriangleTool()
+    
+    await this.canvas.clickAt(x, y)
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Get shape by index
+   */
+  async getShape(index: number): Promise<Locator> {
+    return this.page.locator('.x6-node').nth(index)
+  }
+
+  /**
+   * Get selected shapes
+   */
+  async getSelectedShapes() {
+    return this.page.locator('.x6-node-selected, .x6-node.x6-selected')
+  }
+
+  /**
+   * Count selected shapes
+   */
+  async countSelectedShapes() {
+    return await this.getSelectedShapes().count()
+  }
+
+  /**
+   * Click on shape to select it
+   */
+  async selectShape(index: number) {
+    const shape = await this.getShape(index)
+    await shape.click()
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Multi-select shapes (Ctrl+click)
+   */
+  async multiSelectShape(index: number) {
+    const shape = await this.getShape(index)
+    await this.page.keyboard.down('Control')
+    await shape.click()
+    await this.page.keyboard.up('Control')
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Drag shape to new position
+   */
+  async dragShape(index: number, deltaX: number, deltaY: number) {
+    const shape = await this.getShape(index)
+    const box = await shape.boundingBox()
+    if (!box) throw new Error('Shape not found')
+    
+    await shape.dragTo(shape, {
+      targetPosition: {
+        x: box.width / 2 + deltaX,
+        y: box.height / 2 + deltaY,
+      },
+    })
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Resize shape
+   */
+  async resizeShape(index: number, handle: 'se' | 'sw' | 'ne' | 'nw', deltaX: number, deltaY: number) {
+    const shape = await this.getShape(index)
+    const resizeHandle = shape.locator(`.x6-resize-${handle}`)
+    
+    await resizeHandle.dragTo(resizeHandle, {
+      targetPosition: { x: deltaX, y: deltaY },
+    })
+    await this.page.waitForTimeout(200)
+  }
+
+  /**
+   * Get shape position
+   */
+  async getShapePosition(index: number) {
+    const shape = await this.getShape(index)
+    const box = await shape.boundingBox()
+    if (!box) throw new Error('Shape not found')
+    
+    return {
+      x: box.x,
+      y: box.y,
+      centerX: box.x + box.width / 2,
+      centerY: box.y + box.height / 2,
+    }
+  }
+
+  /**
+   * Get shape size
+   */
+  async getShapeSize(index: number) {
+    const shape = await this.getShape(index)
+    const box = await shape.boundingBox()
+    if (!box) throw new Error('Shape not found')
+    
+    return {
+      width: box.width,
+      height: box.height,
+    }
+  }
+
+  /**
+   * Expect shape count
+   */
+  async expectShapeCount(count: number) {
+    await expect(this.page.locator('.x6-node')).toHaveCount(count)
+  }
+
+  /**
+   * Expect selected shape count
+   */
+  async expectSelectedCount(count: number) {
+    const selectedCount = await this.countSelectedShapes()
+    expect(selectedCount).toBe(count)
+  }
+}
