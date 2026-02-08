@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { optimizeHistory, deepClone, performanceMonitor } from '@utils/performanceUtils'
-import type { ConnectionPoint, Connector } from '../types/connection'
+import type { ConnectionPoint, Connector, ConnectorStyle } from '../types/connection'
 
 export interface Shape {
   id: string
@@ -63,6 +63,7 @@ export interface CanvasState {
   isDrawingConnector: boolean
   connectorStartShapeId: string | null
   connectorStartPointId: string | null
+  defaultConnectorStyle: ConnectorStyle
 
   // 历史记录
   history: Shape[][]
@@ -108,6 +109,7 @@ export interface CanvasState {
   startDrawingConnector: (shapeId: string, pointId: string) => void
   endDrawingConnector: (shapeId: string, pointId: string) => void
   cancelDrawingConnector: () => void
+  setDefaultConnectorStyle: (style: ConnectorStyle) => void
 
   // 历史操作
   undo: () => void
@@ -145,6 +147,7 @@ const useCanvasStore = create<CanvasState>()(
       isDrawingConnector: false,
       connectorStartShapeId: null,
       connectorStartPointId: null,
+      defaultConnectorStyle: 'orthogonal',
 
       history: [[]],
       historyIndex: 0,
@@ -482,6 +485,11 @@ const useCanvasStore = create<CanvasState>()(
           connectorStartShapeId: null,
           connectorStartPointId: null,
         })
+      },
+
+      // 设置默认连接线样式
+      setDefaultConnectorStyle: (style) => {
+        set({ defaultConnectorStyle: style })
       },
 
       // 撤销

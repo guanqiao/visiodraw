@@ -20,7 +20,8 @@ import {
   getNearestEdgePoint,
   isNearShapeEdge,
 } from '@utils/connectionPoints'
-import { createConnectorObjects, calculateStraightPath, calculateOrthogonalPath, calculateCurvedPath, pointsToPath } from '@utils/connectorRenderer'
+import {
+  createConnectorObjects, calculateStraightPath, calculateOrthogonalPath, calculateCurvedPath, pointsToPath } from '@utils/connectorRenderer'
 import { defaultConnectionPointOptions } from '../types/connection'
 import type { ConnectionPoint, ConnectorStyle } from '../types/connection'
 import type { DragData, DropPosition } from '../types/dragDrop'
@@ -55,6 +56,9 @@ const Canvas: React.FC = () => {
   const alignmentLinesRef = useRef<fabric.Line[]>([])
   const SNAP_THRESHOLD = 10 // 吸附阈值（像素）
 
+  // 防止事件循环的标志
+  const isProcessingSelectionRef = useRef(false)
+
   const {
     setCanvas,
     currentTool,
@@ -79,6 +83,7 @@ const Canvas: React.FC = () => {
     autoSwitchToSelect,
     toggleShapeSelection,
     clearSelection,
+    defaultConnectorStyle,
   } = useCanvasStore()
 
   const { copy, cut, paste } = useClipboardStore()
@@ -127,41 +132,66 @@ const Canvas: React.FC = () => {
 
     // 监听对象选择事件
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    canvas.on('selection:created', (e: any) => {
+    const handleSelectionCreated = (e: any) => {
+      if (isProcessingSelectionRef.current) return
+      isProcessingSelectionRef.current = true
+
       const activeObject = e.selected?.[0]
       if (activeObject && activeObject.id) {
         // 检查是否是连接线
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((activeObject as any).type === 'connector') {
           selectConnector(activeObject.id as string)
-          selectShape(null)
+          clearSelection()
         } else {
           selectShape(activeObject.id as string)
           selectConnector(null)
         }
       }
-    })
+
+      // 使用setTimeout确保在下一次事件循环中重置标志
+      setTimeout(() => {
+        isProcessingSelectionRef.current = false
+      }, 0)
+    }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    canvas.on('selection:updated', (e: any) => {
+    const handleSelectionUpdated = (e: any) => {
+      if (isProcessingSelectionRef.current) return
+      isProcessingSelectionRef.current = true
+
       const activeObject = e.selected?.[0]
       if (activeObject && activeObject.id) {
         // 检查是否是连接线
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((activeObject as any).type === 'connector') {
           selectConnector(activeObject.id as string)
-          selectShape(null)
+          clearSelection()
         } else {
           selectShape(activeObject.id as string)
           selectConnector(null)
         }
       }
-    })
 
-    canvas.on('selection:cleared', () => {
-      selectShape(null)
-      selectConnector(null)
-    })
+      setTimeout(() => {
+        isProcessingSelectionRef.current = false
+      }, 0)
+    }
+
+    const handleSelectionCleared = () => {
+      if (isProcessingSelectionRef.current) return
+      isProcessingSelectionRef.current = true
+
+      clearSelection()
+
+      setTimeout(() => {
+        isProcessingSelectionRef.current = false
+      }, 0)
+    }
+
+    canvas.on('selection:created', handleSelectionCreated)
+    canvas.on('selection:updated', handleSelectionUpdated)
+    canvas.on('selection:cleared', handleSelectionCleared)
 
     // 监听对象修改事件
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,7 +250,7 @@ const Canvas: React.FC = () => {
             const edgePoint = getNearestEdgePoint(shape, pointer.x, pointer.y)
             isDrawingLineRef.current = true
             lineStartRef.current = { x: edgePoint.x, y: edgePoint.y, shapeId: shape.id }
-            currentLineStyleRef.current = 'straight'
+            currentLineStyleRef.current = defaultConnectorStyle
             createPreviewLine(edgePoint.x, edgePoint.y, edgePoint.x, edgePoint.y)
             return
           }
@@ -238,7 +268,7 @@ const Canvas: React.FC = () => {
             shapes.find((s) => s.id === shapeId)!.connectionPoints!.find((p) => p.id === connectionPointId)!
           )
           lineStartRef.current = { x: pos.x, y: pos.y, shapeId, pointId: connectionPointId }
-          currentLineStyleRef.current = 'straight'
+          currentLineStyleRef.current = defaultConnectorStyle
 
           // 创建预览线
           createPreviewLine(pos.x, pos.y, pos.x, pos.y)
@@ -253,7 +283,7 @@ const Canvas: React.FC = () => {
             const edgePoint = getNearestEdgePoint(shape, pointer.x, pointer.y)
             isDrawingLineRef.current = true
             lineStartRef.current = { x: edgePoint.x, y: edgePoint.y, shapeId: shape.id }
-            currentLineStyleRef.current = 'straight'
+            currentLineStyleRef.current = defaultConnectorStyle
             createPreviewLine(edgePoint.x, edgePoint.y, edgePoint.x, edgePoint.y)
             return
           }
@@ -472,6 +502,9 @@ const Canvas: React.FC = () => {
 
     // 清理函数
     return () => {
+      canvas.off('selection:created', handleSelectionCreated)
+      canvas.off('selection:updated', handleSelectionUpdated)
+      canvas.off('selection:cleared', handleSelectionCleared)
       canvas.dispose()
       fabricCanvasRef.current = null
     }
@@ -1021,6 +1054,39 @@ const Canvas: React.FC = () => {
         )
         break
       }
+      case 'input-output': {
+        // 输入/输出使用Path绘制（平行四边形）
+        const skew = width * 0.2
+        shape = new fabric.Path(
+          `M ${skew} 0 L ${width} 0 L ${width - skew} ${height} L 0 ${height} Z`,
+          {
+            ...commonProps,
+          }
+        )
+        break
+      }
+      case 'document': {
+        // 文档使用Path绘制
+        shape = new fabric.Path(
+          `M 0 0 L ${width - 20} 0 L ${width} 20 L ${width} ${height} L 0 ${height} Z`,
+          {
+            ...commonProps,
+          }
+        )
+        break
+      }
+      case 'database': {
+        // 数据库使用自定义Path绘制
+        const rx = width / 2
+        const ry = height / 4
+        shape = new fabric.Path(
+          `M 0 ${ry} A ${rx} ${ry} 0 0 1 ${width} ${ry} L ${width} ${height - ry} A ${rx} ${ry} 0 0 1 0 ${height - ry} Z M 0 ${ry * 2} A ${rx} ${ry * 0.5} 0 0 0 ${width} ${ry * 2}`,
+          {
+            ...commonProps,
+          }
+        )
+        break
+      }
       case 'line':
       case 'arrow':
       case 'double-arrow':
@@ -1155,11 +1221,27 @@ const Canvas: React.FC = () => {
             height: shapeData.height,
           })
           break
+        case 'rounded-rectangle':
+          shape = new fabric.Rect({
+            ...commonProps,
+            width: shapeData.width,
+            height: shapeData.height,
+            rx: (shapeData as unknown as { rx?: number }).rx || 10,
+            ry: (shapeData as unknown as { ry?: number }).ry || 10,
+          })
+          break
         case 'circle':
         case 'start-end':
           shape = new fabric.Circle({
             ...commonProps,
             radius: (shapeData as unknown as { radius?: number }).radius || shapeData.width / 2,
+          })
+          break
+        case 'ellipse':
+          shape = new fabric.Ellipse({
+            ...commonProps,
+            rx: (shapeData as unknown as { rx?: number }).rx || shapeData.width / 2,
+            ry: (shapeData as unknown as { ry?: number }).ry || shapeData.height / 2,
           })
           break
         case 'triangle':
@@ -1176,6 +1258,45 @@ const Canvas: React.FC = () => {
           const halfH = shapeData.height / 2
           shape = new fabric.Path(
             `M ${halfW} 0 L ${shapeData.width} ${halfH} L ${halfW} ${shapeData.height} L 0 ${halfH} Z`,
+            {
+              ...commonProps,
+            }
+          )
+          break
+        }
+        case 'input-output': {
+          // 输入/输出使用Path绘制（平行四边形）
+          const w = shapeData.width
+          const h = shapeData.height
+          const skew = w * 0.2
+          shape = new fabric.Path(
+            `M ${skew} 0 L ${w} 0 L ${w - skew} ${h} L 0 ${h} Z`,
+            {
+              ...commonProps,
+            }
+          )
+          break
+        }
+        case 'document': {
+          // 文档使用Path绘制
+          const w = shapeData.width
+          const h = shapeData.height
+          shape = new fabric.Path(
+            `M 0 0 L ${w - 20} 0 L ${w} 20 L ${w} ${h} L 0 ${h} Z`,
+            {
+              ...commonProps,
+            }
+          )
+          break
+        }
+        case 'database': {
+          // 数据库使用自定义Path绘制
+          const w = shapeData.width
+          const h = shapeData.height
+          const rx = w / 2
+          const ry = h / 4
+          shape = new fabric.Path(
+            `M 0 ${ry} A ${rx} ${ry} 0 0 1 ${w} ${ry} L ${w} ${h - ry} A ${rx} ${ry} 0 0 1 0 ${h - ry} Z M 0 ${ry * 2} A ${rx} ${ry * 0.5} 0 0 0 ${w} ${ry * 2}`,
             {
               ...commonProps,
             }
