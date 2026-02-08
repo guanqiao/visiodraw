@@ -62,6 +62,12 @@ export interface X6GraphState {
   alignNodes: (alignment: 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom') => void
   distributeNodes: (direction: 'horizontal' | 'vertical') => void
 
+  // Layer operations
+  bringToFront: (id: string) => void
+  sendToBack: (id: string) => void
+  bringForward: (id: string) => void
+  sendBackward: (id: string) => void
+
   // Connection points
   updateNodeConnectionPoints: (id: string, connectionPoints: ConnectionPoint[]) => void
 
@@ -448,6 +454,64 @@ const useX6GraphStore = create<X6GraphState>()(
             currentY += node.height + gap
           })
         }
+      },
+
+      bringToFront: (id) => {
+        const { graph, nodes } = get()
+        if (graph) {
+          const cell = graph.getCellById(id)
+          if (cell) {
+            cell.toFront()
+          }
+        }
+        // Update z-index in store
+        const maxZ = Math.max(...nodes.map(n => n.zIndex || 0), 0)
+        const newNodes = nodes.map(n => n.id === id ? { ...n, zIndex: maxZ + 1 } : n)
+        set({ nodes: newNodes })
+      },
+
+      sendToBack: (id) => {
+        const { graph, nodes } = get()
+        if (graph) {
+          const cell = graph.getCellById(id)
+          if (cell) {
+            cell.toBack()
+          }
+        }
+        // Update z-index in store
+        const minZ = Math.min(...nodes.map(n => n.zIndex || 0), 0)
+        const newNodes = nodes.map(n => n.id === id ? { ...n, zIndex: minZ - 1 } : n)
+        set({ nodes: newNodes })
+      },
+
+      bringForward: (id) => {
+        const { graph, nodes } = get()
+        const node = nodes.find(n => n.id === id)
+        if (!node) return
+
+        if (graph) {
+          const cell = graph.getCellById(id)
+          if (cell) {
+            cell.toFront()
+          }
+        }
+        const newNodes = nodes.map(n => n.id === id ? { ...n, zIndex: (n.zIndex || 0) + 1 } : n)
+        set({ nodes: newNodes })
+      },
+
+      sendBackward: (id) => {
+        const { graph, nodes } = get()
+        const node = nodes.find(n => n.id === id)
+        if (!node) return
+
+        if (graph) {
+          const cell = graph.getCellById(id)
+          if (cell) {
+            cell.toBack()
+          }
+        }
+        const newNodes = nodes.map(n => n.id === id ? { ...n, zIndex: (n.zIndex || 0) - 1 } : n)
+        set({ nodes: newNodes })
       },
 
       updateNodeConnectionPoints: (id, connectionPoints) => {

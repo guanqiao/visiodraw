@@ -1,14 +1,18 @@
 import React, { useState } from 'react'
-import { Layout, message } from 'antd'
+import { Layout, message, Tabs } from 'antd'
 import X6Canvas from '@components/X6Canvas'
 import Toolbar from '@components/Toolbar'
 import StatusBar from '@components/StatusBar'
 import PropertyPanel from '@components/PropertyPanel'
+import ShapeLibrary from '@components/ShapeLibrary'
+import LayerPanel from '@components/LayerPanel'
+import TemplateGallery from '@components/TemplateGallery'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { v4 as uuidv4 } from 'uuid'
 
 const { Content, Sider } = Layout
+const { TabPane } = Tabs
 
 const App: React.FC = () => {
   const [showTemplates, setShowTemplates] = useState(false)
@@ -150,16 +154,29 @@ const App: React.FC = () => {
       />
       
       <Layout style={{ flex: 1, overflow: 'hidden' }}>
+        <Sider width={280} style={{ background: '#fff', borderRight: '1px solid #f0f0f0', overflow: 'auto' }}>
+          <ShapeLibrary />
+        </Sider>
+        
         <Content style={{ position: 'relative', overflow: 'hidden' }}>
           <X6Canvas />
         </Content>
         
-        <Sider width={300} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0', padding: '16px', overflow: 'auto' }}>
-          <PropertyPanel />
+        <Sider width={300} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0', overflow: 'hidden' }}>
+          <Tabs defaultActiveKey="properties" size="small" style={{ height: '100%' }}>
+            <TabPane tab="属性" key="properties" style={{ height: 'calc(100% - 40px)', overflow: 'auto', padding: '16px' }}>
+              <PropertyPanel />
+            </TabPane>
+            <TabPane tab="图层" key="layers" style={{ height: 'calc(100% - 40px)', overflow: 'auto' }}>
+              <LayerPanel />
+            </TabPane>
+          </Tabs>
         </Sider>
       </Layout>
       
       <StatusBar />
+      
+      <TemplateGallery visible={showTemplates} onClose={() => setShowTemplates(false)} />
     </Layout>
   )
 }
