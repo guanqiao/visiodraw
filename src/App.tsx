@@ -1,31 +1,33 @@
-import React, { useEffect } from 'react'
+import React, { useState } from 'react'
 import { Layout, message } from 'antd'
 import X6Canvas from '@components/X6Canvas'
+import Toolbar from '@components/Toolbar'
+import StatusBar from '@components/StatusBar'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { v4 as uuidv4 } from 'uuid'
 
-const { Header, Sider, Content } = Layout
+const { Content } = Layout
 
 const App: React.FC = () => {
+  const [showTemplates, setShowTemplates] = useState(false)
+  const [showStencils, setShowStencils] = useState(false)
+
   const {
     newGraph,
     nodes,
     selectedNodeIds,
-    deleteNode,
     deleteNodes,
     addNodes,
     selectNode,
-    zoom,
-    setZoom,
-    alignNodes,
-    distributeNodes,
+    importFromJson,
+    exportToJson,
   } = useX6GraphStore()
 
   const { copy, cut, paste } = useClipboardStore()
 
   // Keyboard shortcuts
-  useEffect(() => {
+  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Delete
       if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -69,93 +71,88 @@ const App: React.FC = () => {
         }
       }
 
-      // Zoom
-      if ((e.ctrlKey || e.metaKey) && e.key === '=') {
+      // New file
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault()
-        setZoom(z => Math.min(z + 0.1, 3))
+        handleNewFile()
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === '-') {
+
+      // Open file
+      if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
         e.preventDefault()
-        setZoom(z => Math.max(z - 0.1, 0.1))
+        handleOpenFile()
       }
-      if ((e.ctrlKey || e.metaKey) && e.key === '0') {
+
+      // Save file
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
-        setZoom(1)
+        handleSaveFile()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [selectedNodeIds, nodes, deleteNodes, copy, cut, paste, addNodes, selectNode, setZoom])
+  }, [selectedNodeIds, nodes, deleteNodes, copy, cut, paste, addNodes, selectNode])
 
-  // Alignment handlers
-  const handleAlignLeft = () => {
-    alignNodes('left')
-    message.success('左对齐完成')
+  const handleNewFile = () => {
+    if (nodes.length > 0) {
+      const confirmed = window.confirm('当前画布有未保存的内容，确定要新建吗？')
+      if (!confirmed) return
+    }
+    newGraph()
+    message.success('新建画布')
   }
 
-  const handleAlignCenter = () => {
-    alignNodes('center')
-    message.success('水平居中完成')
+  const handleOpenFile = () => {
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = '.json'
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0]
+      if (file) {
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          try {
+            const json = event.target?.result as string
+            importFromJson(json)
+            message.success('文件已打开')
+          } catch (error) {
+            message.error('打开文件失败')
+          }
+        }
+        reader.readAsText(file)
+      }
+    }
+    input.click()
   }
 
-  const handleAlignRight = () => {
-    alignNodes('right')
-    message.success('右对齐完成')
-  }
-
-  const handleAlignTop = () => {
-    alignNodes('top')
-    message.success('顶端对齐完成')
-  }
-
-  const handleAlignMiddle = () => {
-    alignNodes('middle')
-    message.success('垂直居中完成')
-  }
-
-  const handleAlignBottom = () => {
-    alignNodes('bottom')
-    message.success('底端对齐完成')
-  }
-
-  const handleDistributeHorizontal = () => {
-    distributeNodes('horizontal')
-    message.success('水平分布完成')
-  }
-
-  const handleDistributeVertical = () => {
-    distributeNodes('vertical')
-    message.success('垂直分布完成')
+  const handleSaveFile = () => {
+    const json = exportToJson()
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `visiodraw-${Date.now()}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+    message.success('文件已保存')
   }
 
   return (
-    <Layout style={{ height: '100vh' }}>
-      <Header style={{ height: 'auto', padding: 0, background: '#fff', borderBottom: '1px solid #f0f0f0' }}>
-        <div style={{ padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 16 }}>
-          <h1 style={{ margin: 0, fontSize: 18 }}>VisioDraw X6</h1>
-          <div style={{ flex: 1 }} />
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={handleAlignLeft}>左对齐</button>
-            <button onClick={handleAlignCenter}>水平居中</button>
-            <button onClick={handleAlignRight}>右对齐</button>
-            <button onClick={handleAlignTop}>顶端对齐</button>
-            <button onClick={handleAlignMiddle}>垂直居中</button>
-            <button onClick={handleAlignBottom}>底端对齐</button>
-            <button onClick={handleDistributeHorizontal}>水平分布</button>
-            <button onClick={handleDistributeVertical}>垂直分布</button>
-          </div>
-        </div>
-      </Header>
-      <Layout>
-        <Content style={{ position: 'relative' }}>
-          <X6Canvas />
-        </Content>
-      </Layout>
-      <div style={{ padding: '8px 16px', background: '#f5f5f5', borderTop: '1px solid #d9d9d9' }}>
-        <span>Zoom: {Math.round(zoom * 100)}%</span>
-        <span style={{ marginLeft: 16 }}>Selected: {selectedNodeIds.length} nodes</span>
-      </div>
+    <Layout style={{ height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <Toolbar
+        onNewFile={handleNewFile}
+        onOpenFile={handleOpenFile}
+        onSaveFile={handleSaveFile}
+        onShowTemplates={() => setShowTemplates(true)}
+        onShowStencils={() => setShowStencils(true)}
+      />
+      
+      <Content style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        <X6Canvas />
+      </Content>
+      
+      <StatusBar />
     </Layout>
   )
 }
