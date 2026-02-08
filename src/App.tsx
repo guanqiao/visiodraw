@@ -3,11 +3,12 @@ import { Layout, message } from 'antd'
 import X6Canvas from '@components/X6Canvas'
 import Toolbar from '@components/Toolbar'
 import StatusBar from '@components/StatusBar'
+import PropertyPanel from '@components/PropertyPanel'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { v4 as uuidv4 } from 'uuid'
 
-const { Content } = Layout
+const { Content, Sider } = Layout
 
 const App: React.FC = () => {
   const [showTemplates, setShowTemplates] = useState(false)
@@ -148,9 +149,15 @@ const App: React.FC = () => {
         onShowStencils={() => setShowStencils(true)}
       />
       
-      <Content style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
-        <X6Canvas />
-      </Content>
+      <Layout style={{ flex: 1, overflow: 'hidden' }}>
+        <Content style={{ position: 'relative', overflow: 'hidden' }}>
+          <X6Canvas />
+        </Content>
+        
+        <Sider width={300} style={{ background: '#fff', borderLeft: '1px solid #f0f0f0', padding: '16px', overflow: 'auto' }}>
+          <PropertyPanel />
+        </Sider>
+      </Layout>
       
       <StatusBar />
     </Layout>
