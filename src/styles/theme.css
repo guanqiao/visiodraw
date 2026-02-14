@@ -101,3 +101,31 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* Resizable Panel Handle Styles */
+.resize-handle {
+  position: relative;
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 4px;
+  height: 40px;
+  border-radius: 2px;
+  background-color: var(--border-color-dark);
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.resize-handle:hover::before,
+.resize-handle[data-resize-handle-active]::before {
+  opacity: 0.6;
+}
+
+.resize-handle:hover {
+  background-color: var(--accent-color) !important;
+}

@@ -1,6 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useRef, useCallback, useEffect } from 'react'
 import { Layout, message, Tabs } from 'antd'
-import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import X6Canvas from '@components/X6Canvas'
 import Toolbar from '@components/Toolbar'
 import StatusBar from '@components/StatusBar'
@@ -10,22 +9,125 @@ import LayerPanel from '@components/LayerPanel'
 import TemplateGallery from '@components/TemplateGallery'
 import CanvasHistoryPanel from '@components/CanvasHistoryPanel'
 import SequenceScriptEditor from '@components/SequenceScriptEditor'
+import SqlExportDialog from '@components/SqlExportDialog'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { useTheme } from '@hooks/useTheme'
 import { v4 as uuidv4 } from 'uuid'
 import './styles/theme.css'
 
-const { Content, Sider } = Layout
 const { TabPane } = Tabs
+
+interface ResizableSiderProps {
+  children: React.ReactNode
+  width: number
+  minWidth: number
+  maxWidth: number
+  side: 'left' | 'right'
+  onWidthChange: (width: number) => void
+  style?: React.CSSProperties
+}
+
+const ResizableSider: React.FC<ResizableSiderProps> = ({
+  children,
+  width,
+  minWidth,
+  maxWidth,
+  side,
+  onWidthChange,
+  style,
+}) => {
+  const [isResizing, setIsResizing] = useState(false)
+  const startXRef = useRef(0)
+  const startWidthRef = useRef(width)
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setIsResizing(true)
+    startXRef.current = e.clientX
+    startWidthRef.current = width
+  }, [width])
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return
+
+      const delta = side === 'left'
+        ? e.clientX - startXRef.current
+        : startXRef.current - e.clientX
+
+      let newWidth = startWidthRef.current + delta
+      newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth))
+      onWidthChange(newWidth)
+    }
+
+    const handleMouseUp = () => {
+      setIsResizing(false)
+    }
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove)
+      document.addEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = 'col-resize'
+      document.body.style.userSelect = 'none'
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+  }, [isResizing, minWidth, maxWidth, onWidthChange, side])
+
+  return (
+    <div style={{ position: 'relative', display: 'flex', height: '100%', ...style }}>
+      <div style={{ width, overflow: 'auto', flexShrink: 0 }}>
+        {children}
+      </div>
+      <div
+        onMouseDown={handleMouseDown}
+        style={{
+          position: 'absolute',
+          [side]: -4,
+          top: 0,
+          bottom: 0,
+          width: 8,
+          cursor: 'col-resize',
+          zIndex: 10,
+          background: isResizing ? 'var(--accent-color)' : 'transparent',
+          transition: 'background 0.2s',
+        }}
+        className="resize-handle"
+      />
+    </div>
+  )
+}
 
 const App: React.FC = () => {
   const [showTemplates, setShowTemplates] = useState(false)
   const [, setShowStencils] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showScriptEditor, setShowScriptEditor] = useState(false)
+  const [showSqlExport, setShowSqlExport] = useState(false)
 
-  // Initialize theme system
+  const [leftWidth, setLeftWidth] = useState(() => {
+    const saved = localStorage.getItem('left-panel-width')
+    return saved ? parseInt(saved, 10) : 280
+  })
+  const [rightWidth, setRightWidth] = useState(() => {
+    const saved = localStorage.getItem('right-panel-width')
+    return saved ? parseInt(saved, 10) : 300
+  })
+
+  useEffect(() => {
+    localStorage.setItem('left-panel-width', leftWidth.toString())
+  }, [leftWidth])
+
+  useEffect(() => {
+    localStorage.setItem('right-panel-width', rightWidth.toString())
+  }, [rightWidth])
+
   useTheme()
 
   const {
@@ -41,10 +143,8 @@ const App: React.FC = () => {
 
   const { copy, cut, paste } = useClipboardStore()
 
-  // Keyboard shortcuts
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Delete
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedNodeIds.length > 0) {
           deleteNodes(selectedNodeIds)
@@ -52,7 +152,6 @@ const App: React.FC = () => {
         }
       }
 
-      // Copy
       if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
         if (selectedNodeIds.length > 0) {
           const selectedNodes = nodes.filter(n => selectedNodeIds.includes(n.id))
@@ -61,7 +160,6 @@ const App: React.FC = () => {
         }
       }
 
-      // Cut
       if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
         if (selectedNodeIds.length > 0) {
           const selectedNodes = nodes.filter(n => selectedNodeIds.includes(n.id))
@@ -70,7 +168,6 @@ const App: React.FC = () => {
         }
       }
 
-      // Paste
       if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         const result = paste()
         if (result && result.shapes.length > 0) {
@@ -86,19 +183,16 @@ const App: React.FC = () => {
         }
       }
 
-      // New file
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault()
         handleNewFile()
       }
 
-      // Open file
       if ((e.ctrlKey || e.metaKey) && e.key === 'o') {
         e.preventDefault()
         handleOpenFile()
       }
 
-      // Save file
       if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault()
         handleSaveFile()
@@ -163,30 +257,37 @@ const App: React.FC = () => {
         onShowStencils={() => setShowStencils(true)}
         onShowHistory={() => setShowHistory(true)}
         onShowScriptEditor={() => setShowScriptEditor(true)}
+        onShowSqlExport={() => setShowSqlExport(true)}
       />
       
       <Layout style={{ flex: 1, overflow: 'hidden' }}>
-        <Sider
-          width={280}
+        <ResizableSider
+          side="left"
+          width={leftWidth}
+          minWidth={200}
+          maxWidth={500}
+          onWidthChange={setLeftWidth}
           style={{
             background: 'var(--bg-primary)',
             borderRight: '1px solid var(--border-color)',
-            overflow: 'auto',
           }}
         >
           <ShapeLibrary />
-        </Sider>
+        </ResizableSider>
 
-        <Content style={{ position: 'relative', overflow: 'hidden', flex: 1, height: '100%' }}>
+        <div style={{ position: 'relative', overflow: 'hidden', flex: 1, height: '100%' }}>
           <X6Canvas />
-        </Content>
+        </div>
 
-        <Sider
-          width={300}
+        <ResizableSider
+          side="right"
+          width={rightWidth}
+          minWidth={200}
+          maxWidth={500}
+          onWidthChange={setRightWidth}
           style={{
             background: 'var(--bg-primary)',
             borderLeft: '1px solid var(--border-color)',
-            overflow: 'hidden',
           }}
         >
           <Tabs defaultActiveKey="properties" size="small" style={{ height: '100%' }}>
@@ -214,7 +315,7 @@ const App: React.FC = () => {
               <LayerPanel />
             </TabPane>
           </Tabs>
-        </Sider>
+        </ResizableSider>
       </Layout>
       
       <StatusBar />
@@ -222,8 +323,39 @@ const App: React.FC = () => {
       <TemplateGallery visible={showTemplates} onClose={() => setShowTemplates(false)} />
       <CanvasHistoryPanel visible={showHistory} onClose={() => setShowHistory(false)} />
       <SequenceScriptEditor visible={showScriptEditor} onClose={() => setShowScriptEditor(false)} />
+      <SqlExportDialog
+        visible={showSqlExport}
+        tables={nodes
+          .filter((n) => n.type === 'er-table-entity-with-columns' || n.type === 'er-table-entity')
+          .map((n) => ({
+            id: n.id,
+            name: n.text?.split('\n')[0] || 'untitled',
+            columns: parseColumnsFromText(n.text || ''),
+          }))}
+        onCancel={() => setShowSqlExport(false)}
+      />
     </Layout>
   )
+}
+
+function parseColumnsFromText(text: string) {
+  const lines = text.split('\n').filter((l) => l.trim())
+  if (lines.length <= 1) return []
+  
+  return lines.slice(1).map((line) => {
+    const parts = line.trim().split(/\s+/)
+    const name = parts[0] || ''
+    const type = parts[1] || 'varchar'
+    const constraints: string[] = []
+    
+    if (line.includes('[pk]')) constraints.push('pk')
+    if (line.includes('[fk]')) constraints.push('fk')
+    if (line.includes('[unique]')) constraints.push('unique')
+    if (line.includes('[notnull]')) constraints.push('notnull')
+    if (line.includes('[auto]')) constraints.push('auto')
+    
+    return { name, type, constraints }
+  })
 }
 
 export default App

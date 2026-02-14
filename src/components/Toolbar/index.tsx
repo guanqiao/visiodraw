@@ -55,6 +55,7 @@ interface ToolbarProps {
   onShowStencils?: () => void
   onShowHistory?: () => void
   onShowScriptEditor?: () => void
+  onShowSqlExport?: () => void
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -66,6 +67,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onShowStencils,
   onShowHistory,
   onShowScriptEditor,
+  onShowSqlExport,
 }) => {
   const {
     currentTool,
@@ -223,6 +225,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
       label: '导出 SVG (透明背景)',
       icon: <FileOutlined />,
       onClick: () => handleExportSvg(true),
+    },
+    { type: 'divider' },
+    {
+      key: 'sql',
+      label: '导出 SQL (ER图)',
+      icon: <CodeOutlined />,
+      onClick: onShowSqlExport,
     },
   ]
 
