@@ -10,19 +10,17 @@ const THEME_CHANGE_EVENT = 'visiodraw-theme-change'
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(() => {
-    // Check localStorage first
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null
       if (stored && (stored === 'light' || stored === 'dark')) {
         return stored
       }
 
-      // Check system preference
       if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         return 'dark'
       }
     }
-    return 'light'
+    return 'dark'
   })
 
   // Apply theme to document

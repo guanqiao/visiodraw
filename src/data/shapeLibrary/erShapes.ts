@@ -1,20 +1,10 @@
 import type { ShapeCategory } from '../../types/shapeLibrary'
 
-/**
- * ER图形状库 - 基于 Chen ER Notation 和 Crow's Foot Notation 行业标准
- *
- * 参考标准:
- * - Chen ER Notation (Peter Chen, 1976)
- * - Crow's Foot Notation (James Martin, 1983)
- * - ISO/IEC 19506:2012 (Meta Object Facility)
- */
-
 export const erShapes: ShapeCategory = {
   id: 'er',
   name: 'ER图',
   icon: 'database',
   shapes: [
-    // ========== 实体 (Entity) ==========
     {
       id: 'er-entity',
       name: '实体',
@@ -38,6 +28,17 @@ export const erShapes: ShapeCategory = {
       tags: ['er', 'entity', 'weak', 'erd', 'dependent'],
     },
     {
+      id: 'er-table-entity',
+      name: '表格实体',
+      category: 'er',
+      type: 'er-table-entity',
+      icon: `<svg viewBox="0 0 40 40"><rect x="5" y="5" width="30" height="30" fill="#e6f7ff" stroke="#1890ff" stroke-width="2"/><line x1="5" y1="12" x2="35" y2="12" stroke="#1890ff" stroke-width="1.5"/><line x1="5" y1="20" x2="35" y2="20" stroke="#1890ff" stroke-width="1.5"/><text x="20" y="10" text-anchor="middle" font-size="4" fill="#1890ff">Entity</text><text x="20" y="17" text-anchor="middle" font-size="3" fill="#1890ff" text-decoration="underline">PK</text></svg>`,
+      width: 140,
+      height: 100,
+      defaultProps: { fill: '#e6f7ff', stroke: '#1890ff', strokeWidth: 2 },
+      tags: ['er', 'entity', 'table', 'ie-notation', 'erd'],
+    },
+    {
       id: 'er-associative-entity',
       name: '关联实体',
       category: 'er',
@@ -49,7 +50,6 @@ export const erShapes: ShapeCategory = {
       tags: ['er', 'entity', 'associative', 'link', 'erd'],
     },
 
-    // ========== 属性 (Attribute) ==========
     {
       id: 'er-attribute',
       name: '属性',
