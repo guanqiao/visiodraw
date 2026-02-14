@@ -40,6 +40,10 @@ export type ERRelationType =
   | 'er-crows-foot-zero-one'   // Crow's Foot - 零或一
   | 'er-crows-foot-one-many'   // Crow's Foot - 一或多
   | 'er-crows-foot-zero-many'  // Crow's Foot - 零或多
+  | 'er-one-to-one'            // 一对一关系
+  | 'er-one-to-many'           // 一对多关系
+  | 'er-many-to-many'          // 多对多关系
+  | 'er-foreign-key'           // 外键关系
 
 export type LineStyle = 'solid' | 'dashed' | 'dotted'
 
@@ -188,8 +192,33 @@ export const defaultConnectionPointsConfig: Record<string, ConnectionPointPositi
   'uml-execution-environment': ['top', 'bottom', 'left', 'right'],
   'uml-communication-path': ['top', 'bottom', 'left', 'right'],
   // UML - Common
-  'uml-note': ['top', 'bottom', 'left', 'right'],
+  'uml-comment': ['top', 'bottom', 'left', 'right'],
   'uml-constraint': ['top', 'bottom', 'left', 'right'],
+  // 新增 UML 时序图元素
+  'uml-sync-message': ['top', 'bottom', 'left', 'right'],
+  'uml-async-message': ['top', 'bottom', 'left', 'right'],
+  'uml-return-message': ['top', 'bottom', 'left', 'right'],
+  'uml-fragment-alt': ['top', 'bottom', 'left', 'right'],
+  'uml-fragment-loop': ['top', 'bottom', 'left', 'right'],
+  'uml-fragment-par': ['top', 'bottom', 'left', 'right'],
+  'uml-fragment-opt': ['top', 'bottom', 'left', 'right'],
+  'uml-actor-lifeline': ['top', 'bottom', 'left', 'right'],
+  // 新增 UML 类图关系连接器
+  'uml-generalization': [],
+  'uml-realization': [],
+  'uml-dependency': [],
+  'uml-association': [],
+  'uml-aggregation': [],
+  'uml-composition': [],
+  // 新增 UML 用例图关系连接器
+  // (已存在于 153-154 行)
+  // 新增活动图增强元素
+  'uml-object-node': ['top', 'bottom', 'left', 'right'],
+  'uml-data-store': ['top', 'bottom', 'left', 'right'],
+  // 新增 ER 图元素
+  'uml-entity': ['top', 'bottom', 'left', 'right'],
+  'uml-attribute': ['top', 'bottom', 'left', 'right'],
+  'uml-relationship': [],
   // Legacy UML types (for backward compatibility)
   'uml-lifeline': ['top', 'bottom', 'left', 'right'],
   'uml-object': ['top', 'bottom', 'left', 'right'],
@@ -208,7 +237,6 @@ export const defaultConnectionPointsConfig: Record<string, ConnectionPointPositi
   'uml-node': ['top', 'bottom', 'left', 'right'],
   'uml-artifact': ['top', 'bottom', 'left', 'right'],
   'uml-device': ['top', 'bottom', 'left', 'right'],
-  'uml-comment': ['top', 'bottom', 'left', 'right'],
 
   // ER图 - 基于 Chen Notation 和 Crow's Foot Notation
   // 实体类型
@@ -507,6 +535,46 @@ export const erRelations: Record<ERRelationType, ERRelationConfig> = {
     strokeWidth: 1.5,
     description: '零或多',
     cardinality: '0..*',
+  },
+  'er-one-to-one': {
+    name: '一对一关系',
+    lineStyle: 'solid',
+    startStyle: 'none',
+    endStyle: 'arrow',
+    stroke: '#1890ff',
+    strokeWidth: 2,
+    description: '一个实体唯一对应另一个实体',
+    cardinality: '1:1',
+  },
+  'er-one-to-many': {
+    name: '一对多关系',
+    lineStyle: 'solid',
+    startStyle: 'none',
+    endStyle: 'arrow',
+    stroke: '#1890ff',
+    strokeWidth: 2,
+    description: '一个实体对应多个实体',
+    cardinality: '1:N',
+  },
+  'er-many-to-many': {
+    name: '多对多关系',
+    lineStyle: 'solid',
+    startStyle: 'none',
+    endStyle: 'arrow',
+    stroke: '#1890ff',
+    strokeWidth: 2,
+    description: '多个实体对应多个实体',
+    cardinality: 'N:M',
+  },
+  'er-foreign-key': {
+    name: '外键关系',
+    lineStyle: 'solid',
+    startStyle: 'none',
+    endStyle: 'diamond',
+    stroke: '#722ed1',
+    strokeWidth: 2,
+    description: '外键引用关系',
+    cardinality: 'FK',
   },
 }
 

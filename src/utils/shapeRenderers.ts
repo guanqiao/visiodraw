@@ -28,6 +28,7 @@ import {
   createBpmnActivityPath,
   createDoubleEllipsePath,
   createErTableEntityPath,
+  createErTableWithColumnsPath,
 } from './shapeMath'
 
 export interface ShapeRenderConfig {
@@ -738,6 +739,55 @@ export const renderErTableEntity = (config: ShapeRenderConfig): Node => {
   })
 }
 
+export const renderErTableEntityWithColumns = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const columnCount = Math.max((config.text?.split('\n').length || 3) - 1, 2)
+  const path = createErTableWithColumnsPath(config.width, config.height, columnCount)
+  
+  const lines = (config.text || 'Entity\nid    int [pk]\nname  varchar').split('\n')
+  const headerHeight = Math.max(config.height * 0.15, 24)
+  const rowHeight = (config.height - headerHeight) / Math.max(columnCount, 1)
+
+  const labelTexts = lines.map((line, index) => {
+    const y = index === 0 
+      ? headerHeight / 2 + 4 
+      : headerHeight + (index - 0.5) * rowHeight + 4
+    return {
+      text: line,
+      x: config.width / 2,
+      y: y,
+    }
+  })
+
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+      label: {
+        ...base.attrs.label,
+        text: '',
+      },
+    },
+    shapes: labelTexts.map((item, index) => ({
+      type: 'text',
+      attrs: {
+        x: item.x,
+        y: item.y,
+        text: item.text,
+        fill: '#333333',
+        fontSize: index === 0 ? 14 : 11,
+        fontWeight: index === 0 ? 'bold' : 'normal',
+        textAnchor: 'middle',
+        dominantBaseline: 'middle',
+      },
+    })),
+  })
+}
+
 export const renderErAttribute = renderEllipse
 
 export const renderErKeyAttribute = (config: ShapeRenderConfig): Node => {
@@ -1181,6 +1231,7 @@ export const shapeRenderers: Record<string, (config: ShapeRenderConfig) => Node>
   'er-entity': renderErEntity,
   'er-weak-entity': renderErWeakEntity,
   'er-table-entity': renderErTableEntity,
+  'er-table-entity-with-columns': renderErTableEntityWithColumns,
   'er-associative-entity': renderErAssociativeEntity,
   'er-attribute': renderErAttribute,
   'er-key-attribute': renderErKeyAttribute,

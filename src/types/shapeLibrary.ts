@@ -10,6 +10,19 @@ export interface ShapeLibraryItem {
   tags: string[]
 }
 
+export type ErConstraint = 'pk' | 'fk' | 'unique' | 'notnull' | 'auto' | 'index'
+
+export interface ErColumn {
+  name: string
+  type: string
+  constraints: ErConstraint[]
+}
+
+export interface ErTableEntityData {
+  entityName: string
+  columns: ErColumn[]
+}
+
 export interface ShapeCategory {
   id: string
   name: string

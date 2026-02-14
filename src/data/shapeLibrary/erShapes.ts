@@ -39,6 +39,17 @@ export const erShapes: ShapeCategory = {
       tags: ['er', 'entity', 'table', 'ie-notation', 'erd'],
     },
     {
+      id: 'er-table-entity-with-columns',
+      name: '表格实体(带列)',
+      category: 'er',
+      type: 'er-table-entity-with-columns',
+      icon: `<svg viewBox="0 0 40 40"><rect x="3" y="3" width="34" height="34" fill="#e6f7ff" stroke="#1890ff" stroke-width="2"/><line x1="3" y1="10" x2="37" y2="10" stroke="#1890ff" stroke-width="1"/><line x1="3" y1="20" x2="37" y2="20" stroke="#1890ff" stroke-width="1"/><line x1="3" y1="30" x2="37" y2="30" stroke="#1890ff" stroke-width="1"/><text x="20" y="7.5" text-anchor="middle" font-size="4" fill="#1890ff" font-weight="bold">users</text><text x="20" y="16" text-anchor="middle" font-size="3" fill="#333">id int[pk]</text><text x="20" y="26" text-anchor="middle" font-size="3" fill="#333">name</text></svg>`,
+      width: 160,
+      height: 140,
+      defaultProps: { fill: '#e6f7ff', stroke: '#1890ff', strokeWidth: 2, text: 'users\nid      int    [pk]\nname    varchar\nemail   varchar [unique]' },
+      tags: ['er', 'entity', 'table', 'columns', 'ie-notation', 'erd'],
+    },
+    {
       id: 'er-associative-entity',
       name: '关联实体',
       category: 'er',

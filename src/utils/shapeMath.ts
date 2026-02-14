@@ -492,3 +492,22 @@ export function createErTableEntityPath(
     M0,${headerHeight} L${width},${headerHeight}
     M0,${pkHeight} L${width},${pkHeight}`
 }
+
+export function createErTableWithColumnsPath(
+  width: number,
+  height: number,
+  columnCount: number
+): string {
+  const headerHeight = Math.max(height * 0.15, 24)
+  const rowHeight = (height - headerHeight) / Math.max(columnCount, 1)
+
+  let path = `M0,0 L${width},0 L${width},${height} L0,${height} Z
+    M0,${headerHeight} L${width},${headerHeight}`
+
+  for (let i = 1; i <= columnCount; i++) {
+    const y = headerHeight + i * rowHeight
+    path += ` M0,${y} L${width},${y}`
+  }
+
+  return path
+}

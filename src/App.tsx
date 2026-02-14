@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Layout, message, Tabs } from 'antd'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import X6Canvas from '@components/X6Canvas'
 import Toolbar from '@components/Toolbar'
 import StatusBar from '@components/StatusBar'
