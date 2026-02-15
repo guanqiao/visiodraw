@@ -1,279 +1,358 @@
-import React, { useState, useCallback } from 'react'
-import { Modal, Table, Button, Input, Select, Checkbox, Space, Popconfirm, message } from 'antd'
-import { PlusOutlined, DeleteOutlined, CopyOutlined } from '@ant-design/icons'
+import React, { useState, useEffect, useCallback } from 'react'
+import { Table, Button, Input, Select, Checkbox, Space, Popconfirm, Tooltip, message, Dropdown, Typography } from 'antd'
+import { PlusOutlined, DeleteOutlined, KeyOutlined, LinkOutlined, SafetyOutlined, ThunderboltOutlined, HolderOutlined, MoreOutlined, CopyOutlined, ArrowUpOutlined, ArrowDownOutlined, OrderedListOutlined } from '@ant-design/icons'
 import type { ColumnsType } from 'antd/es/table'
 import type { ErColumn, ErConstraint } from '../types/shapeLibrary'
-import { exportTableToSQL, type SqlDialect } from '../utils/erExporter'
+import { v4 as uuidv4 } from 'uuid'
 
-interface ErColumnRow extends ErColumn {
-  key: string
+const { Text } = Typography
+
+export interface ErTableColumn extends ErColumn {
+  id: string
 }
 
 interface ErTableEditorProps {
-  visible: boolean
-  entityName: string
-  columns: ErColumn[]
-  onCancel: () => void
-  onOk: (entityName: string, columns: ErColumn[]) => void
+  tableName: string
+  columns: ErTableColumn[]
+  onChange: (tableName: string, columns: ErTableColumn[]) => void
+  readOnly?: boolean
 }
 
 const DATA_TYPES = [
-  'int',
-  'bigint',
-  'smallint',
-  'tinyint',
-  'decimal',
-  'float',
-  'double',
-  'varchar',
-  'char',
-  'text',
-  'longtext',
-  'boolean',
-  'date',
-  'datetime',
-  'timestamp',
-  'time',
-  'json',
-  'uuid',
-  'blob',
-  'binary',
+  { label: 'INT', value: 'int' },
+  { label: 'BIGINT', value: 'bigint' },
+  { label: 'SMALLINT', value: 'smallint' },
+  { label: 'TINYINT', value: 'tinyint' },
+  { label: 'VARCHAR(255)', value: 'varchar' },
+  { label: 'VARCHAR(50)', value: 'varchar[50]' },
+  { label: 'VARCHAR(100)', value: 'varchar[100]' },
+  { label: 'TEXT', value: 'text' },
+  { label: 'BOOLEAN', value: 'boolean' },
+  { label: 'DATE', value: 'date' },
+  { label: 'DATETIME', value: 'datetime' },
+  { label: 'TIMESTAMP', value: 'timestamp' },
+  { label: 'TIME', value: 'time' },
+  { label: 'FLOAT', value: 'float' },
+  { label: 'DOUBLE', value: 'double' },
+  { label: 'DECIMAL(10,2)', value: 'decimal' },
+  { label: 'JSON', value: 'json' },
+  { label: 'UUID', value: 'uuid' },
+  { label: 'BLOB', value: 'blob' },
+  { label: 'BINARY', value: 'binary' },
 ]
 
-const CONSTRAINT_OPTIONS: { label: string; value: ErConstraint }[] = [
-  { label: 'PK', value: 'pk' },
-  { label: 'FK', value: 'fk' },
-  { label: 'UNIQUE', value: 'unique' },
-  { label: 'NOT NULL', value: 'notnull' },
-  { label: 'AUTO', value: 'auto' },
-  { label: 'INDEX', value: 'index' },
+const CONSTRAINT_CONFIG: { key: ErConstraint; label: string; icon: React.ReactNode; color: string; tooltip: string }[] = [
+  { key: 'pk', label: 'PK', icon: <KeyOutlined />, color: '#1890ff', tooltip: '主键 (Primary Key)' },
+  { key: 'fk', label: 'FK', icon: <LinkOutlined />, color: '#722ed1', tooltip: '外键 (Foreign Key)' },
+  { key: 'unique', label: 'UQ', icon: <SafetyOutlined />, color: '#13c2c2', tooltip: '唯一约束 (Unique)' },
+  { key: 'notnull', label: 'NN', icon: <SafetyOutlined />, color: '#fa8c16', tooltip: '非空约束 (Not Null)' },
+  { key: 'auto', label: 'AI', icon: <ThunderboltOutlined />, color: '#52c41a', tooltip: '自增 (Auto Increment)' },
+  { key: 'index', label: 'IDX', icon: <OrderedListOutlined />, color: '#eb2f96', tooltip: '索引 (Index)' },
 ]
 
-export const ErTableEditor: React.FC<ErTableEditorProps> = ({
-  visible,
-  entityName: initialEntityName,
-  columns: initialColumns,
-  onCancel,
-  onOk,
+const ErTableEditor: React.FC<ErTableEditorProps> = ({
+  tableName,
+  columns,
+  onChange,
+  readOnly = false,
 }) => {
-  const [entityName, setEntityName] = useState(initialEntityName)
-  const [columns, setColumns] = useState<ErColumnRow[]>(() =>
-    initialColumns.map((col, index) => ({ ...col, key: `col-${index}-${Date.now()}` }))
-  )
-  const [sqlPreview, setSqlPreview] = useState<string>('')
-  const [showSqlPreview, setShowSqlPreview] = useState(false)
-  const [dialect, setDialect] = useState<SqlDialect>('mysql')
+  const [localTableName, setLocalTableName] = useState(tableName)
+  const [localColumns, setLocalColumns] = useState<ErTableColumn[]>(columns)
+  const [dragIndex, setDragIndex] = useState<number | null>(null)
 
-  const addColumn = useCallback(() => {
-    const newColumn: ErColumnRow = {
-      key: `col-${Date.now()}`,
-      name: `column_${columns.length + 1}`,
+  useEffect(() => {
+    setLocalTableName(tableName)
+    setLocalColumns(columns)
+  }, [tableName, columns])
+
+  const handleTableNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value
+    setLocalTableName(newName)
+    onChange(newName, localColumns)
+  }
+
+  const handleColumnChange = (id: string, field: 'name' | 'type', value: string) => {
+    const newColumns = localColumns.map((col) =>
+      col.id === id ? { ...col, [field]: value } : col
+    )
+    setLocalColumns(newColumns)
+    onChange(localTableName, newColumns)
+  }
+
+  const handleConstraintChange = (id: string, constraint: ErConstraint, checked: boolean) => {
+    const newColumns = localColumns.map((col) => {
+      if (col.id === id) {
+        const newConstraints = checked
+          ? [...col.constraints, constraint]
+          : col.constraints.filter((c) => c !== constraint)
+        return { ...col, constraints: newConstraints }
+      }
+      return col
+    })
+    setLocalColumns(newColumns)
+    onChange(localTableName, newColumns)
+  }
+
+  const addColumn = () => {
+    const newColumn: ErTableColumn = {
+      id: uuidv4(),
+      name: `column_${localColumns.length + 1}`,
       type: 'varchar',
       constraints: [],
     }
-    setColumns([...columns, newColumn])
-  }, [columns])
+    const newColumns = [...localColumns, newColumn]
+    setLocalColumns(newColumns)
+    onChange(localTableName, newColumns)
+    message.success('已添加新列')
+  }
 
-  const deleteColumn = useCallback((key: string) => {
-    setColumns(columns.filter((col) => col.key !== key))
-  }, [columns])
+  const deleteColumn = (id: string) => {
+    const newColumns = localColumns.filter((col) => col.id !== id)
+    setLocalColumns(newColumns)
+    onChange(localTableName, newColumns)
+  }
 
-  const updateColumn = useCallback((key: string, field: keyof ErColumn, value: string | ErConstraint[]) => {
-    setColumns(
-      columns.map((col) =>
-        col.key === key ? { ...col, [field]: value } : col
+  const duplicateColumn = (column: ErTableColumn) => {
+    const newColumn: ErTableColumn = {
+      ...column,
+      id: uuidv4(),
+      name: `${column.name}_copy`,
+    }
+    const index = localColumns.findIndex((c) => c.id === column.id)
+    const newColumns = [...localColumns]
+    newColumns.splice(index + 1, 0, newColumn)
+    setLocalColumns(newColumns)
+    onChange(localTableName, newColumns)
+    message.success('已复制列')
+  }
+
+  const moveColumn = (id: string, direction: 'up' | 'down') => {
+    const index = localColumns.findIndex((c) => c.id === id)
+    if (index === -1) return
+    if (direction === 'up' && index === 0) return
+    if (direction === 'down' && index === localColumns.length - 1) return
+
+    const newColumns = [...localColumns]
+    const targetIndex = direction === 'up' ? index - 1 : index + 1
+    ;[newColumns[index], newColumns[targetIndex]] = [newColumns[targetIndex], newColumns[index]]
+    setLocalColumns(newColumns)
+    onChange(localTableName, newColumns)
+  }
+
+  const handleDragStart = (index: number) => {
+    setDragIndex(index)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (dragIndex === null || dragIndex === index) return
+
+    const newColumns = [...localColumns]
+    const draggedItem = newColumns[dragIndex]
+    newColumns.splice(dragIndex, 1)
+    newColumns.splice(index, 0, draggedItem)
+    setLocalColumns(newColumns)
+    setDragIndex(index)
+  }
+
+  const handleDragEnd = () => {
+    if (dragIndex !== null) {
+      onChange(localTableName, localColumns)
+    }
+    setDragIndex(null)
+  }
+
+  const getConstraintMenuItems = (column: ErTableColumn) => {
+    return CONSTRAINT_CONFIG.map((config) => ({
+      key: config.key,
+      label: (
+        <Checkbox
+          checked={column.constraints.includes(config.key)}
+          onChange={(e) => handleConstraintChange(column.id, config.key, e.target.checked)}
+        >
+          <Space>
+            <span style={{ color: config.color }}>{config.icon}</span>
+            <span>{config.label}</span>
+            <Text type="secondary" style={{ fontSize: 11 }}>{config.tooltip}</Text>
+          </Space>
+        </Checkbox>
+      ),
+    }))
+  }
+
+  const renderConstraints = (column: ErTableColumn) => {
+    const activeConstraints = CONSTRAINT_CONFIG.filter((c) =>
+      column.constraints.includes(c.key)
+    )
+
+    if (activeConstraints.length === 0) {
+      return (
+        <Dropdown menu={{ items: getConstraintMenuItems(column) }} trigger={['click']} disabled={readOnly}>
+          <Button size="small" type="dashed" icon={<PlusOutlined />}>
+            添加约束
+          </Button>
+        </Dropdown>
       )
-    )
-  }, [columns])
-
-  const toggleConstraint = useCallback((key: string, constraint: ErConstraint, checked: boolean) => {
-    setColumns(
-      columns.map((col) => {
-        if (col.key !== key) return col
-        const constraints = checked
-          ? [...col.constraints.filter(c => c !== constraint), constraint]
-          : col.constraints.filter((c) => c !== constraint)
-        return { ...col, constraints }
-      })
-    )
-  }, [columns])
-
-  const handleOk = useCallback(() => {
-    if (!entityName.trim()) {
-      message.warning('请输入实体名称')
-      return
     }
-    if (columns.length === 0) {
-      message.warning('请至少添加一列')
-      return
-    }
-    const hasPk = columns.some((col) => col.constraints.includes('pk'))
-    if (!hasPk) {
-      message.warning('请至少指定一个主键列')
-      return
-    }
-    onOk(
-      entityName.trim(),
-      columns.map(({ key: _key, ...rest }) => rest)
+
+    return (
+      <Space size={2} wrap>
+        {activeConstraints.map((config) => (
+          <Tooltip key={config.key} title={config.tooltip}>
+            <Button
+              size="small"
+              style={{ 
+                color: config.color, 
+                borderColor: config.color,
+                padding: '0 6px',
+                fontSize: 11,
+              }}
+              onClick={() => handleConstraintChange(column.id, config.key, false)}
+              disabled={readOnly}
+            >
+              {config.icon} {config.label}
+            </Button>
+          </Tooltip>
+        ))}
+        <Dropdown menu={{ items: getConstraintMenuItems(column) }} trigger={['click']} disabled={readOnly}>
+          <Button size="small" type="text" icon={<PlusOutlined />} />
+        </Dropdown>
+      </Space>
     )
-  }, [entityName, columns, onOk])
+  }
 
-  const generateSqlPreview = useCallback(() => {
-    const cols = columns.map(({ key: _key, ...rest }) => rest)
-    const sql = exportTableToSQL(entityName, cols, { dialect, dropIfExists: true })
-    setSqlPreview(sql)
-    setShowSqlPreview(true)
-  }, [entityName, columns, dialect])
-
-  const copySql = useCallback(() => {
-    navigator.clipboard.writeText(sqlPreview)
-    message.success('SQL已复制到剪贴板')
-  }, [sqlPreview])
-
-  const tableColumns: ColumnsType<ErColumnRow> = [
+  const columnsDef: ColumnsType<ErTableColumn> = [
+    {
+      key: 'drag',
+      width: 30,
+      render: (_, __, index) => (
+        <HolderOutlined
+          style={{ cursor: 'grab', color: '#999' }}
+          draggable={!readOnly}
+          onDragStart={() => handleDragStart(index)}
+          onDragOver={(e) => handleDragOver(e, index)}
+          onDragEnd={handleDragEnd}
+        />
+      ),
+    },
+    {
+      title: '#',
+      key: 'index',
+      width: 40,
+      render: (_, __, index) => <Text type="secondary">{index + 1}</Text>,
+    },
     {
       title: '列名',
       dataIndex: 'name',
+      key: 'name',
       width: 150,
-      render: (value, record) => (
+      render: (name, record) => (
         <Input
-          value={value}
-          onChange={(e) => updateColumn(record.key, 'name', e.target.value)}
+          value={name}
+          onChange={(e) => handleColumnChange(record.id, 'name', e.target.value)}
           placeholder="列名"
+          size="small"
+          style={{ fontWeight: record.constraints.includes('pk') ? 'bold' : 'normal' }}
+          readOnly={readOnly}
         />
       ),
     },
     {
       title: '数据类型',
       dataIndex: 'type',
+      key: 'type',
       width: 140,
-      render: (value, record) => (
+      render: (type, record) => (
         <Select
-          value={value}
-          onChange={(v) => updateColumn(record.key, 'type', v)}
-          options={DATA_TYPES.map((t) => ({ label: t, value: t }))}
+          value={type}
+          onChange={(value) => handleColumnChange(record.id, 'type', value)}
+          options={DATA_TYPES}
+          size="small"
           style={{ width: '100%' }}
+          disabled={readOnly}
           showSearch
+          filterOption={(input, option) =>
+            (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+          }
         />
       ),
     },
     {
       title: '约束',
-      dataIndex: 'constraints',
+      key: 'constraints',
       width: 200,
-      render: (constraints: ErConstraint[], record) => (
-        <Space size={4} wrap>
-          {CONSTRAINT_OPTIONS.map((opt) => (
-            <Checkbox
-              key={opt.value}
-              checked={constraints.includes(opt.value)}
-              onChange={(e) => toggleConstraint(record.key, opt.value, e.target.checked)}
-            >
-              {opt.label}
-            </Checkbox>
-          ))}
-        </Space>
-      ),
+      render: (_, record) => renderConstraints(record),
     },
     {
-      title: '',
-      width: 50,
-      render: (_, record) => (
-        <Popconfirm
-          title="确定删除此列?"
-          onConfirm={() => deleteColumn(record.key)}
-          okText="确定"
-          cancelText="取消"
-        >
-          <Button type="text" danger icon={<DeleteOutlined />} />
-        </Popconfirm>
+      title: '操作',
+      key: 'actions',
+      width: 80,
+      render: (_, record, index) => (
+        <Space size={0}>
+          <Dropdown
+            menu={{
+              items: [
+                { key: 'copy', icon: <CopyOutlined />, label: '复制列', onClick: () => duplicateColumn(record) },
+                { key: 'up', icon: <ArrowUpOutlined />, label: '上移', onClick: () => moveColumn(record.id, 'up'), disabled: index === 0 },
+                { key: 'down', icon: <ArrowDownOutlined />, label: '下移', onClick: () => moveColumn(record.id, 'down'), disabled: index === localColumns.length - 1 },
+                { type: 'divider' },
+                { key: 'delete', icon: <DeleteOutlined />, label: '删除列', danger: true },
+              ],
+              onClick: ({ key }) => {
+                if (key === 'delete') {
+                  deleteColumn(record.id)
+                }
+              },
+            }}
+            trigger={['click']}
+          >
+            <Button size="small" type="text" icon={<MoreOutlined />} disabled={readOnly} />
+          </Dropdown>
+        </Space>
       ),
     },
   ]
 
   return (
-    <>
-      <Modal
-        title="编辑表格实体"
-        open={visible}
-        onCancel={onCancel}
-        onOk={handleOk}
-        width={700}
-        okText="确定"
-        cancelText="取消"
-        footer={[
-          <Button key="sql" onClick={generateSqlPreview}>
-            预览SQL
-          </Button>,
-          <Button key="cancel" onClick={onCancel}>
-            取消
-          </Button>,
-          <Button key="ok" type="primary" onClick={handleOk}>
-            确定
-          </Button>,
-        ]}
-      >
-        <Space direction="vertical" style={{ width: '100%' }} size="middle">
-          <div>
-            <label style={{ marginRight: 8, fontWeight: 500 }}>实体名称:</label>
-            <Input
-              value={entityName}
-              onChange={(e) => setEntityName(e.target.value)}
-              placeholder="输入实体名称"
-              style={{ width: 300 }}
-            />
-          </div>
+    <div style={{ padding: '8px 0' }}>
+      <div style={{ marginBottom: 12 }}>
+        <Text strong style={{ marginRight: 8 }}>表名:</Text>
+        <Input
+          value={localTableName}
+          onChange={handleTableNameChange}
+          placeholder="输入表名"
+          style={{ width: 200 }}
+          readOnly={readOnly}
+        />
+      </div>
 
-          <div>
-            <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 500 }}>列定义:</span>
-              <Button type="dashed" icon={<PlusOutlined />} onClick={addColumn}>
-                添加列
-              </Button>
-            </div>
-            <Table
-              columns={tableColumns}
-              dataSource={columns}
-              pagination={false}
-              size="small"
-              rowKey="key"
-              locale={{ emptyText: '暂无列，请点击"添加列"按钮' }}
-            />
-          </div>
-        </Space>
-      </Modal>
+      <Table
+        dataSource={localColumns}
+        columns={columnsDef}
+        rowKey="id"
+        size="small"
+        pagination={false}
+        bordered
+        style={{ marginBottom: 12 }}
+        onRow={(record, index) => ({
+          draggable: !readOnly,
+          onDragStart: (e) => {
+            e.dataTransfer.effectAllowed = 'move'
+            if (index !== undefined) handleDragStart(index)
+          },
+          onDragOver: (e) => {
+            if (index !== undefined) handleDragOver(e, index)
+          },
+          onDragEnd: handleDragEnd,
+        })}
+      />
 
-      <Modal
-        title="SQL预览"
-        open={showSqlPreview}
-        onCancel={() => setShowSqlPreview(false)}
-        footer={[
-          <Select
-            key="dialect"
-            value={dialect}
-            onChange={setDialect}
-            style={{ width: 120, marginRight: 8 }}
-            options={[
-              { label: 'MySQL', value: 'mysql' },
-              { label: 'PostgreSQL', value: 'postgres' },
-              { label: 'SQLite', value: 'sqlite' },
-              { label: 'SQL Server', value: 'sqlserver' },
-            ]}
-          />,
-          <Button key="copy" icon={<CopyOutlined />} onClick={copySql}>
-            复制
-          </Button>,
-          <Button key="close" onClick={() => setShowSqlPreview(false)}>
-            关闭
-          </Button>,
-        ]}
-        width={600}
-      >
-        <pre style={{ background: '#f5f5f5', padding: 16, borderRadius: 4, overflow: 'auto' }}>
-          {sqlPreview}
-        </pre>
-      </Modal>
-    </>
+      {!readOnly && (
+        <Button type="dashed" icon={<PlusOutlined />} onClick={addColumn} block>
+          添加列
+        </Button>
+      )}
+    </div>
   )
 }
 

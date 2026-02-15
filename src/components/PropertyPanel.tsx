@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Card, Form, InputNumber, Input, ColorPicker, Space, Button, Divider, Select, Slider } from 'antd'
+import React, { useState, useMemo, useCallback } from 'react'
+import { Card, Form, InputNumber, Input, ColorPicker, Space, Button, Divider, Select, Slider, Tabs, Typography } from 'antd'
 import {
   AlignLeftOutlined,
   AlignCenterOutlined,
@@ -23,14 +23,19 @@ import {
   PlusOutlined,
   EditOutlined,
   FontSizeOutlined,
+  DatabaseOutlined,
+  SettingOutlined,
 } from '@ant-design/icons'
 import useX6GraphStore from '@stores/x6GraphStore'
-import type { ConnectorStyle, ConnectorEndStyle, LineStyle, ConnectorLabel, UMLRelationType } from '../types/connection'
+import type { ConnectorStyle, ConnectorEndStyle, LineStyle, ConnectorLabel, UMLRelationType, ERRelationType } from '../types/connection'
 import { ConnectorRenderer } from '@utils/connectorRenderer'
-import { umlRelations } from '../types/connection'
+import { umlRelations, erRelations } from '../types/connection'
 import { v4 as uuidv4 } from 'uuid'
+import ErTableEditor, { type ErTableColumn } from './ErTableEditor'
 
 const { Option } = Select
+
+const ER_TABLE_TYPES = ['er-table-entity', 'er-table-entity-with-columns']
 
 const PropertyPanel: React.FC = () => {
   const {
@@ -46,19 +51,106 @@ const PropertyPanel: React.FC = () => {
     graph,
   } = useX6GraphStore()
 
-  // Get selected nodes
   const selectedNodes = nodes.filter((n) => selectedNodeIds.includes(n.id))
   const hasNodeSelection = selectedNodes.length > 0
   const hasMultipleNodeSelection = selectedNodes.length > 1
   const singleNode = selectedNodes.length === 1 ? selectedNodes[0] : null
 
-  // Get selected edge
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId)
   const hasEdgeSelection = !!selectedEdge
 
-  // Label editing state
   const [editingLabelIndex, setEditingLabelIndex] = useState<number | null>(null)
   const [labelText, setLabelText] = useState('')
+
+  const isErTableEntity = singleNode && ER_TABLE_TYPES.includes(singleNode.type)
+
+  const parseTextToColumns = useCallback((text: string): { tableName: string; columns: ErTableColumn[] } => {
+    const lines = text.split('\n').filter((l) => l.trim())
+    if (lines.length === 0) {
+      return { tableName: 'untitled', columns: [] }
+    }
+    
+    const tableName = lines[0].trim()
+    const columns: ErTableColumn[] = []
+    
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line) continue
+      
+      const constraintMatch = line.match(/^(.+?)\s*\[(.+)\]\s*$/)
+      
+      if (constraintMatch) {
+        const colName = constraintMatch[1].trim().split(/\s+/)[0]
+        const typePart = constraintMatch[1].trim().split(/\s+/).slice(1).join(' ') || 'varchar'
+        const constraintStr = constraintMatch[2]
+        
+        const constraints: string[] = []
+        if (constraintStr.includes('pk')) constraints.push('pk')
+        if (constraintStr.includes('fk')) constraints.push('fk')
+        if (constraintStr.includes('unique')) constraints.push('unique')
+        if (constraintStr.includes('notnull')) constraints.push('notnull')
+        if (constraintStr.includes('auto')) constraints.push('auto')
+        if (constraintStr.includes('index')) constraints.push('index')
+        
+        columns.push({ id: uuidv4(), name: colName, type: typePart, constraints: constraints as any })
+      } else {
+        const parts = line.split(/\s+/)
+        const colName = parts[0]
+        const type = parts[1] || 'varchar'
+        
+        columns.push({ id: uuidv4(), name: colName, type, constraints: [] })
+      }
+    }
+    
+    return { tableName, columns }
+  }, [])
+
+  const columnsToText = useCallback((tableName: string, columns: ErTableColumn[]): string => {
+    const lines = [tableName]
+    columns.forEach((col) => {
+      const constraints = col.constraints.length > 0 ? ` [${col.constraints.join(',')}]` : ''
+      lines.push(`${col.name}\t${col.type}${constraints}`)
+    })
+    return lines.join('\n')
+  }, [])
+
+  const erTableData = useMemo(() => {
+    if (!isErTableEntity || !singleNode?.text) {
+      return { tableName: 'untitled', columns: [] }
+    }
+    return parseTextToColumns(singleNode.text)
+  }, [isErTableEntity, singleNode?.text, parseTextToColumns])
+
+  const handleErTableChange = useCallback((tableName: string, columns: ErTableColumn[]) => {
+    if (!singleNode) return
+    const newText = columnsToText(tableName, columns)
+    updateNode(singleNode.id, { text: newText })
+    
+    const newHeight = Math.max(80, 40 + columns.length * 28)
+    if (singleNode.height !== newHeight) {
+      updateNode(singleNode.id, { height: newHeight })
+    }
+    
+    if (graph) {
+      const x6Node = graph.getCellById(singleNode.id)
+      if (x6Node) {
+        x6Node.attr('label/text', '')
+        x6Node.prop('shapes', columns.map((col, index) => ({
+          type: 'text',
+          attrs: {
+            x: singleNode.width / 2,
+            y: index === 0 ? 20 : 40 + (index - 1) * 28,
+            text: index === 0 ? tableName : `${col.name}\t${col.type}${col.constraints.length > 0 ? ' [' + col.constraints.join(',') + ']' : ''}`,
+            fill: index === 0 ? '#1890ff' : '#333333',
+            fontSize: index === 0 ? 14 : 11,
+            fontWeight: index === 0 ? 'bold' : 'normal',
+            textAnchor: 'middle',
+            dominantBaseline: 'middle',
+          },
+        })))
+      }
+    }
+  }, [singleNode, updateNode, graph, columnsToText])
 
   // Handle position change
   const handlePositionChange = (axis: 'x' | 'y', value: number | null) => {
@@ -303,6 +395,30 @@ const PropertyPanel: React.FC = () => {
     }
   }
 
+  // ER 关系处理
+  const handleERRelationChange = (relationType: ERRelationType) => {
+    if (!selectedEdge) return
+    const config = erRelations[relationType]
+    updateEdge(selectedEdge.id, {
+      lineStyle: config.lineStyle,
+      startStyle: config.startStyle,
+      endStyle: config.endStyle,
+      stroke: config.stroke,
+      strokeWidth: config.strokeWidth,
+    })
+    if (graph) {
+      const x6Edge = graph.getCellById(selectedEdge.id)
+      if (x6Edge && x6Edge.isEdge()) {
+        ConnectorRenderer.updateEdgeMarkers(x6Edge as any, config.startStyle, config.endStyle)
+        ConnectorRenderer.updateEdgeAppearance(x6Edge as any, {
+          lineStyle: config.lineStyle,
+          stroke: config.stroke,
+          strokeWidth: config.strokeWidth,
+        })
+      }
+    }
+  }
+
   // No selection
   if (!hasNodeSelection && !hasEdgeSelection) {
     return (
@@ -346,6 +462,28 @@ const PropertyPanel: React.FC = () => {
               <Option value="directed-association">定向关联 (Directed)</Option>
               <Option value="aggregation">聚合 (Aggregation)</Option>
               <Option value="composition">组合 (Composition)</Option>
+            </Select>
+          </Form.Item>
+
+          {/* ER 关系类型 */}
+          <Form.Item label="ER 关系">
+            <Select
+              placeholder="选择 ER 关系类型"
+              onChange={handleERRelationChange}
+              style={{ width: '100%' }}
+              allowClear
+            >
+              <Option value="er-one-to-one">一对一 (1:1)</Option>
+              <Option value="er-one-to-many">一对多 (1:N)</Option>
+              <Option value="er-many-to-many">多对多 (N:M)</Option>
+              <Option value="er-identifying">标识关系 (弱实体)</Option>
+              <Option value="er-non-identifying">非标识关系</Option>
+              <Option value="er-total-participation">完全参与</Option>
+              <Option value="er-partial-participation">部分参与</Option>
+              <Option value="er-foreign-key">外键关系</Option>
+              <Option value="er-entity-attribute">实体-属性连接</Option>
+              <Option value="er-entity-relationship">实体-关系连接</Option>
+              <Option value="er-isa-hierarchy">ISA层次继承</Option>
             </Select>
           </Form.Item>
 
@@ -605,175 +743,267 @@ const PropertyPanel: React.FC = () => {
     )
   }
 
+  const renderErTablePanel = () => {
+    if (!isErTableEntity) return null
+    
+    return (
+      <Tabs
+        defaultActiveKey="editor"
+        size="small"
+        items={[
+          {
+            key: 'editor',
+            label: (
+              <Space size={4}>
+                <DatabaseOutlined />
+                表格编辑
+              </Space>
+            ),
+            children: (
+              <ErTableEditor
+                tableName={erTableData.tableName}
+                columns={erTableData.columns}
+                onChange={handleErTableChange}
+              />
+            ),
+          },
+          {
+            key: 'style',
+            label: (
+              <Space size={4}>
+                <SettingOutlined />
+                样式
+              </Space>
+            ),
+            children: (
+              <Form layout="vertical" size="small">
+                <Form.Item label="位置">
+                  <Space>
+                    <InputNumber
+                      addonBefore="X"
+                      value={singleNode?.x}
+                      onChange={(v) => handlePositionChange('x', v)}
+                      style={{ width: 100 }}
+                    />
+                    <InputNumber
+                      addonBefore="Y"
+                      value={singleNode?.y}
+                      onChange={(v) => handlePositionChange('y', v)}
+                      style={{ width: 100 }}
+                    />
+                  </Space>
+                </Form.Item>
+                <Form.Item label="尺寸">
+                  <Space>
+                    <InputNumber
+                      addonBefore="W"
+                      value={singleNode?.width}
+                      onChange={(v) => handleSizeChange('width', v)}
+                      style={{ width: 100 }}
+                    />
+                    <InputNumber
+                      addonBefore="H"
+                      value={singleNode?.height}
+                      onChange={(v) => handleSizeChange('height', v)}
+                      style={{ width: 100 }}
+                    />
+                  </Space>
+                </Form.Item>
+                <Form.Item label="填充颜色">
+                  <ColorPicker
+                    value={singleNode?.fill}
+                    onChange={(color) => handleFillChange(color.toHexString())}
+                    showText
+                  />
+                </Form.Item>
+                <Form.Item label="描边颜色">
+                  <ColorPicker
+                    value={singleNode?.stroke}
+                    onChange={(color) => handleStrokeChange(color.toHexString())}
+                    showText
+                  />
+                </Form.Item>
+              </Form>
+            ),
+          },
+        ]}
+      />
+    )
+  }
+
   // Node property panel
   return (
     <Card title="图形属性" size="small">
-      <Form layout="vertical" size="small">
-        {/* Position */}
-        <Form.Item label="位置">
-          <Space>
-            <InputNumber
-              addonBefore="X"
-              value={singleNode?.x ?? selectedNodes[0]?.x}
-              onChange={(v) => handlePositionChange('x', v)}
-              style={{ width: 120 }}
-            />
-            <InputNumber
-              addonBefore="Y"
-              value={singleNode?.y ?? selectedNodes[0]?.y}
-              onChange={(v) => handlePositionChange('y', v)}
-              style={{ width: 120 }}
-            />
-          </Space>
-        </Form.Item>
-
-        {/* Size */}
-        <Form.Item label="尺寸">
-          <Space>
-            <InputNumber
-              addonBefore="W"
-              value={singleNode?.width}
-              onChange={(v) => handleSizeChange('width', v)}
-              disabled={!singleNode}
-              style={{ width: 120 }}
-            />
-            <InputNumber
-              addonBefore="H"
-              value={singleNode?.height}
-              onChange={(v) => handleSizeChange('height', v)}
-              disabled={!singleNode}
-              style={{ width: 120 }}
-            />
-          </Space>
-        </Form.Item>
-
-        <Divider style={{ margin: '12px 0' }} />
-
-        {/* Text */}
-        {singleNode && (
-          <>
-            <Form.Item label="文本内容">
-              <Input
-                value={singleNode.text || ''}
-                onChange={handleNodeTextChange}
-                placeholder="输入文本"
-              />
-            </Form.Item>
-
-            <Form.Item label="字体大小">
+      {isErTableEntity ? (
+        renderErTablePanel()
+      ) : (
+        <Form layout="vertical" size="small">
+          {/* Position */}
+          <Form.Item label="位置">
+            <Space>
               <InputNumber
-                min={8}
-                max={72}
-                value={singleNode.fontSize || 14}
-                onChange={handleNodeFontSizeChange}
-                prefix={<FontSizeOutlined />}
-                style={{ width: '100%' }}
+                addonBefore="X"
+                value={singleNode?.x ?? selectedNodes[0]?.x}
+                onChange={(v) => handlePositionChange('x', v)}
+                style={{ width: 120 }}
               />
-            </Form.Item>
-
-            <Form.Item label="字体颜色">
-              <ColorPicker
-                value={singleNode.fontColor || '#333333'}
-                onChange={(color) => handleNodeTextColorChange(color.toHexString())}
-                showText
+              <InputNumber
+                addonBefore="Y"
+                value={singleNode?.y ?? selectedNodes[0]?.y}
+                onChange={(v) => handlePositionChange('y', v)}
+                style={{ width: 120 }}
               />
-            </Form.Item>
+            </Space>
+          </Form.Item>
 
-            <Divider style={{ margin: '12px 0' }} />
-          </>
-        )}
+          {/* Size */}
+          <Form.Item label="尺寸">
+            <Space>
+              <InputNumber
+                addonBefore="W"
+                value={singleNode?.width}
+                onChange={(v) => handleSizeChange('width', v)}
+                disabled={!singleNode}
+                style={{ width: 120 }}
+              />
+              <InputNumber
+                addonBefore="H"
+                value={singleNode?.height}
+                onChange={(v) => handleSizeChange('height', v)}
+                disabled={!singleNode}
+                style={{ width: 120 }}
+              />
+            </Space>
+          </Form.Item>
 
-        {/* Fill Color */}
-        <Form.Item label="填充颜色">
-          <ColorPicker
-            value={singleNode?.fill ?? selectedNodes[0]?.fill}
-            onChange={(color) => handleFillChange(color.toHexString())}
-            showText
-          />
-        </Form.Item>
+          <Divider style={{ margin: '12px 0' }} />
 
-        {/* Stroke Color */}
-        <Form.Item label="描边颜色">
-          <ColorPicker
-            value={singleNode?.stroke ?? selectedNodes[0]?.stroke}
-            onChange={(color) => handleStrokeChange(color.toHexString())}
-            showText
-          />
-        </Form.Item>
+          {/* Text */}
+          {singleNode && (
+            <>
+              <Form.Item label="文本内容">
+                <Input
+                  value={singleNode.text || ''}
+                  onChange={handleNodeTextChange}
+                  placeholder="输入文本"
+                />
+              </Form.Item>
 
-        {/* Stroke Width */}
-        <Form.Item label="描边宽度">
-          <InputNumber
-            min={0}
-            max={10}
-            value={singleNode?.strokeWidth ?? selectedNodes[0]?.strokeWidth}
-            onChange={handleStrokeWidthChange}
-            style={{ width: '100%' }}
-          />
-        </Form.Item>
+              <Form.Item label="字体大小">
+                <InputNumber
+                  min={8}
+                  max={72}
+                  value={singleNode.fontSize || 14}
+                  onChange={handleNodeFontSizeChange}
+                  prefix={<FontSizeOutlined />}
+                  style={{ width: '100%' }}
+                />
+              </Form.Item>
 
-        {/* Alignment - Only show for multiple selection */}
-        {hasMultipleNodeSelection && (
-          <>
-            <Divider style={{ margin: '12px 0' }} />
-            <Form.Item label="对齐">
-              <Space wrap>
-                <Button
-                  icon={<AlignLeftOutlined />}
-                  onClick={() => alignNodes('left')}
-                  size="small"
+              <Form.Item label="字体颜色">
+                <ColorPicker
+                  value={singleNode.fontColor || '#333333'}
+                  onChange={(color) => handleNodeTextColorChange(color.toHexString())}
+                  showText
                 />
-                <Button
-                  icon={<AlignCenterOutlined />}
-                  onClick={() => alignNodes('center')}
-                  size="small"
-                />
-                <Button
-                  icon={<AlignRightOutlined />}
-                  onClick={() => alignNodes('right')}
-                  size="small"
-                />
-                <Button
-                  icon={<VerticalAlignTopOutlined />}
-                  onClick={() => alignNodes('top')}
-                  size="small"
-                />
-                <Button
-                  icon={<VerticalAlignMiddleOutlined />}
-                  onClick={() => alignNodes('middle')}
-                  size="small"
-                />
-                <Button
-                  icon={<VerticalAlignBottomOutlined />}
-                  onClick={() => alignNodes('bottom')}
-                  size="small"
-                />
-              </Space>
-            </Form.Item>
+              </Form.Item>
 
-            {selectedNodes.length >= 3 && (
-              <Form.Item label="分布">
-                <Space>
+              <Divider style={{ margin: '12px 0' }} />
+            </>
+          )}
+
+          {/* Fill Color */}
+          <Form.Item label="填充颜色">
+            <ColorPicker
+              value={singleNode?.fill ?? selectedNodes[0]?.fill}
+              onChange={(color) => handleFillChange(color.toHexString())}
+              showText
+            />
+          </Form.Item>
+
+          {/* Stroke Color */}
+          <Form.Item label="描边颜色">
+            <ColorPicker
+              value={singleNode?.stroke ?? selectedNodes[0]?.stroke}
+              onChange={(color) => handleStrokeChange(color.toHexString())}
+              showText
+            />
+          </Form.Item>
+
+          {/* Stroke Width */}
+          <Form.Item label="描边宽度">
+            <InputNumber
+              min={0}
+              max={10}
+              value={singleNode?.strokeWidth ?? selectedNodes[0]?.strokeWidth}
+              onChange={handleStrokeWidthChange}
+              style={{ width: '100%' }}
+            />
+          </Form.Item>
+
+          {/* Alignment - Only show for multiple selection */}
+          {hasMultipleNodeSelection && (
+            <>
+              <Divider style={{ margin: '12px 0' }} />
+              <Form.Item label="对齐">
+                <Space wrap>
                   <Button
-                    icon={<ColumnWidthOutlined />}
-                    onClick={() => distributeNodes('horizontal')}
+                    icon={<AlignLeftOutlined />}
+                    onClick={() => alignNodes('left')}
                     size="small"
-                  >
-                    水平
-                  </Button>
+                  />
                   <Button
-                    icon={<ColumnHeightOutlined />}
-                    onClick={() => distributeNodes('vertical')}
+                    icon={<AlignCenterOutlined />}
+                    onClick={() => alignNodes('center')}
                     size="small"
-                  >
-                    垂直
-                  </Button>
+                  />
+                  <Button
+                    icon={<AlignRightOutlined />}
+                    onClick={() => alignNodes('right')}
+                    size="small"
+                  />
+                  <Button
+                    icon={<VerticalAlignTopOutlined />}
+                    onClick={() => alignNodes('top')}
+                    size="small"
+                  />
+                  <Button
+                    icon={<VerticalAlignMiddleOutlined />}
+                    onClick={() => alignNodes('middle')}
+                    size="small"
+                  />
+                  <Button
+                    icon={<VerticalAlignBottomOutlined />}
+                    onClick={() => alignNodes('bottom')}
+                    size="small"
+                  />
                 </Space>
               </Form.Item>
-            )}
-          </>
-        )}
-      </Form>
+
+              {selectedNodes.length >= 3 && (
+                <Form.Item label="分布">
+                  <Space>
+                    <Button
+                      icon={<ColumnWidthOutlined />}
+                      onClick={() => distributeNodes('horizontal')}
+                      size="small"
+                    >
+                      水平
+                    </Button>
+                    <Button
+                      icon={<ColumnHeightOutlined />}
+                      onClick={() => distributeNodes('vertical')}
+                      size="small"
+                    >
+                      垂直
+                    </Button>
+                  </Space>
+                </Form.Item>
+              )}
+            </>
+          )}
+        </Form>
+      )}
     </Card>
   )
 }

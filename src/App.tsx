@@ -10,10 +10,12 @@ import TemplateGallery from '@components/TemplateGallery'
 import CanvasHistoryPanel from '@components/CanvasHistoryPanel'
 import SequenceScriptEditor from '@components/SequenceScriptEditor'
 import SqlExportDialog from '@components/SqlExportDialog'
+import SqlImportDialog from '@components/SqlImportDialog'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { useTheme } from '@hooks/useTheme'
 import { v4 as uuidv4 } from 'uuid'
+import { generateErNodesFromTables, type ParsedSqlTable } from '@utils/erExporter'
 import './styles/theme.css'
 
 const { TabPane } = Tabs
@@ -110,14 +112,17 @@ const App: React.FC = () => {
   const [showHistory, setShowHistory] = useState(false)
   const [showScriptEditor, setShowScriptEditor] = useState(false)
   const [showSqlExport, setShowSqlExport] = useState(false)
+  const [showSqlImport, setShowSqlImport] = useState(false)
 
   const [leftWidth, setLeftWidth] = useState(() => {
     const saved = localStorage.getItem('left-panel-width')
-    return saved ? parseInt(saved, 10) : 280
+    const width = saved ? parseInt(saved, 10) : 280
+    return isNaN(width) || width < 100 ? 280 : width
   })
   const [rightWidth, setRightWidth] = useState(() => {
     const saved = localStorage.getItem('right-panel-width')
-    return saved ? parseInt(saved, 10) : 300
+    const width = saved ? parseInt(saved, 10) : 300
+    return isNaN(width) || width < 100 ? 300 : width
   })
 
   useEffect(() => {
@@ -136,12 +141,52 @@ const App: React.FC = () => {
     selectedNodeIds,
     deleteNodes,
     addNodes,
+    addEdge,
     selectNode,
     importFromJson,
     exportToJson,
   } = useX6GraphStore()
 
   const { copy, cut, paste } = useClipboardStore()
+
+  const handleSqlImport = useCallback((tables: ParsedSqlTable[]) => {
+    const erNodes = generateErNodesFromTables(tables)
+    const nodesWithIds = erNodes.map(node => ({
+      ...node,
+      id: uuidv4(),
+      fill: '#e6f7ff',
+      stroke: '#1890ff',
+      strokeWidth: 2,
+    }))
+    addNodes(nodesWithIds)
+    
+    tables.forEach((table, tableIndex) => {
+      table.foreignKeys.forEach(fk => {
+        const sourceNode = nodesWithIds[tableIndex]
+        const targetNode = nodesWithIds.find(n => 
+          n.text?.split('\n')[0]?.toLowerCase() === fk.refTable.toLowerCase()
+        )
+        if (sourceNode && targetNode) {
+          addEdge({
+            id: uuidv4(),
+            sourceShapeId: sourceNode.id,
+            sourcePointId: 'bottom',
+            targetShapeId: targetNode.id,
+            targetPointId: 'top',
+            style: 'orthogonal' as const,
+            lineStyle: 'solid' as const,
+            startStyle: 'none' as const,
+            endStyle: 'arrow' as const,
+            stroke: '#722ed1',
+            strokeWidth: 2,
+          })
+        }
+      })
+    })
+    
+    setShowSqlImport(false)
+    message.success(`已导入 ${tables.length} 个表`)
+  }, [addNodes, addEdge])
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -258,9 +303,10 @@ const App: React.FC = () => {
         onShowHistory={() => setShowHistory(true)}
         onShowScriptEditor={() => setShowScriptEditor(true)}
         onShowSqlExport={() => setShowSqlExport(true)}
+        onShowSqlImport={() => setShowSqlImport(true)}
       />
       
-      <Layout style={{ flex: 1, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', height: 'calc(100vh - 56px - 32px)' }}>
         <ResizableSider
           side="left"
           width={leftWidth}
@@ -316,13 +362,18 @@ const App: React.FC = () => {
             </TabPane>
           </Tabs>
         </ResizableSider>
-      </Layout>
+      </div>
       
       <StatusBar />
       
       <TemplateGallery visible={showTemplates} onClose={() => setShowTemplates(false)} />
       <CanvasHistoryPanel visible={showHistory} onClose={() => setShowHistory(false)} />
       <SequenceScriptEditor visible={showScriptEditor} onClose={() => setShowScriptEditor(false)} />
+      <SqlImportDialog
+        visible={showSqlImport}
+        onImport={handleSqlImport}
+        onCancel={() => setShowSqlImport(false)}
+      />
       <SqlExportDialog
         visible={showSqlExport}
         tables={nodes
@@ -346,7 +397,7 @@ function parseColumnsFromText(text: string) {
     const parts = line.trim().split(/\s+/)
     const name = parts[0] || ''
     const type = parts[1] || 'varchar'
-    const constraints: string[] = []
+    const constraints: import('./types/shapeLibrary').ErConstraint[] = []
     
     if (line.includes('[pk]')) constraints.push('pk')
     if (line.includes('[fk]')) constraints.push('fk')

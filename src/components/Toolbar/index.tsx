@@ -38,6 +38,8 @@ import {
   FileImageOutlined,
   FileOutlined,
   CodeOutlined,
+  DatabaseOutlined,
+  ImportOutlined,
 } from '@ant-design/icons'
 import { HandIcon } from './HandIcon'
 import { Button, Space, Divider, Tooltip, Dropdown } from 'antd'
@@ -56,6 +58,7 @@ interface ToolbarProps {
   onShowHistory?: () => void
   onShowScriptEditor?: () => void
   onShowSqlExport?: () => void
+  onShowSqlImport?: () => void
 }
 
 const Toolbar: React.FC<ToolbarProps> = ({
@@ -68,6 +71,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
   onShowHistory,
   onShowScriptEditor,
   onShowSqlExport,
+  onShowSqlImport,
 }) => {
   const {
     currentTool,
@@ -232,6 +236,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
       label: '导出 SQL (ER图)',
       icon: <CodeOutlined />,
       onClick: onShowSqlExport,
+    },
+    {
+      key: 'sql-import',
+      label: '从 SQL 导入 ER图',
+      icon: <DatabaseOutlined />,
+      onClick: onShowSqlImport,
     },
   ]
 

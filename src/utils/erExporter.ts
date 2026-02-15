@@ -210,3 +210,189 @@ export function parseErTableText(text: string): { name: string; columns: ErColum
   
   return { name, columns }
 }
+
+export interface ParsedSqlTable {
+  name: string
+  columns: ErColumn[]
+  foreignKeys: {
+    column: string
+    refTable: string
+    refColumn: string
+  }[]
+}
+
+export interface SqlParseResult {
+  tables: ParsedSqlTable[]
+  errors: string[]
+}
+
+export function parseCreateTableSQL(sql: string): SqlParseResult {
+  const tables: ParsedSqlTable[] = []
+  const errors: string[] = []
+  
+  const cleanedSql = sql
+    .replace(/--.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  
+  const tableRegex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"[\w\]]+\s*\(([\s\S]*?)\)(?:\s*;|\s*$)/gi
+  
+  let match
+  while ((match = tableRegex.exec(cleanedSql)) !== null) {
+    const fullMatch = match[0]
+    const tableBody = match[1]
+    
+    const tableNameMatch = fullMatch.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([`"[\w\]]+)/i)
+    if (!tableNameMatch) continue
+    
+    let tableName = tableNameMatch[1]
+    tableName = tableName.replace(/[`"[\]]/g, '')
+    
+    const columns: ErColumn[] = []
+    const foreignKeys: ParsedSqlTable['foreignKeys'] = []
+    
+    const parts = tableBody.split(',').map(p => p.trim()).filter(p => p)
+    
+    for (const part of parts) {
+      const upperPart = part.toUpperCase()
+      
+      if (upperPart.startsWith('PRIMARY KEY')) {
+        const pkMatch = part.match(/PRIMARY\s+KEY\s*\(([^)]+)\)/i)
+        if (pkMatch) {
+          const pkColumns = pkMatch[1].split(',').map(c => c.trim().replace(/[`"[\]]/g, ''))
+          for (const pkCol of pkColumns) {
+            const colIndex = columns.findIndex(c => c.name.toLowerCase() === pkCol.toLowerCase())
+            if (colIndex !== -1 && !columns[colIndex].constraints.includes('pk')) {
+              columns[colIndex].constraints.push('pk')
+            }
+          }
+        }
+        continue
+      }
+      
+      if (upperPart.startsWith('FOREIGN KEY')) {
+        const fkMatch = part.match(/FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+[`"[\w\]]+\s*\(([^)]+)\)/i)
+        if (fkMatch) {
+          const fkColumn = fkMatch[1].replace(/[`"[\]]/g, '').trim()
+          const refMatch = part.match(/REFERENCES\s+([`"[\w\]]+)\s*\(([^)]+)\)/i)
+          if (refMatch) {
+            const refTable = refMatch[1].replace(/[`"[\]]/g, '')
+            const refColumn = refMatch[2].replace(/[`"[\]]/g, '').trim()
+            foreignKeys.push({ column: fkColumn, refTable, refColumn })
+            
+            const colIndex = columns.findIndex(c => c.name.toLowerCase() === fkColumn.toLowerCase())
+            if (colIndex !== -1 && !columns[colIndex].constraints.includes('fk')) {
+              columns[colIndex].constraints.push('fk')
+            }
+          }
+        }
+        continue
+      }
+      
+      if (upperPart.startsWith('UNIQUE') || upperPart.startsWith('INDEX') || upperPart.startsWith('KEY') || upperPart.startsWith('CONSTRAINT')) {
+        continue
+      }
+      
+      const colMatch = part.match(/^([`"[\w\]]+)\s+(\w+(?:\s*\([^)]*\))?)/i)
+      if (colMatch) {
+        const colName = colMatch[1].replace(/[`"[\]]/g, '')
+        let colType = colMatch[2].toUpperCase()
+        
+        const typeMap: Record<string, string> = {
+          'INTEGER': 'int',
+          'INT': 'int',
+          'BIGINT': 'bigint',
+          'SMALLINT': 'smallint',
+          'TINYINT': 'tinyint',
+          'VARCHAR': 'varchar',
+          'NVARCHAR': 'varchar',
+          'CHAR': 'varchar',
+          'TEXT': 'text',
+          'BOOLEAN': 'boolean',
+          'BOOL': 'boolean',
+          'DATE': 'date',
+          'DATETIME': 'datetime',
+          'TIMESTAMP': 'timestamp',
+          'TIME': 'time',
+          'FLOAT': 'float',
+          'DOUBLE': 'double',
+          'DECIMAL': 'decimal',
+          'NUMERIC': 'decimal',
+          'JSON': 'json',
+          'JSONB': 'json',
+          'UUID': 'uuid',
+          'UNIQUEIDENTIFIER': 'uuid',
+          'BLOB': 'blob',
+          'BINARY': 'binary',
+          'VARBINARY': 'blob',
+          'BIT': 'boolean',
+        }
+        
+        const baseType = colType.replace(/\([^)]*\)/, '').trim()
+        colType = typeMap[baseType] || baseType.toLowerCase()
+        
+        const constraints: ErConstraint[] = []
+        
+        if (/\bPRIMARY\s+KEY\b/i.test(part)) {
+          constraints.push('pk')
+        }
+        if (/\bNOT\s+NULL\b/i.test(part)) {
+          constraints.push('notnull')
+        }
+        if (/\bUNIQUE\b/i.test(part) && !/\bPRIMARY\s+KEY\b/i.test(part)) {
+          constraints.push('unique')
+        }
+        if (/\bAUTO_INCREMENT\b/i.test(part) || /\bAUTOINCREMENT\b/i.test(part) || /\bIDENTITY\b/i.test(part)) {
+          constraints.push('auto')
+        }
+        
+        columns.push({ name: colName, type: colType, constraints })
+      }
+    }
+    
+    if (columns.length > 0) {
+      tables.push({ name: tableName, columns, foreignKeys })
+    }
+  }
+  
+  if (tables.length === 0 && cleanedSql.length > 0) {
+    errors.push('未能解析到有效的 CREATE TABLE 语句')
+  }
+  
+  return { tables, errors }
+}
+
+export function generateErNodesFromTables(
+  tables: ParsedSqlTable[],
+  startX: number = 100,
+  startY: number = 100,
+  spacingX: number = 250,
+  spacingY: number = 300,
+  columnsPerRow: number = 3
+): { id: string; type: string; x: number; y: number; width: number; height: number; text: string }[] {
+  return tables.map((table, index) => {
+    const row = Math.floor(index / columnsPerRow)
+    const col = index % columnsPerRow
+    
+    const columnCount = table.columns.length
+    const height = Math.max(80, 40 + columnCount * 24)
+    const width = Math.max(160, 180)
+    
+    const lines = [table.name]
+    table.columns.forEach(col => {
+      const constraints = col.constraints.length > 0 ? ` [${col.constraints.join(',')}]` : ''
+      lines.push(`${col.name}\t${col.type}${constraints}`)
+    })
+    
+    return {
+      id: `er-table-${index}-${Date.now()}`,
+      type: 'er-table-entity-with-columns',
+      x: startX + col * spacingX,
+      y: startY + row * spacingY,
+      width,
+      height,
+      text: lines.join('\n'),
+    }
+  })
+}

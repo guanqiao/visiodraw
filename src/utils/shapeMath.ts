@@ -625,3 +625,103 @@ export function createErTableWithColumnsPath(
 
   return path
 }
+
+export function createUmlEnumPath(width: number, height: number): string {
+  const headerHeight = height * 0.25
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z
+    M0,${headerHeight} L${width},${headerHeight}`
+}
+
+export function createUmlCompositeStatePath(width: number, height: number): string {
+  const cornerRadius = Math.min(width, height) * 0.1
+  const innerMargin = Math.min(width, height) * 0.1
+  const innerWidth = width - innerMargin * 2
+  const innerHeight = height * 0.4
+  const innerY = height - innerMargin - innerHeight
+
+  return `M${cornerRadius},0 
+    L${width - cornerRadius},0 
+    Q${width},0 ${width},${cornerRadius}
+    L${width},${height - cornerRadius}
+    Q${width},${height} ${width - cornerRadius},${height}
+    L${cornerRadius},${height}
+    Q0,${height} 0,${height - cornerRadius}
+    L0,${cornerRadius}
+    Q0,0 ${cornerRadius},0 Z
+    M${innerMargin},${innerY} 
+    L${innerMargin + innerWidth},${innerY} 
+    L${innerMargin + innerWidth},${innerY + innerHeight} 
+    L${innerMargin},${innerY + innerHeight} Z`
+}
+
+export function createUmlProvidedInterfacePath(width: number, height: number): string {
+  const cx = width * 0.7
+  const cy = height / 2
+  const r = Math.min(width, height) * 0.2
+
+  return `M0,${cy} L${cx - r},${cy}
+    M${cx},${cy - r} A${r},${r} 0 1,1 ${cx},${cy + r} A${r},${r} 0 1,1 ${cx},${cy - r}`
+}
+
+export function createUmlRequiredInterfacePath(width: number, height: number): string {
+  const cx = width * 0.7
+  const cy = height / 2
+  const r = Math.min(width, height) * 0.2
+
+  return `M0,${cy} L${cx},${cy}
+    M${cx + r},${cy - r} A${r},${r} 0 1,0 ${cx + r},${cy + r}`
+}
+
+export function createUmlSignalSendPath(width: number, height: number): string {
+  const arrowWidth = width * 0.25
+  return `M0,0 L${width - arrowWidth},0 L${width},${height / 2} L${width - arrowWidth},${height} L0,${height} Z`
+}
+
+export function createUmlSignalReceivePath(width: number, height: number): string {
+  const arrowWidth = width * 0.25
+  return `M${arrowWidth},0 L${width},0 L${width},${height} L${arrowWidth},${height} L0,${height / 2} Z`
+}
+
+export function createUmlObjectInstancePath(width: number, height: number): string {
+  const headerHeight = height * 0.3
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z
+    M0,${headerHeight} L${width},${headerHeight}`
+}
+
+export function createUmlTimingRulerPath(width: number, height: number): string {
+  const tickCount = 5
+  const tickSpacing = width / tickCount
+  const tickHeight = height * 0.2
+  const cy = height / 2
+
+  let path = `M0,${cy} L${width},${cy}`
+  for (let i = 0; i <= tickCount; i++) {
+    const x = i * tickSpacing
+    path += ` M${x},${cy - tickHeight} L${x},${cy + tickHeight}`
+  }
+  path += ` M${width - tickHeight},${cy} L${width},${cy} L${width - tickHeight},${cy + tickHeight}`
+
+  return path
+}
+
+export function createUmlTimingStateLinePath(width: number, height: number): string {
+  const stateWidth = width * 0.15
+  const stateHeight = height * 0.3
+  const transitions = [
+    { x: stateWidth, y: stateHeight / 2 },
+    { x: width * 0.4, y: height - stateHeight / 2 },
+    { x: width * 0.6, y: height - stateHeight / 2 },
+    { x: width - stateWidth, y: stateHeight / 2 },
+  ]
+
+  let path = `M0,0 L${stateWidth},0 L${stateWidth},${stateHeight} L0,${stateHeight} Z`
+  
+  for (let i = 0; i < transitions.length - 1; i++) {
+    path += ` M${transitions[i].x},${transitions[i].y} L${transitions[i + 1].x},${transitions[i + 1].y}`
+  }
+
+  const lastX = width - stateWidth
+  path += ` M${lastX},0 L${width},0 L${width},${stateHeight} L${lastX},${stateHeight} Z`
+
+  return path
+}
