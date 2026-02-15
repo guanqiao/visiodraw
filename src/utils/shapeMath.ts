@@ -459,6 +459,120 @@ export function createBpmnActivityPath(width: number, height: number): string {
     Q0,0 ${cornerRadius},0 Z`
 }
 
+export function createBpmnUserTaskPath(width: number, height: number): string {
+  const cornerRadius = Math.min(width, height) * 0.1
+  const lineY = height * 0.85
+  const lineHeight = height * 0.05
+
+  return `M${cornerRadius},0 
+    L${width - cornerRadius},0 
+    Q${width},0 ${width},${cornerRadius}
+    L${width},${height - cornerRadius}
+    Q${width},${height} ${width - cornerRadius},${height}
+    L${cornerRadius},${height}
+    Q0,${height} 0,${height - cornerRadius}
+    L0,${cornerRadius}
+    Q0,0 ${cornerRadius},0 Z
+    M0,${lineY} L${width},${lineY}
+    M0,${lineY + lineHeight} L${width},${lineY + lineHeight}`
+}
+
+export function createBpmnServiceTaskPath(width: number, height: number): string {
+  const cornerRadius = Math.min(width, height) * 0.1
+  const cx = width / 2
+  const cy = height / 2
+  const gearR = Math.min(width, height) * 0.25
+  const innerR = gearR * 0.4
+  const toothHeight = gearR * 0.2
+  const toothCount = 8
+
+  let gearPath = ''
+  for (let i = 0; i < toothCount; i++) {
+    const angle = (i / toothCount) * Math.PI * 2
+    const nextAngle = ((i + 0.5) / toothCount) * Math.PI * 2
+    const x1 = cx + Math.cos(angle) * (gearR + toothHeight)
+    const y1 = cy + Math.sin(angle) * (gearR + toothHeight)
+    const x2 = cx + Math.cos(nextAngle) * (gearR + toothHeight)
+    const y2 = cy + Math.sin(nextAngle) * (gearR + toothHeight)
+    const x3 = cx + Math.cos(nextAngle) * gearR
+    const y3 = cy + Math.sin(nextAngle) * gearR
+    const prevAngle = ((i - 0.5) / toothCount) * Math.PI * 2
+    const x4 = cx + Math.cos(prevAngle) * gearR
+    const y4 = cy + Math.sin(prevAngle) * gearR
+    
+    if (i === 0) {
+      gearPath = `M${x1},${y1} L${x2},${y2} L${x3},${y3} L${x4},${y4}`
+    } else {
+      gearPath += ` L${x1},${y1} L${x2},${y2} L${x3},${y3} L${x4},${y4}`
+    }
+  }
+  gearPath += ' Z'
+
+  const innerCircle = `M${cx},${cy - innerR} A${innerR},${innerR} 0 1,1 ${cx},${cy + innerR} A${innerR},${innerR} 0 1,1 ${cx},${cy - innerR}`
+
+  return `M${cornerRadius},0 
+    L${width - cornerRadius},0 
+    Q${width},0 ${width},${cornerRadius}
+    L${width},${height - cornerRadius}
+    Q${width},${height} ${width - cornerRadius},${height}
+    L${cornerRadius},${height}
+    Q0,${height} 0,${height - cornerRadius}
+    L0,${cornerRadius}
+    Q0,0 ${cornerRadius},0 Z
+    M${gearPath}
+    M${innerCircle}`
+}
+
+export function createBpmnSubprocessPath(width: number, height: number): string {
+  const outerRadius = Math.min(width, height) * 0.08
+  const innerMargin = 12
+
+  return `M${outerRadius},0 
+    L${width - outerRadius},0 
+    Q${width},0 ${width},${outerRadius}
+    L${width},${height - outerRadius}
+    Q${width},${height} ${width - outerRadius},${height}
+    L${outerRadius},${height}
+    Q0,${height} 0,${height - outerRadius}
+    L0,${outerRadius}
+    Q0,0 ${outerRadius},0 Z
+    M${innerMargin},${innerMargin} L${width - innerMargin},${innerMargin}
+    L${width - innerMargin},${height - innerMargin} L${innerMargin},${height - innerMargin} Z`
+}
+
+export function createBpmnPoolPath(width: number, height: number): string {
+  const laneWidth = Math.min(width * 0.2, 80)
+
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z
+    M${laneWidth},0 L${laneWidth},${height}`
+}
+
+export function createBpmnLanePath(width: number, height: number): string {
+  const laneHeaderWidth = Math.min(width * 0.15, 60)
+
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z
+    M${laneHeaderWidth},0 L${laneHeaderWidth},${height}`
+}
+
+export function createBpmnDataObjectPath(width: number, height: number): string {
+  const cornerSize = width * 0.25
+
+  return `M0,0 L${width - cornerSize},0 L${width},${cornerSize} L${width},${height} L0,${height} Z`
+}
+
+export function createBpmnDataStorePath(width: number, height: number): string {
+  const topControl = height * 0.15
+  const bottomControl = height * 0.15
+
+  return `M0,${topControl} 
+    Q${width / 2},0 ${width},${topControl}
+    L${width},${height - bottomControl}
+    Q${width / 2},${height} 0,${height - bottomControl}
+    Z
+    M0,${topControl * 2} 
+    Q${width / 2},${topControl} ${width},${topControl * 2}`
+}
+
 export function createDoubleEllipsePath(
   width: number,
   height: number,

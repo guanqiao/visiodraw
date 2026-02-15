@@ -26,6 +26,13 @@ import {
   createBpmnEventPath,
   createBpmnGatewayPath,
   createBpmnActivityPath,
+  createBpmnUserTaskPath,
+  createBpmnServiceTaskPath,
+  createBpmnSubprocessPath,
+  createBpmnPoolPath,
+  createBpmnLanePath,
+  createBpmnDataObjectPath,
+  createBpmnDataStorePath,
   createDoubleEllipsePath,
   createErTableEntityPath,
   createErTableWithColumnsPath,
@@ -1180,6 +1187,111 @@ export const renderBpmnInclusiveGateway = (config: ShapeRenderConfig): Node => {
   })
 }
 
+export const renderBpmnUserTask = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnUserTaskPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnServiceTask = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnServiceTaskPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnSubprocess = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnSubprocessPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnPool = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnPoolPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnLane = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnLanePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnDataObject = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnDataObjectPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnDataStore = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnDataStorePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
 export const shapeRenderers: Record<string, (config: ShapeRenderConfig) => Node> = {
   rectangle: renderRectangle,
   'rounded-rectangle': renderRoundedRectangle,
@@ -1268,9 +1380,102 @@ export const shapeRenderers: Record<string, (config: ShapeRenderConfig) => Node>
   'bpmn-end-event': renderBpmnEndEvent,
   'bpmn-intermediate-event': renderBpmnIntermediateEvent,
   'bpmn-task': renderBpmnTask,
+  'bpmn-user-task': renderBpmnUserTask,
+  'bpmn-service-task': renderBpmnServiceTask,
+  'bpmn-subprocess': renderBpmnSubprocess,
+  'bpmn-pool': renderBpmnPool,
+  'bpmn-lane': renderBpmnLane,
+  'bpmn-data-object': renderBpmnDataObject,
+  'bpmn-data-store': renderBpmnDataStore,
   'bpmn-exclusive-gateway': renderBpmnExclusiveGateway,
   'bpmn-parallel-gateway': renderBpmnParallelGateway,
   'bpmn-inclusive-gateway': renderBpmnInclusiveGateway,
+
+  'aws-ec2': renderServer,
+  'aws-lambda': renderServer,
+  'aws-ecs': renderServer,
+  'aws-eks': renderServer,
+  'aws-s3': renderDatabase,
+  'aws-ebs': renderDatabase,
+  'aws-rds': renderDatabase,
+  'aws-dynamodb': renderDatabase,
+  'aws-vpc': renderRectangle,
+  'aws-elb': renderRectangle,
+  'aws-cloudfront': renderCloud,
+  'aws-sqs': renderRectangle,
+  'aws-sns': renderRectangle,
+  'aws-iam': renderRectangle,
+  'aws-cloudwatch': renderRectangle,
+  'aws-apigateway': renderCloud,
+  'aws-kinesis': renderRectangle,
+  'aws-redshift': renderDatabase,
+  'aws-elasticache': renderDatabase,
+  'aws-eventbridge': renderRectangle,
+  'aws-stepfunctions': renderRectangle,
+  'aws-codebuild': renderServer,
+  'aws-cloudformation': renderRectangle,
+
+  'azure-vm': renderServer,
+  'azure-functions': renderServer,
+  'azure-appservice': renderServer,
+  'azure-aks': renderServer,
+  'azure-storage': renderDatabase,
+  'azure-sql': renderDatabase,
+  'azure-cosmosdb': renderDatabase,
+  'azure-vnet': renderRectangle,
+  'azure-lb': renderRectangle,
+  'azure-cdn': renderCloud,
+  'azure-eventhub': renderRectangle,
+  'azure-servicebus': renderRectangle,
+  'azure-keyvault': renderRectangle,
+  'azure-redis': renderDatabase,
+  'azure-apim': renderCloud,
+  'azure-logicapps': renderRectangle,
+  'azure-eventgrid': renderRectangle,
+  'azure-devops': renderRectangle,
+
+  'gcp-compute': renderServer,
+  'gcp-functions': renderServer,
+  'gcp-gke': renderServer,
+  'gcp-storage': renderDatabase,
+  'gcp-cloudsql': renderDatabase,
+  'gcp-firestore': renderDatabase,
+  'gcp-vpc': renderRectangle,
+  'gcp-lb': renderRectangle,
+  'gcp-bigquery': renderDatabase,
+  'gcp-pubsub': renderRectangle,
+  'gcp-cloudrun': renderServer,
+  'gcp-apigee': renderCloud,
+  'gcp-dataflow': renderRectangle,
+  'gcp-cloudbuild': renderServer,
+
+  'aliyun-ecs': renderServer,
+  'aliyun-oss': renderDatabase,
+  'aliyun-rds': renderDatabase,
+  'aliyun-slb': renderRectangle,
+  'aliyun-vpc': renderRectangle,
+  'aliyun-ack': renderServer,
+  'aliyun-rocketmq': renderRectangle,
+  'aliyun-cdn': renderCloud,
+  'aliyun-apigateway': renderCloud,
+
+  'tencent-cvm': renderServer,
+  'tencent-cos': renderDatabase,
+  'tencent-cdb': renderDatabase,
+  'tencent-clb': renderRectangle,
+  'tencent-tke': renderServer,
+  'tencent-cmq': renderRectangle,
+  'tencent-apigateway': renderCloud,
+  'tencent-cls': renderRectangle,
+
+  'cloud-generic': renderCloud,
+  'cloud-server': renderServer,
+  'cloud-database': renderDatabase,
+  'cloud-loadbalancer': renderRectangle,
+  'cloud-firewall': renderRectangle,
+  'cloud-cdn': renderCloud,
+  'cloud-api-gateway': renderCloud,
+  'cloud-mq': renderRectangle,
 }
 
 export const renderShape = (type: string, config: ShapeRenderConfig): Node => {
