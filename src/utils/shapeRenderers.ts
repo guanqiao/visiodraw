@@ -36,6 +36,15 @@ import {
   createDoubleEllipsePath,
   createErTableEntityPath,
   createErTableWithColumnsPath,
+  createUmlEnumPath,
+  createUmlCompositeStatePath,
+  createUmlProvidedInterfacePath,
+  createUmlRequiredInterfacePath,
+  createUmlSignalSendPath,
+  createUmlSignalReceivePath,
+  createUmlObjectInstancePath,
+  createUmlTimingRulerPath,
+  createUmlTimingStateLinePath,
 } from './shapeMath'
 
 export interface ShapeRenderConfig {
@@ -1292,6 +1301,424 @@ export const renderBpmnDataStore = (config: ShapeRenderConfig): Node => {
   })
 }
 
+export const renderUmlEnum = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlEnumPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderUmlGenericClass = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlClassPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderUmlCompositeState = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlCompositeStatePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderUmlStateHistory = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Circle({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      label: {
+        ...base.attrs.label,
+        text: 'H',
+        fontSize: 12,
+        fontWeight: 'bold',
+      },
+    },
+  })
+}
+
+export const renderUmlStateDeepHistory = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Circle({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      label: {
+        ...base.attrs.label,
+        text: 'H*',
+        fontSize: 10,
+        fontWeight: 'bold',
+      },
+    },
+  })
+}
+
+export const renderUmlStateEntryPoint = renderCircle
+
+export const renderUmlStateExitPoint = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const r = Math.min(config.width, config.height) / 2
+  return new Shape.Circle({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: '#fff',
+        strokeWidth: 2,
+      },
+    },
+  })
+}
+
+export const renderUmlStateTerminate = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cx = config.width / 2
+  const cy = config.height / 2
+  const size = Math.min(config.width, config.height) * 0.4
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${cx - size},${cy - size} L${cx + size},${cy + size} M${cx + size},${cy - size} L${cx - size},${cy + size}`,
+        fill: 'none',
+        strokeWidth: 3,
+      },
+    },
+  })
+}
+
+export const renderUmlProvidedInterface = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlProvidedInterfacePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlRequiredInterface = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlRequiredInterfacePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlConnector = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cx = config.width / 2
+  const cy = config.height / 2
+  const r = Math.min(config.width, config.height) * 0.1
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlExecutionEnvironment = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlNodePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderUmlCommunicationPath = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${config.height / 2} L${config.width},${config.height / 2}`,
+        fill: 'none',
+        strokeDasharray: '5,3',
+      },
+    },
+  })
+}
+
+export const renderUmlSignalSend = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlSignalSendPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderUmlSignalReceive = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlSignalReceivePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderUmlFlowFinal = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const r = Math.min(config.width, config.height) / 2
+  const cx = config.width / 2
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${cx - r},${cy - r} A${r},${r} 0 1,1 ${cx + r},${cy} A${r},${r} 0 1,1 ${cx - r},${cy - r} M${cx - r * 0.7},${cy - r * 0.7} L${cx + r * 0.7},${cy + r * 0.7}`,
+        fill: '#fff',
+        strokeWidth: 2,
+      },
+    },
+  })
+}
+
+export const renderUmlTimingRuler = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlTimingRulerPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlTimingStateLine = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlTimingStateLinePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderUmlTimingEvent = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cx = config.width / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${cx},0 L${cx},${config.height}`,
+        fill: 'none',
+        strokeDasharray: '3,2',
+      },
+    },
+  })
+}
+
+export const renderUmlTimingDuration = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  const tickH = config.height * 0.25
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy} M0,${cy - tickH} L0,${cy + tickH} M${config.width},${cy - tickH} L${config.width},${cy + tickH}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlTimingConstraint = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: 'transparent',
+        strokeDasharray: '3,2',
+      },
+    },
+  })
+}
+
+export const renderUmlObjectInstance = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlObjectInstancePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderUmlLink = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${config.height / 2} L${config.width},${config.height / 2}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlLinkEnd = renderRectangle
+
+export const renderUmlCommObject = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      label: {
+        ...base.attrs.label,
+        text: config.text || ':Object',
+      },
+    },
+  })
+}
+
+export const renderUmlCommLink = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${config.height / 2} L${config.width},${config.height / 2}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlCommMessage = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width - 10},${cy}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlCommReverseMessage = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${config.width},${cy} L10,${cy}`,
+        fill: 'none',
+        strokeDasharray: '3,2',
+      },
+    },
+  })
+}
+
 export const shapeRenderers: Record<string, (config: ShapeRenderConfig) => Node> = {
   rectangle: renderRectangle,
   'rounded-rectangle': renderRoundedRectangle,
@@ -1339,6 +1766,46 @@ export const shapeRenderers: Record<string, (config: ShapeRenderConfig) => Node>
   'uml-fragment': renderUmlFragment,
   'uml-rect': renderUmlRect,
   'uml-anchor': renderUmlAnchor,
+  'uml-enum': renderUmlEnum,
+  'uml-generic-class': renderUmlGenericClass,
+  'uml-fragment-alt': renderUmlFragment,
+  'uml-fragment-loop': renderUmlFragment,
+  'uml-fragment-par': renderUmlFragment,
+  'uml-fragment-opt': renderUmlFragment,
+  'uml-fragment-break': renderUmlFragment,
+  'uml-fragment-critical': renderUmlFragment,
+  'uml-fragment-strict': renderUmlFragment,
+  'uml-fragment-seq': renderUmlFragment,
+  'uml-fragment-ignore': renderUmlFragment,
+  'uml-fragment-consider': renderUmlFragment,
+  'uml-fragment-assert': renderUmlFragment,
+  'uml-fragment-neg': renderUmlFragment,
+  'uml-signal-send': renderUmlSignalSend,
+  'uml-signal-receive': renderUmlSignalReceive,
+  'uml-flow-final': renderUmlFlowFinal,
+  'uml-state-composite': renderUmlCompositeState,
+  'uml-state-history': renderUmlStateHistory,
+  'uml-state-deep-history': renderUmlStateDeepHistory,
+  'uml-state-entry-point': renderUmlStateEntryPoint,
+  'uml-state-exit-point': renderUmlStateExitPoint,
+  'uml-state-terminate': renderUmlStateTerminate,
+  'uml-interface-provided': renderUmlProvidedInterface,
+  'uml-interface-required': renderUmlRequiredInterface,
+  'uml-connector': renderUmlConnector,
+  'uml-execution-environment': renderUmlExecutionEnvironment,
+  'uml-communication-path': renderUmlCommunicationPath,
+  'uml-timing-ruler': renderUmlTimingRuler,
+  'uml-timing-state-line': renderUmlTimingStateLine,
+  'uml-timing-event': renderUmlTimingEvent,
+  'uml-timing-duration': renderUmlTimingDuration,
+  'uml-timing-constraint': renderUmlTimingConstraint,
+  'uml-object-instance': renderUmlObjectInstance,
+  'uml-link': renderUmlLink,
+  'uml-link-end': renderUmlLinkEnd,
+  'uml-comm-object': renderUmlCommObject,
+  'uml-comm-link': renderUmlCommLink,
+  'uml-comm-message': renderUmlCommMessage,
+  'uml-comm-reverse-message': renderUmlCommReverseMessage,
 
   'er-entity': renderErEntity,
   'er-weak-entity': renderErWeakEntity,
