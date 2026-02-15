@@ -12,23 +12,28 @@ interface SqlImportDialogProps {
   onCancel: () => void
 }
 
-const SAMPLE_SQL = `-- 示例 SQL
+const SAMPLE_SQL = `-- 示例 SQL (支持 DEFAULT, ENUM, COMMENT, INDEX 等)
 CREATE TABLE users (
-  id INT PRIMARY KEY AUTO_INCREMENT,
-  username VARCHAR(50) NOT NULL UNIQUE,
-  email VARCHAR(100) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+  id INT PRIMARY KEY AUTO_INCREMENT COMMENT '用户ID',
+  username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
+  email VARCHAR(100) NOT NULL UNIQUE COMMENT '邮箱',
+  password VARCHAR(255) NOT NULL COMMENT '密码',
+  status ENUM('active', 'inactive', 'banned') DEFAULT 'active' COMMENT '状态',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_email (email)
+) COMMENT = '用户表';
 
 CREATE TABLE posts (
   id INT PRIMARY KEY AUTO_INCREMENT,
-  user_id INT NOT NULL,
-  title VARCHAR(200) NOT NULL,
-  content TEXT,
+  user_id INT NOT NULL COMMENT '作者ID',
+  title VARCHAR(200) NOT NULL COMMENT '标题',
+  content TEXT COMMENT '内容',
   status ENUM('draft', 'published') DEFAULT 'draft',
+  view_count INT DEFAULT 0,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  FOREIGN KEY (user_id) REFERENCES users(id),
+  INDEX idx_user (user_id),
+  INDEX idx_status (status)
 );
 
 CREATE TABLE comments (
@@ -37,8 +42,8 @@ CREATE TABLE comments (
   user_id INT NOT NULL,
   content TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (post_id) REFERENCES posts(id),
-  FOREIGN KEY (user_id) REFERENCES users(id)
+  CONSTRAINT fk_comment_post FOREIGN KEY (post_id) REFERENCES posts(id),
+  CONSTRAINT fk_comment_user FOREIGN KEY (user_id) REFERENCES users(id)
 );`
 
 const SqlImportDialog: React.FC<SqlImportDialogProps> = ({
@@ -102,7 +107,14 @@ const SqlImportDialog: React.FC<SqlImportDialogProps> = ({
       title: '表名',
       dataIndex: 'name',
       key: 'name',
-      render: (name: string) => <Text strong style={{ color: '#1890ff' }}>{name}</Text>,
+      render: (name: string, record: ParsedSqlTable) => (
+        <Space direction="vertical" size={0}>
+          <Text strong style={{ color: '#1890ff' }}>{name}</Text>
+          {record.comment && (
+            <Text type="secondary" style={{ fontSize: 11 }}>{record.comment}</Text>
+          )}
+        </Space>
+      ),
     },
     {
       title: '列数',
@@ -129,9 +141,33 @@ const SqlImportDialog: React.FC<SqlImportDialogProps> = ({
       render: (_: unknown, record: ParsedSqlTable) => {
         const fkColumns = record.columns.filter(c => c.constraints.includes('fk'))
         return fkColumns.length > 0 ? (
-          <Text type="warning">{fkColumns.map(c => c.name).join(', ')}</Text>
+          <Space direction="vertical" size={0}>
+            {record.foreignKeys.map((fk, idx) => (
+              <Text key={idx} type="warning" style={{ fontSize: 11 }}>
+                {fk.column} → {fk.refTable}.{fk.refColumn}
+              </Text>
+            ))}
+          </Space>
         ) : (
           <Text type="secondary">无</Text>
+        )
+      },
+    },
+    {
+      title: '索引',
+      key: 'indexes',
+      render: (_: unknown, record: ParsedSqlTable) => {
+        if (record.indexes.length === 0) {
+          return <Text type="secondary">无</Text>
+        }
+        return (
+          <Space direction="vertical" size={0}>
+            {record.indexes.map((idx, i) => (
+              <Text key={i} style={{ fontSize: 11 }}>
+                {idx.isUnique ? '🔷' : '📋'} {idx.name} ({idx.columns.join(', ')})
+              </Text>
+            ))}
+          </Space>
         )
       },
     },
@@ -213,9 +249,19 @@ const SqlImportDialog: React.FC<SqlImportDialogProps> = ({
 
       {parseResult.errors.length > 0 && (
         <Alert
-          type="warning"
-          message="解析警告"
+          type="error"
+          message="解析错误"
           description={parseResult.errors.join('; ')}
+          showIcon
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
+      {'warnings' in parseResult && parseResult.warnings.length > 0 && (
+        <Alert
+          type="warning"
+          message="解析提示"
+          description={parseResult.warnings.join('; ')}
           showIcon
           style={{ marginBottom: 16 }}
         />
@@ -227,6 +273,11 @@ const SqlImportDialog: React.FC<SqlImportDialogProps> = ({
             <Space>
               <CheckCircleOutlined style={{ color: '#52c41a' }} />
               <Text>解析结果: {parseResult.tables.length} 个表</Text>
+              {'indexes' in parseResult.tables[0] && (
+                <Text type="secondary">
+                  ({parseResult.tables.reduce((sum, t) => sum + (t.indexes?.length || 0), 0)} 个索引)
+                </Text>
+              )}
             </Space>
           </Divider>
 

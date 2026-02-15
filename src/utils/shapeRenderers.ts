@@ -33,6 +33,14 @@ import {
   createBpmnLanePath,
   createBpmnDataObjectPath,
   createBpmnDataStorePath,
+  createBpmnBoundaryEventPath,
+  createBpmnTerminateEventPath,
+  createBpmnCompensationEventPath,
+  createBpmnScriptTaskPath,
+  createBpmnSendTaskPath,
+  createBpmnReceiveTaskPath,
+  createBpmnManualTaskPath,
+  createBpmnBusinessRuleTaskPath,
   createDoubleEllipsePath,
   createErTableEntityPath,
   createErTableWithColumnsPath,
@@ -755,23 +763,155 @@ export const renderErTableEntity = (config: ShapeRenderConfig): Node => {
   })
 }
 
+function parseErColumnLine(line: string): { 
+  name: string
+  type: string
+  constraints: string[]
+  displayText: string
+  isPk: boolean
+  isFk: boolean
+} {
+  const constraintMatch = line.match(/^(.+?)\s*\[(.+)\]\s*$/)
+  let name = ''
+  let type = 'varchar'
+  let constraints: string[] = []
+  
+  if (constraintMatch) {
+    const parts = constraintMatch[1].trim().split(/\s+/)
+    name = parts[0]
+    type = parts.slice(1).join(' ') || 'varchar'
+    constraints = constraintMatch[2].split(',').map(c => c.trim().toLowerCase())
+  } else {
+    const parts = line.trim().split(/\s+/)
+    name = parts[0]
+    type = parts.slice(1).join(' ') || 'varchar'
+  }
+  
+  const isPk = constraints.includes('pk')
+  const isFk = constraints.includes('fk')
+  
+  const constraintIcons: string[] = []
+  if (constraints.includes('pk')) constraintIcons.push('🔑')
+  if (constraints.includes('fk')) constraintIcons.push('🔗')
+  if (constraints.includes('unique')) constraintIcons.push('UQ')
+  if (constraints.includes('notnull')) constraintIcons.push('NN')
+  if (constraints.includes('auto')) constraintIcons.push('AI')
+  if (constraints.includes('index')) constraintIcons.push('IDX')
+  
+  const displayText = `${name} ${type}${constraintIcons.length > 0 ? ' ' + constraintIcons.join(' ') : ''}`
+  
+  return { name, type, constraints, displayText, isPk, isFk }
+}
+
 export const renderErTableEntityWithColumns = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
-  const columnCount = Math.max((config.text?.split('\n').length || 3) - 1, 2)
+  const lines = (config.text || 'Entity\nid    int [pk]\nname  varchar').split('\n')
+  const columnCount = Math.max(lines.length - 1, 2)
   const path = createErTableWithColumnsPath(config.width, config.height, columnCount)
   
-  const lines = (config.text || 'Entity\nid    int [pk]\nname  varchar').split('\n')
-  const headerHeight = Math.max(config.height * 0.15, 24)
+  const headerHeight = Math.max(config.height * 0.18, 28)
   const rowHeight = (config.height - headerHeight) / Math.max(columnCount, 1)
-
-  const labelTexts = lines.map((line, index) => {
-    const y = index === 0 
-      ? headerHeight / 2 + 4 
-      : headerHeight + (index - 0.5) * rowHeight + 4
-    return {
-      text: line,
+  const tableName = lines[0] || 'Entity'
+  
+  const columnInfos = lines.slice(1).map(line => parseErColumnLine(line))
+  
+  const shapes: any[] = []
+  
+  shapes.push({
+    type: 'rect',
+    attrs: {
+      x: 0,
+      y: 0,
+      width: config.width,
+      height: headerHeight,
+      fill: '#1890ff',
+      stroke: 'none',
+    },
+  })
+  
+  shapes.push({
+    type: 'text',
+    attrs: {
       x: config.width / 2,
-      y: y,
+      y: headerHeight / 2 + 1,
+      text: tableName,
+      fill: '#ffffff',
+      fontSize: 13,
+      fontWeight: 'bold',
+      textAnchor: 'middle',
+      dominantBaseline: 'middle',
+    },
+  })
+  
+  columnInfos.forEach((col, index) => {
+    const y = headerHeight + index * rowHeight
+    
+    if (index % 2 === 0) {
+      shapes.push({
+        type: 'rect',
+        attrs: {
+          x: 0,
+          y: y,
+          width: config.width,
+          height: rowHeight,
+          fill: '#fafafa',
+          stroke: 'none',
+        },
+      })
+    }
+    
+    const textColor = col.isPk ? '#1890ff' : col.isFk ? '#722ed1' : '#333333'
+    const fontWeight = col.isPk ? 'bold' : 'normal'
+    
+    shapes.push({
+      type: 'text',
+      attrs: {
+        x: 8,
+        y: y + rowHeight / 2,
+        text: col.name,
+        fill: textColor,
+        fontSize: 11,
+        fontWeight: fontWeight,
+        textAnchor: 'start',
+        dominantBaseline: 'middle',
+        textDecoration: col.isPk ? 'underline' : 'none',
+      },
+    })
+    
+    shapes.push({
+      type: 'text',
+      attrs: {
+        x: config.width - 8,
+        y: y + rowHeight / 2,
+        text: col.type.toUpperCase(),
+        fill: '#666666',
+        fontSize: 10,
+        fontWeight: 'normal',
+        textAnchor: 'end',
+        dominantBaseline: 'middle',
+      },
+    })
+    
+    const constraintIcons: string[] = []
+    if (col.constraints.includes('pk')) constraintIcons.push('🔑')
+    if (col.constraints.includes('fk')) constraintIcons.push('🔗')
+    if (col.constraints.includes('auto')) constraintIcons.push('⚡')
+    if (col.constraints.includes('unique')) constraintIcons.push('🔷')
+    if (col.constraints.includes('notnull')) constraintIcons.push('✦')
+    
+    if (constraintIcons.length > 0) {
+      shapes.push({
+        type: 'text',
+        attrs: {
+          x: config.width / 2,
+          y: y + rowHeight / 2,
+          text: constraintIcons.join(''),
+          fill: '#333333',
+          fontSize: 9,
+          textAnchor: 'middle',
+          dominantBaseline: 'middle',
+        },
+      })
     }
   })
 
@@ -782,25 +922,14 @@ export const renderErTableEntityWithColumns = (config: ShapeRenderConfig): Node 
       body: {
         ...base.attrs.body,
         d: path,
+        fill: '#ffffff',
       },
       label: {
         ...base.attrs.label,
         text: '',
       },
     },
-    shapes: labelTexts.map((item, index) => ({
-      type: 'text',
-      attrs: {
-        x: item.x,
-        y: item.y,
-        text: item.text,
-        fill: '#333333',
-        fontSize: index === 0 ? 14 : 11,
-        fontWeight: index === 0 ? 'bold' : 'normal',
-        textAnchor: 'middle',
-        dominantBaseline: 'middle',
-      },
-    })),
+    shapes,
   })
 }
 
@@ -1301,6 +1430,129 @@ export const renderBpmnDataStore = (config: ShapeRenderConfig): Node => {
   })
 }
 
+export const renderBpmnBoundaryEvent = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnBoundaryEventPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnTerminateEvent = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnTerminateEventPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+        fill: config.fill || '#fff2f0',
+        stroke: config.stroke || '#f5222d',
+        strokeWidth: 3,
+      },
+    },
+  })
+}
+
+export const renderBpmnCompensationEvent = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnCompensationEventPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnScriptTask = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnScriptTaskPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnSendTask = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnSendTaskPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnReceiveTask = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnReceiveTaskPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnManualTask = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnManualTaskPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
+export const renderBpmnBusinessRuleTask = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createBpmnBusinessRuleTaskPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+    },
+  })
+}
+
 export const renderUmlEnum = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
   const path = createUmlEnumPath(config.width, config.height)
@@ -1719,6 +1971,548 @@ export const renderUmlCommReverseMessage = (config: ShapeRenderConfig): Node => 
   })
 }
 
+export const renderUmlAbstractClass = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlClassPath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+      },
+      label: {
+        ...base.attrs.label,
+        fontStyle: 'italic',
+      },
+    },
+  })
+}
+
+export const renderUmlAnnotation = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlNotePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+        fill: '#fffbe6',
+        stroke: '#faad14',
+      },
+    },
+  })
+}
+
+export const renderUmlSystemBoundary = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: 'transparent',
+        strokeDasharray: '5,3',
+      },
+    },
+  })
+}
+
+export const renderUmlObject = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      label: {
+        ...base.attrs.label,
+        text: config.text ? `:${config.text}` : ':Object',
+      },
+    },
+  })
+}
+
+export const renderUmlActorLifeline = (config: ShapeRenderConfig): Node => {
+  const path = createUmlActorPath(config.width, config.height * 0.3)
+  const base = createBaseConfig(config)
+  const centerY = config.height * 0.3
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `${path} M${config.width / 2},${centerY} L${config.width / 2},${config.height}`,
+        fill: 'none',
+        strokeDasharray: '4,4',
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      },
+    },
+  })
+}
+
+export const renderUmlSelfMessage = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cx = config.width / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${cx * 0.3},${config.height * 0.2} L${cx * 1.2},${config.height * 0.2} L${cx * 1.2},${config.height * 0.7} L${cx * 0.3},${config.height * 0.7}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlSyncMessage = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlAsyncMessage = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlReturnMessage = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${config.width},${cy} L0,${cy}`,
+        fill: 'none',
+        strokeDasharray: '4,4',
+      },
+    },
+  })
+}
+
+export const renderUmlActivity = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        rx: config.height / 2,
+        ry: config.height / 2,
+      },
+    },
+  })
+}
+
+export const renderUmlAction = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        rx: 5,
+        ry: 5,
+      },
+    },
+  })
+}
+
+export const renderUmlDecision = renderDiamond
+
+export const renderUmlFork = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cx = config.width / 2
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: '#722ed1',
+        width: config.width,
+        height: 4,
+      },
+    },
+  })
+}
+
+export const renderUmlInitial = renderCircle
+
+export const renderUmlFinal = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const r = Math.min(config.width, config.height) / 2
+  const cx = config.width / 2
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${cx - r},${cy} A${r},${r} 0 1,1 ${cx + r},${cy} A${r},${r} 0 1,1 ${cx - r},${cy} M${cx - r * 0.6},${cy} A${r * 0.6},${r * 0.6} 0 1,1 ${cx + r * 0.6},${cy} A${r * 0.6},${r * 0.6} 0 1,1 ${cx - r * 0.6},${cy}`,
+        fill: '#f5222d',
+      },
+    },
+  })
+}
+
+export const renderUmlSwimlane = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const headerWidth = config.width * 0.15
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,0 L${config.width},0 L${config.width},${config.height} L0,${config.height} Z M${headerWidth},0 L${headerWidth},${config.height}`,
+        fill: '#fafafa',
+      },
+    },
+  })
+}
+
+export const renderUmlObjectNode = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        strokeDasharray: '4,2',
+      },
+    },
+  })
+}
+
+export const renderUmlDataStore = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createCylinderPath(config.width, config.height, 0.15)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+        fill: '#fff7e6',
+        stroke: '#fa8c16',
+      },
+    },
+  })
+}
+
+export const renderUmlState = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        rx: config.height / 2,
+        ry: config.height / 2,
+      },
+    },
+  })
+}
+
+export const renderUmlInitialState = renderCircle
+
+export const renderUmlFinalState = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const r = Math.min(config.width, config.height) / 2
+  const cx = config.width / 2
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${cx - r},${cy} A${r},${r} 0 1,1 ${cx + r},${cy} A${r},${r} 0 1,1 ${cx - r},${cy} M${cx - r * 0.6},${cy} A${r * 0.6},${r * 0.6} 0 1,1 ${cx + r * 0.6},${cy} A${r * 0.6},${r * 0.6} 0 1,1 ${cx - r * 0.6},${cy}`,
+        fill: '#f5222d',
+      },
+    },
+  })
+}
+
+export const renderUmlChoice = renderDiamond
+
+export const renderUmlPort = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: '#fff2e8',
+        stroke: '#fa541c',
+      },
+    },
+  })
+}
+
+export const renderUmlArtifact = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const foldSize = Math.min(config.width, config.height) * 0.15
+  const foldX = config.width - foldSize
+  const foldY = foldSize
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,0 L${foldX},0 L${config.width},${foldY} L${config.width},${config.height} L0,${config.height} Z M${foldX},0 L${foldX},${foldY} L${config.width},${foldY}`,
+        fill: '#f9f0ff',
+        stroke: '#722ed1',
+      },
+    },
+  })
+}
+
+export const renderUmlDevice = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlNodePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+        fill: '#e6fffb',
+        stroke: '#13c2c2',
+      },
+    },
+  })
+}
+
+export const renderUmlComment = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const path = createUmlNotePath(config.width, config.height)
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: path,
+        fill: '#fffbe6',
+        stroke: '#faad14',
+      },
+    },
+  })
+}
+
+export const renderUmlConstraint = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: 'transparent',
+        strokeDasharray: '4,2',
+      },
+    },
+  })
+}
+
+export const renderUmlGeneralization = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  const arrowSize = 10
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width - arrowSize},${cy}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlRealization = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy}`,
+        fill: 'none',
+        strokeDasharray: '6,3',
+      },
+    },
+  })
+}
+
+export const renderUmlDependency = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy}`,
+        fill: 'none',
+        strokeDasharray: '4,2',
+      },
+    },
+  })
+}
+
+export const renderUmlAssociation = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlAggregation = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  const diamondSize = 12
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${diamondSize},${cy} L${config.width},${cy}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlComposition = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  const diamondSize = 12
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M${diamondSize},${cy} L${config.width},${cy}`,
+        fill: 'none',
+      },
+    },
+  })
+}
+
+export const renderUmlInclude = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy}`,
+        fill: 'none',
+        strokeDasharray: '4,2',
+      },
+    },
+  })
+}
+
+export const renderUmlExtend = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const cy = config.height / 2
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,${cy} L${config.width},${cy}`,
+        fill: 'none',
+        strokeDasharray: '4,2',
+      },
+    },
+  })
+}
+
+export const renderUmlEntity = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const headerHeight = config.height * 0.25
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,0 L${config.width},0 L${config.width},${config.height} L0,${config.height} Z M0,${headerHeight} L${config.width},${headerHeight}`,
+        fill: '#e6f7ff',
+        stroke: '#1890ff',
+      },
+    },
+  })
+}
+
+export const renderUmlAttribute = renderEllipse
+
+export const renderUmlRelationship = renderDiamond
+
 export const shapeRenderers: Record<string, (config: ShapeRenderConfig) => Node> = {
   rectangle: renderRectangle,
   'rounded-rectangle': renderRoundedRectangle,
@@ -1806,6 +2600,66 @@ export const shapeRenderers: Record<string, (config: ShapeRenderConfig) => Node>
   'uml-comm-link': renderUmlCommLink,
   'uml-comm-message': renderUmlCommMessage,
   'uml-comm-reverse-message': renderUmlCommReverseMessage,
+  'uml-abstract-class': renderUmlAbstractClass,
+  'uml-annotation': renderUmlAnnotation,
+  'uml-system-boundary': renderUmlSystemBoundary,
+  'uml-object': renderUmlObject,
+  'uml-actor-lifeline': renderUmlActorLifeline,
+  'uml-self-message': renderUmlSelfMessage,
+  'uml-sync-message': renderUmlSyncMessage,
+  'uml-async-message': renderUmlAsyncMessage,
+  'uml-return-message': renderUmlReturnMessage,
+  'uml-activity': renderUmlActivity,
+  'uml-action': renderUmlAction,
+  'uml-decision': renderUmlDecision,
+  'uml-fork': renderUmlFork,
+  'uml-initial': renderUmlInitial,
+  'uml-final': renderUmlFinal,
+  'uml-swimlane': renderUmlSwimlane,
+  'uml-object-node': renderUmlObjectNode,
+  'uml-data-store': renderUmlDataStore,
+  'uml-state': renderUmlState,
+  'uml-initial-state': renderUmlInitialState,
+  'uml-final-state': renderUmlFinalState,
+  'uml-choice': renderUmlChoice,
+  'uml-port': renderUmlPort,
+  'uml-artifact': renderUmlArtifact,
+  'uml-device': renderUmlDevice,
+  'uml-comment': renderUmlComment,
+  'uml-constraint': renderUmlConstraint,
+  'uml-generalization': renderUmlGeneralization,
+  'uml-realization': renderUmlRealization,
+  'uml-dependency': renderUmlDependency,
+  'uml-association': renderUmlAssociation,
+  'uml-aggregation': renderUmlAggregation,
+  'uml-composition': renderUmlComposition,
+  'uml-include': renderUmlInclude,
+  'uml-extend': renderUmlExtend,
+  'uml-entity': renderUmlEntity,
+  'uml-attribute': renderUmlAttribute,
+  'uml-relationship': renderUmlRelationship,
+  'uml-actor-sequence': renderUmlActorLifeline,
+  'uml-message-sync': renderUmlSyncMessage,
+  'uml-message-async': renderUmlAsyncMessage,
+  'uml-message-return': renderUmlReturnMessage,
+  'uml-alt-fragment': renderUmlFragment,
+  'uml-loop-fragment': renderUmlFragment,
+  'uml-activity-action': renderUmlAction,
+  'uml-activity-start': renderUmlInitial,
+  'uml-activity-end': renderUmlFinal,
+  'uml-activity-decision': renderUmlDecision,
+  'uml-activity-fork': renderUmlFork,
+  'uml-activity-swimlane': renderUmlSwimlane,
+  'uml-activity-signal-send': renderUmlSignalSend,
+  'uml-activity-signal-receive': renderUmlSignalReceive,
+  'uml-state-simple': renderUmlState,
+  'uml-state-start': renderUmlInitialState,
+  'uml-state-end': renderUmlFinalState,
+  'uml-state-choice': renderUmlChoice,
+  'uml-component-main': renderUmlComponent,
+  'uml-node-server': renderUmlNode,
+  'uml-artifact-file': renderUmlArtifact,
+  'uml-device-server': renderUmlDevice,
 
   'er-entity': renderErEntity,
   'er-weak-entity': renderErWeakEntity,
@@ -1854,6 +2708,14 @@ export const shapeRenderers: Record<string, (config: ShapeRenderConfig) => Node>
   'bpmn-lane': renderBpmnLane,
   'bpmn-data-object': renderBpmnDataObject,
   'bpmn-data-store': renderBpmnDataStore,
+  'bpmn-boundary-event': renderBpmnBoundaryEvent,
+  'bpmn-terminate-event': renderBpmnTerminateEvent,
+  'bpmn-compensation-event': renderBpmnCompensationEvent,
+  'bpmn-script-task': renderBpmnScriptTask,
+  'bpmn-send-task': renderBpmnSendTask,
+  'bpmn-receive-task': renderBpmnReceiveTask,
+  'bpmn-manual-task': renderBpmnManualTask,
+  'bpmn-business-rule-task': renderBpmnBusinessRuleTask,
   'bpmn-exclusive-gateway': renderBpmnExclusiveGateway,
   'bpmn-parallel-gateway': renderBpmnParallelGateway,
   'bpmn-inclusive-gateway': renderBpmnInclusiveGateway,

@@ -573,6 +573,167 @@ export function createBpmnDataStorePath(width: number, height: number): string {
     Q${width / 2},${topControl} ${width},${topControl * 2}`
 }
 
+export function createBpmnBoundaryEventPath(width: number, height: number): string {
+  const cx = width / 2
+  const cy = height / 2
+  const r = Math.min(width, height) / 2 - 2
+  const innerR = r * 0.6
+
+  return `M${cx},${cy - r} A${r},${r} 0 1,1 ${cx},${cy + r} A${r},${r} 0 1,1 ${cx},${cy - r}
+    M${cx},${cy - innerR} A${innerR},${innerR} 0 1,1 ${cx},${cy + innerR} A${innerR},${innerR} 0 1,1 ${cx},${cy - innerR}`
+}
+
+export function createBpmnTerminateEventPath(width: number, height: number): string {
+  const cx = width / 2
+  const cy = height / 2
+  const r = Math.min(width, height) / 2 - 2
+
+  return `M${cx},${cy - r} A${r},${r} 0 1,1 ${cx},${cy + r} A${r},${r} 0 1,1 ${cx},${cy - r}
+    M${cx},${cy - r * 0.5} L${cx + r * 0.5},${cy} L${cx},${cy + r * 0.5} L${cx - r * 0.5},${cy} Z`
+}
+
+export function createBpmnCompensationEventPath(width: number, height: number): string {
+  const cx = width / 2
+  const cy = height / 2
+  const r = Math.min(width, height) / 2 - 2
+  const arrowSize = r * 0.4
+
+  return `M${cx},${cy - r} A${r},${r} 0 1,1 ${cx},${cy + r} A${r},${r} 0 1,1 ${cx},${cy - r}
+    M${cx - arrowSize},${cy - arrowSize * 0.5} L${cx},${cy - arrowSize} L${cx + arrowSize},${cy - arrowSize * 0.5}
+    M${cx - arrowSize},${cy + arrowSize * 0.5} L${cx},${cy + arrowSize} L${cx + arrowSize},${cy + arrowSize * 0.5}`
+}
+
+export function createBpmnScriptTaskPath(width: number, height: number): string {
+  const cornerRadius = Math.min(width, height) * 0.1
+  const cx = width / 2
+  const cy = height / 2
+  const scriptW = width * 0.4
+  const scriptH = height * 0.5
+  const lineSpacing = scriptH / 4
+
+  let scriptPath = ''
+  for (let i = 0; i < 3; i++) {
+    const y = cy - scriptH / 2 + i * lineSpacing + lineSpacing / 2
+    const x1 = cx - scriptW / 2
+    const x2 = cx + scriptW / 2
+    scriptPath += ` M${x1},${y} L${x2},${y}`
+    if (i < 2) scriptPath += ' '
+  }
+
+  return `M${cornerRadius},0 
+    L${width - cornerRadius},0 
+    Q${width},0 ${width},${cornerRadius}
+    L${width},${height - cornerRadius}
+    Q${width},${height} ${width - cornerRadius},${height}
+    L${cornerRadius},${height}
+    Q0,${height} 0,${height - cornerRadius}
+    L0,${cornerRadius}
+    Q0,0 ${cornerRadius},0 Z
+    M${scriptPath}`
+}
+
+export function createBpmnSendTaskPath(width: number, height: number): string {
+  const cornerRadius = Math.min(width, height) * 0.1
+  const cx = width / 2
+  const cy = height / 2
+  const envW = width * 0.35
+  const envH = height * 0.25
+
+  return `M${cornerRadius},0 
+    L${width - cornerRadius},0 
+    Q${width},0 ${width},${cornerRadius}
+    L${width},${height - cornerRadius}
+    Q${width},${height} ${width - cornerRadius},${height}
+    L${cornerRadius},${height}
+    Q0,${height} 0,${height - cornerRadius}
+    L0,${cornerRadius}
+    Q0,0 ${cornerRadius},0 Z
+    M${cx - envW},${cy - envH / 2} 
+    L${cx},${cy + envH / 2} 
+    L${cx + envW},${cy - envH / 2}
+    L${cx},${cy - envH / 2 + envH * 0.3}
+    Z`
+}
+
+export function createBpmnReceiveTaskPath(width: number, height: number): string {
+  const cornerRadius = Math.min(width, height) * 0.1
+  const cx = width / 2
+  const cy = height / 2
+  const envW = width * 0.35
+  const envH = height * 0.25
+
+  return `M${cornerRadius},0 
+    L${width - cornerRadius},0 
+    Q${width},0 ${width},${cornerRadius}
+    L${width},${height - cornerRadius}
+    Q${width},${height} ${width - cornerRadius},${height}
+    L${cornerRadius},${height}
+    Q0,${height} 0,${height - cornerRadius}
+    L0,${cornerRadius}
+    Q0,0 ${cornerRadius},0 Z
+    M${cx - envW},${cy - envH / 2} 
+    L${cx + envW},${cy - envH / 2}
+    L${cx + envW},${cy + envH / 2}
+    L${cx - envW},${cy + envH / 2}
+    Z
+    M${cx - envW},${cy - envH / 2} L${cx},${cy + envH / 2} L${cx + envW},${cy - envH / 2}`
+}
+
+export function createBpmnManualTaskPath(width: number, height: number): string {
+  const cornerRadius = Math.min(width, height) * 0.1
+  const cx = width / 2
+  const cy = height / 2
+  const handW = width * 0.3
+  const handH = height * 0.4
+
+  const handPath = `M${cx - handW * 0.5},${cy + handH * 0.3}
+    L${cx - handW * 0.3},${cy - handH * 0.5}
+    L${cx - handW * 0.1},${cy - handH * 0.5}
+    L${cx},${cy - handH * 0.2}
+    L${cx + handW * 0.1},${cy - handH * 0.5}
+    L${cx + handW * 0.3},${cy - handH * 0.5}
+    L${cx + handW * 0.5},${cy + handH * 0.3}
+    L${cx + handW * 0.3},${cy + handH * 0.5}
+    L${cx - handW * 0.3},${cy + handH * 0.5}
+    Z`
+
+  return `M${cornerRadius},0 
+    L${width - cornerRadius},0 
+    Q${width},0 ${width},${cornerRadius}
+    L${width},${height - cornerRadius}
+    Q${width},${height} ${width - cornerRadius},${height}
+    L${cornerRadius},${height}
+    Q0,${height} 0,${height - cornerRadius}
+    L0,${cornerRadius}
+    Q0,0 ${cornerRadius},0 Z
+    M${handPath}`
+}
+
+export function createBpmnBusinessRuleTaskPath(width: number, height: number): string {
+  const cornerRadius = Math.min(width, height) * 0.1
+  const cx = width / 2
+  const cy = height / 2
+  const tableW = width * 0.5
+  const tableH = height * 0.5
+  const rowH = tableH / 4
+
+  return `M${cornerRadius},0 
+    L${width - cornerRadius},0 
+    Q${width},0 ${width},${cornerRadius}
+    L${width},${height - cornerRadius}
+    Q${width},${height} ${width - cornerRadius},${height}
+    L${cornerRadius},${height}
+    Q0,${height} 0,${height - cornerRadius}
+    L0,${cornerRadius}
+    Q0,0 ${cornerRadius},0 Z
+    M${cx - tableW / 2},${cy - tableH / 2} L${cx + tableW / 2},${cy - tableH / 2}
+    M${cx - tableW / 2},${cy - tableH / 2 + rowH} L${cx + tableW / 2},${cy - tableH / 2 + rowH}
+    M${cx - tableW / 2},${cy + tableH / 2 - rowH} L${cx + tableW / 2},${cy + tableH / 2 - rowH}
+    M${cx - tableW / 2},${cy - tableH / 2} L${cx - tableW / 2},${cy + tableH / 2}
+    M${cx + tableW / 2},${cy - tableH / 2} L${cx + tableW / 2},${cy + tableH / 2}
+    M${cx - tableW / 2},${cy} L${cx + tableW / 2},${cy}`
+}
+
 export function createDoubleEllipsePath(
   width: number,
   height: number,

@@ -16,6 +16,23 @@ export interface ErColumn {
   name: string
   type: string
   constraints: ErConstraint[]
+  defaultValue?: string
+  comment?: string
+  length?: number
+  nullable?: boolean
+}
+
+export interface ErColumnRenderInfo {
+  name: string
+  type: string
+  constraints: ErConstraint[]
+  defaultValue?: string
+  comment?: string
+  isPrimaryKey: boolean
+  isForeignKey: boolean
+  isNullable: boolean
+  displayText: string
+  constraintIcons: string[]
 }
 
 export interface ErTableEntityData {

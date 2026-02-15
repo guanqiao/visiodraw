@@ -92,13 +92,28 @@ const PropertyPanel: React.FC = () => {
         if (constraintStr.includes('auto')) constraints.push('auto')
         if (constraintStr.includes('index')) constraints.push('index')
         
-        columns.push({ id: uuidv4(), name: colName, type: typePart, constraints: constraints as any })
+        const column: ErTableColumn = { 
+          id: uuidv4(), 
+          name: colName, 
+          type: typePart, 
+          constraints: constraints as any,
+          defaultValue: undefined,
+          comment: undefined,
+        }
+        columns.push(column)
       } else {
         const parts = line.split(/\s+/)
         const colName = parts[0]
         const type = parts[1] || 'varchar'
         
-        columns.push({ id: uuidv4(), name: colName, type, constraints: [] })
+        columns.push({ 
+          id: uuidv4(), 
+          name: colName, 
+          type, 
+          constraints: [],
+          defaultValue: undefined,
+          comment: undefined,
+        })
       }
     }
     
@@ -126,7 +141,7 @@ const PropertyPanel: React.FC = () => {
     const newText = columnsToText(tableName, columns)
     updateNode(singleNode.id, { text: newText })
     
-    const newHeight = Math.max(80, 40 + columns.length * 28)
+    const newHeight = Math.max(100, 50 + columns.length * 28)
     if (singleNode.height !== newHeight) {
       updateNode(singleNode.id, { height: newHeight })
     }
@@ -135,19 +150,113 @@ const PropertyPanel: React.FC = () => {
       const x6Node = graph.getCellById(singleNode.id)
       if (x6Node) {
         x6Node.attr('label/text', '')
-        x6Node.prop('shapes', columns.map((col, index) => ({
+        
+        const headerHeight = 28
+        const rowHeight = 28
+        
+        const shapes: any[] = []
+        
+        shapes.push({
+          type: 'rect',
+          attrs: {
+            x: 0,
+            y: 0,
+            width: singleNode.width,
+            height: headerHeight,
+            fill: '#1890ff',
+            stroke: 'none',
+          },
+        })
+        
+        shapes.push({
           type: 'text',
           attrs: {
             x: singleNode.width / 2,
-            y: index === 0 ? 20 : 40 + (index - 1) * 28,
-            text: index === 0 ? tableName : `${col.name}\t${col.type}${col.constraints.length > 0 ? ' [' + col.constraints.join(',') + ']' : ''}`,
-            fill: index === 0 ? '#1890ff' : '#333333',
-            fontSize: index === 0 ? 14 : 11,
-            fontWeight: index === 0 ? 'bold' : 'normal',
+            y: headerHeight / 2 + 1,
+            text: tableName,
+            fill: '#ffffff',
+            fontSize: 13,
+            fontWeight: 'bold',
             textAnchor: 'middle',
             dominantBaseline: 'middle',
           },
-        })))
+        })
+        
+        columns.forEach((col, index) => {
+          const y = headerHeight + index * rowHeight
+          
+          if (index % 2 === 0) {
+            shapes.push({
+              type: 'rect',
+              attrs: {
+                x: 0,
+                y: y,
+                width: singleNode.width,
+                height: rowHeight,
+                fill: '#fafafa',
+                stroke: 'none',
+              },
+            })
+          }
+          
+          const isPk = col.constraints.includes('pk')
+          const isFk = col.constraints.includes('fk')
+          const textColor = isPk ? '#1890ff' : isFk ? '#722ed1' : '#333333'
+          const fontWeight = isPk ? 'bold' : 'normal'
+          
+          shapes.push({
+            type: 'text',
+            attrs: {
+              x: 8,
+              y: y + rowHeight / 2,
+              text: col.name,
+              fill: textColor,
+              fontSize: 11,
+              fontWeight: fontWeight,
+              textAnchor: 'start',
+              dominantBaseline: 'middle',
+              textDecoration: isPk ? 'underline' : 'none',
+            },
+          })
+          
+          shapes.push({
+            type: 'text',
+            attrs: {
+              x: singleNode.width - 8,
+              y: y + rowHeight / 2,
+              text: col.type.toUpperCase(),
+              fill: '#666666',
+              fontSize: 10,
+              fontWeight: 'normal',
+              textAnchor: 'end',
+              dominantBaseline: 'middle',
+            },
+          })
+          
+          const constraintIcons: string[] = []
+          if (col.constraints.includes('pk')) constraintIcons.push('🔑')
+          if (col.constraints.includes('fk')) constraintIcons.push('🔗')
+          if (col.constraints.includes('auto')) constraintIcons.push('⚡')
+          if (col.constraints.includes('unique')) constraintIcons.push('🔷')
+          if (col.constraints.includes('notnull')) constraintIcons.push('✦')
+          
+          if (constraintIcons.length > 0) {
+            shapes.push({
+              type: 'text',
+              attrs: {
+                x: singleNode.width / 2,
+                y: y + rowHeight / 2,
+                text: constraintIcons.join(''),
+                fill: '#333333',
+                fontSize: 9,
+                textAnchor: 'middle',
+                dominantBaseline: 'middle',
+              },
+            })
+          }
+        })
+        
+        x6Node.prop('shapes', shapes)
       }
     }
   }, [singleNode, updateNode, graph, columnsToText])

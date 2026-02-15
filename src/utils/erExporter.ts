@@ -219,16 +219,61 @@ export interface ParsedSqlTable {
     refTable: string
     refColumn: string
   }[]
+  indexes: {
+    name: string
+    columns: string[]
+    isUnique: boolean
+  }[]
+  comment?: string
 }
 
 export interface SqlParseResult {
   tables: ParsedSqlTable[]
   errors: string[]
+  warnings: string[]
+}
+
+function extractDefaultValue(part: string): string | undefined {
+  const defaultMatch = part.match(/DEFAULT\s+([^,\s]+(?:\s+[^,\s]+)*?)(?:\s+(?:NOT\s+NULL|NULL|UNIQUE|PRIMARY|AUTO_INCREMENT|AUTOINCREMENT|IDENTITY|COMMENT|$))/i)
+  if (defaultMatch) {
+    let value = defaultMatch[1].trim()
+    if (value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1)
+    } else if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1)
+    }
+    return value
+  }
+  return undefined
+}
+
+function extractComment(part: string): string | undefined {
+  const commentMatch = part.match(/COMMENT\s+(['"])([^'"]*)\1/i)
+  if (commentMatch) {
+    return commentMatch[2]
+  }
+  return undefined
+}
+
+function extractEnumValues(part: string): string[] | undefined {
+  const enumMatch = part.match(/ENUM\s*\(([^)]+)\)/i)
+  if (enumMatch) {
+    const values = enumMatch[1].split(',').map(v => {
+      const trimmed = v.trim()
+      if (trimmed.startsWith("'") && trimmed.endsWith("'")) {
+        return trimmed.slice(1, -1)
+      }
+      return trimmed
+    })
+    return values
+  }
+  return undefined
 }
 
 export function parseCreateTableSQL(sql: string): SqlParseResult {
   const tables: ParsedSqlTable[] = []
   const errors: string[] = []
+  const warnings: string[] = []
   
   const cleanedSql = sql
     .replace(/--.*$/gm, '')
@@ -236,7 +281,7 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
     .replace(/\s+/g, ' ')
     .trim()
   
-  const tableRegex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"[\w\]]+\s*\(([\s\S]*?)\)(?:\s*;|\s*$)/gi
+  const tableRegex = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"[\w\]]+\s*\(([\s\S]*?)\)(?:\s*ENGINE\s*=\s*\w+)?(?:\s+COMMENT\s*=\s*['"][^'"]*['"])?(?:\s*;|\s*$)/gi
   
   let match
   while ((match = tableRegex.exec(cleanedSql)) !== null) {
@@ -249,8 +294,12 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
     let tableName = tableNameMatch[1]
     tableName = tableName.replace(/[`"[\]]/g, '')
     
+    const tableCommentMatch = fullMatch.match(/\)\s*COMMENT\s*=\s*['"]([^'"]*)['"]/i)
+    const tableComment = tableCommentMatch ? tableCommentMatch[1] : undefined
+    
     const columns: ErColumn[] = []
     const foreignKeys: ParsedSqlTable['foreignKeys'] = []
+    const indexes: ParsedSqlTable['indexes'] = []
     
     const parts = tableBody.split(',').map(p => p.trim()).filter(p => p)
     
@@ -290,7 +339,71 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
         continue
       }
       
-      if (upperPart.startsWith('UNIQUE') || upperPart.startsWith('INDEX') || upperPart.startsWith('KEY') || upperPart.startsWith('CONSTRAINT')) {
+      if (upperPart.startsWith('INDEX') || upperPart.startsWith('KEY')) {
+        const indexMatch = part.match(/(?:UNIQUE\s+)?(?:INDEX|KEY)\s+(?:[`"]?(\w+)[`"]?\s*)?\(([^)]+)\)/i)
+        if (indexMatch) {
+          const indexName = indexMatch[1] || `idx_${tableName}_${indexes.length}`
+          const indexColumns = indexMatch[2].split(',').map(c => c.trim().replace(/[`"[\]]/g, ''))
+          const isUnique = /UNIQUE/i.test(part)
+          indexes.push({ name: indexName, columns: indexColumns, isUnique })
+        }
+        continue
+      }
+      
+      if (upperPart.startsWith('UNIQUE') && !upperPart.includes('KEY')) {
+        const uniqueMatch = part.match(/UNIQUE\s*\(([^)]+)\)/i)
+        if (uniqueMatch) {
+          const uniqueColumns = uniqueMatch[1].split(',').map(c => c.trim().replace(/[`"[\]]/g, ''))
+          indexes.push({ 
+            name: `uk_${tableName}_${uniqueColumns.join('_')}`, 
+            columns: uniqueColumns, 
+            isUnique: true 
+          })
+        }
+        continue
+      }
+      
+      if (upperPart.startsWith('CONSTRAINT')) {
+        const constraintNameMatch = part.match(/CONSTRAINT\s+[`"]?(\w+)[`"]?\s+/i)
+        if (constraintNameMatch) {
+          const constraintBody = part.substring(part.indexOf(constraintNameMatch[0]) + constraintNameMatch[0].length)
+          const constraintUpper = constraintBody.toUpperCase()
+          
+          if (constraintUpper.startsWith('FOREIGN KEY')) {
+            const fkMatch = constraintBody.match(/FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+[`"[\w\]]+\s*\(([^)]+)\)/i)
+            if (fkMatch) {
+              const fkColumn = fkMatch[1].replace(/[`"[\]]/g, '').trim()
+              const refMatch = constraintBody.match(/REFERENCES\s+([`"[\w\]]+)\s*\(([^)]+)\)/i)
+              if (refMatch) {
+                const refTable = refMatch[1].replace(/[`"[\]]/g, '')
+                const refColumn = refMatch[2].replace(/[`"[\]]/g, '').trim()
+                foreignKeys.push({ column: fkColumn, refTable, refColumn })
+                
+                const colIndex = columns.findIndex(c => c.name.toLowerCase() === fkColumn.toLowerCase())
+                if (colIndex !== -1 && !columns[colIndex].constraints.includes('fk')) {
+                  columns[colIndex].constraints.push('fk')
+                }
+              }
+            }
+          } else if (constraintUpper.startsWith('UNIQUE')) {
+            const uniqueMatch = constraintBody.match(/UNIQUE\s*\(([^)]+)\)/i)
+            if (uniqueMatch) {
+              const uniqueColumns = uniqueMatch[1].split(',').map(c => c.trim().replace(/[`"[\]]/g, ''))
+              indexes.push({ 
+                name: constraintNameMatch[1], 
+                columns: uniqueColumns, 
+                isUnique: true 
+              })
+            }
+          } else if (constraintUpper.startsWith('CHECK')) {
+            warnings.push(`CHECK约束已跳过: ${constraintNameMatch[1]}`)
+          }
+        }
+        continue
+      }
+      
+      if (upperPart.startsWith('CHECK')) {
+        warnings.push('CHECK约束已跳过')
         continue
       }
       
@@ -302,13 +415,17 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
         const typeMap: Record<string, string> = {
           'INTEGER': 'int',
           'INT': 'int',
+          'INT UNSIGNED': 'int',
           'BIGINT': 'bigint',
+          'BIGINT UNSIGNED': 'bigint',
           'SMALLINT': 'smallint',
           'TINYINT': 'tinyint',
           'VARCHAR': 'varchar',
           'NVARCHAR': 'varchar',
           'CHAR': 'varchar',
           'TEXT': 'text',
+          'LONGTEXT': 'text',
+          'MEDIUMTEXT': 'text',
           'BOOLEAN': 'boolean',
           'BOOL': 'boolean',
           'DATE': 'date',
@@ -324,20 +441,24 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
           'UUID': 'uuid',
           'UNIQUEIDENTIFIER': 'uuid',
           'BLOB': 'blob',
+          'LONGBLOB': 'blob',
           'BINARY': 'binary',
           'VARBINARY': 'blob',
           'BIT': 'boolean',
+          'ENUM': 'enum',
+          'SET': 'set',
         }
         
         const baseType = colType.replace(/\([^)]*\)/, '').trim()
         colType = typeMap[baseType] || baseType.toLowerCase()
         
         const constraints: ErConstraint[] = []
+        const isNullable = !/\bNOT\s+NULL\b/i.test(part)
         
         if (/\bPRIMARY\s+KEY\b/i.test(part)) {
           constraints.push('pk')
         }
-        if (/\bNOT\s+NULL\b/i.test(part)) {
+        if (!isNullable) {
           constraints.push('notnull')
         }
         if (/\bUNIQUE\b/i.test(part) && !/\bPRIMARY\s+KEY\b/i.test(part)) {
@@ -347,12 +468,41 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
           constraints.push('auto')
         }
         
-        columns.push({ name: colName, type: colType, constraints })
+        const defaultValue = extractDefaultValue(part)
+        const comment = extractComment(part)
+        const enumValues = extractEnumValues(part)
+        
+        let finalType = colType
+        if (enumValues && colType === 'enum') {
+          finalType = `enum(${enumValues.join('|')})`
+        }
+        
+        const column: ErColumn = { 
+          name: colName, 
+          type: finalType, 
+          constraints,
+          nullable: isNullable,
+        }
+        
+        if (defaultValue !== undefined) {
+          column.defaultValue = defaultValue
+        }
+        if (comment !== undefined) {
+          column.comment = comment
+        }
+        
+        columns.push(column)
       }
     }
     
     if (columns.length > 0) {
-      tables.push({ name: tableName, columns, foreignKeys })
+      tables.push({ 
+        name: tableName, 
+        columns, 
+        foreignKeys,
+        indexes,
+        comment: tableComment,
+      })
     }
   }
   
@@ -360,7 +510,7 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
     errors.push('未能解析到有效的 CREATE TABLE 语句')
   }
   
-  return { tables, errors }
+  return { tables, errors, warnings }
 }
 
 export function generateErNodesFromTables(
@@ -376,8 +526,8 @@ export function generateErNodesFromTables(
     const col = index % columnsPerRow
     
     const columnCount = table.columns.length
-    const height = Math.max(80, 40 + columnCount * 24)
-    const width = Math.max(160, 180)
+    const height = Math.max(100, 50 + columnCount * 28)
+    const width = Math.max(180, 200)
     
     const lines = [table.name]
     table.columns.forEach(col => {
@@ -395,4 +545,414 @@ export function generateErNodesFromTables(
       text: lines.join('\n'),
     }
   })
+}
+
+export function exportToMermaid(
+  tables: { name: string; columns: ErColumn[]; foreignKeys?: { column: string; refTable: string; refColumn: string }[] }[]
+): string {
+  const lines: string[] = []
+  
+  lines.push('```mermaid')
+  lines.push('erDiagram')
+  lines.push('')
+  
+  for (const table of tables) {
+    for (const col of table.columns) {
+      const keyType = col.constraints.includes('pk') ? 'PK' 
+        : col.constraints.includes('fk') ? 'FK' 
+        : ''
+      const typeDisplay = col.type.toUpperCase()
+      const keyMark = keyType ? ` ${keyType}` : ''
+      lines.push(`    ${table.name} {`)
+      lines.push(`        ${typeDisplay} ${col.name}${keyMark}`)
+      lines.push(`    }`)
+    }
+  }
+  
+  lines.push('')
+  
+  const addedRelations = new Set<string>()
+  for (const table of tables) {
+    if (table.foreignKeys) {
+      for (const fk of table.foreignKeys) {
+        const relationKey = `${fk.refTable}-${table.name}`
+        if (!addedRelations.has(relationKey)) {
+          lines.push(`    ${fk.refTable} ||--o{ ${table.name} : "has"`)
+          addedRelations.add(relationKey)
+        }
+      }
+    }
+  }
+  
+  lines.push('```')
+  
+  return lines.join('\n')
+}
+
+export function exportToPlantUML(
+  tables: { name: string; columns: ErColumn[]; foreignKeys?: { column: string; refTable: string; refColumn: string }[]; comment?: string }[]
+): string {
+  const lines: string[] = []
+  
+  lines.push('@startuml')
+  lines.push('')
+  lines.push("' Generated by VisioDraw X6")
+  lines.push(`' Generated at: ${new Date().toISOString()}`)
+  lines.push('')
+  lines.push('skinparam linetype ortho')
+  lines.push('')
+  
+  for (const table of tables) {
+    lines.push(`entity "${table.name}" as ${table.name} {`)
+    
+    for (const col of table.columns) {
+      const parts: string[] = []
+      
+      if (col.constraints.includes('pk')) {
+        parts.push('<u>')
+      }
+      
+      parts.push(col.name)
+      
+      if (col.constraints.includes('pk')) {
+        parts.push('</u>')
+      }
+      
+      parts.push(' : ')
+      parts.push(col.type.toUpperCase())
+      
+      if (col.constraints.includes('fk')) {
+        parts.push(' <<FK>>')
+      }
+      
+      if (col.constraints.includes('unique')) {
+        parts.push(' <<UNIQUE>>')
+      }
+      
+      if (!col.constraints.includes('notnull') && !col.constraints.includes('pk')) {
+        parts.push(' <<NULL>>')
+      }
+      
+      if (col.comment) {
+        parts.push(` // ${col.comment}`)
+      }
+      
+      lines.push(`  ${parts.join('')}`)
+    }
+    
+    lines.push('}')
+    lines.push('')
+  }
+  
+  for (const table of tables) {
+    if (table.foreignKeys) {
+      for (const fk of table.foreignKeys) {
+        lines.push(`${table.name} }|..|| ${fk.refTable} : "${fk.column}"`)
+      }
+    }
+  }
+  
+  lines.push('')
+  lines.push('@enduml')
+  
+  return lines.join('\n')
+}
+
+export function exportToDbml(
+  tables: { name: string; columns: ErColumn[]; foreignKeys?: { column: string; refTable: string; refColumn: string }[]; comment?: string }[]
+): string {
+  const lines: string[] = []
+  
+  lines.push(`// Generated by VisioDraw X6`)
+  lines.push(`// Generated at: ${new Date().toISOString()}`)
+  lines.push('')
+  
+  for (const table of tables) {
+    lines.push(`Table ${table.name} {`)
+    
+    for (const col of table.columns) {
+      const parts: string[] = [col.name, col.type]
+      
+      if (col.constraints.includes('pk')) {
+        parts.push('[pk]')
+      }
+      if (col.constraints.includes('notnull')) {
+        parts.push('[not null]')
+      }
+      if (col.constraints.includes('unique')) {
+        parts.push('[unique]')
+      }
+      if (col.constraints.includes('auto')) {
+        parts.push('[increment]')
+      }
+      if (col.defaultValue) {
+        parts.push(`default: '${col.defaultValue}'`)
+      }
+      if (col.comment) {
+        parts.push(`note: '${col.comment}'`)
+      }
+      
+      lines.push(`  ${parts.join(' ')}`)
+    }
+    
+    lines.push('}')
+    lines.push('')
+  }
+  
+  for (const table of tables) {
+    if (table.foreignKeys) {
+      for (const fk of table.foreignKeys) {
+        lines.push(`Ref: ${table.name}.${fk.column} > ${fk.refTable}.${fk.refColumn}`)
+      }
+    }
+  }
+  
+  return lines.join('\n')
+}
+
+export interface ErLayoutOptions {
+  startX: number
+  startY: number
+  spacingX: number
+  spacingY: number
+  columnsPerRow: number
+  algorithm: 'grid' | 'force' | 'hierarchical'
+}
+
+const defaultLayoutOptions: ErLayoutOptions = {
+  startX: 100,
+  startY: 100,
+  spacingX: 280,
+  spacingY: 350,
+  columnsPerRow: 3,
+  algorithm: 'grid',
+}
+
+export interface ErTableNode {
+  id: string
+  name: string
+  x: number
+  y: number
+  width: number
+  height: number
+  columns: ErColumn[]
+  foreignKeys?: { column: string; refTable: string; refColumn: string }[]
+}
+
+export interface ErLayoutResult {
+  nodes: ErTableNode[]
+  edges: { sourceId: string; targetId: string; sourceColumn: string; targetColumn: string }[]
+}
+
+export function calculateErLayout(
+  tables: ParsedSqlTable[],
+  options: Partial<ErLayoutOptions> = {}
+): ErLayoutResult {
+  const opts = { ...defaultLayoutOptions, ...options }
+  
+  const nodes: ErTableNode[] = tables.map((table, index) => {
+    const columnCount = table.columns.length
+    const height = Math.max(100, 50 + columnCount * 28)
+    const width = Math.max(180, 200)
+    
+    return {
+      id: `er-table-${index}`,
+      name: table.name,
+      x: 0,
+      y: 0,
+      width,
+      height,
+      columns: table.columns,
+      foreignKeys: table.foreignKeys,
+    }
+  })
+  
+  const tableNameToId = new Map<string, string>()
+  tables.forEach((table, index) => {
+    tableNameToId.set(table.name.toLowerCase(), `er-table-${index}`)
+  })
+  
+  const edges: ErLayoutResult['edges'] = []
+  tables.forEach((table, sourceIndex) => {
+    if (table.foreignKeys) {
+      for (const fk of table.foreignKeys) {
+        const targetId = tableNameToId.get(fk.refTable.toLowerCase())
+        if (targetId) {
+          edges.push({
+            sourceId: `er-table-${sourceIndex}`,
+            targetId,
+            sourceColumn: fk.column,
+            targetColumn: fk.refColumn,
+          })
+        }
+      }
+    }
+  })
+  
+  switch (opts.algorithm) {
+    case 'hierarchical':
+      applyHierarchicalLayout(nodes, edges, opts)
+      break
+    case 'force':
+      applyForceLayout(nodes, edges, opts)
+      break
+    case 'grid':
+    default:
+      applyGridLayout(nodes, opts)
+  }
+  
+  return { nodes, edges }
+}
+
+function applyGridLayout(nodes: ErTableNode[], options: ErLayoutOptions): void {
+  nodes.forEach((node, index) => {
+    const row = Math.floor(index / options.columnsPerRow)
+    const col = index % options.columnsPerRow
+    
+    node.x = options.startX + col * options.spacingX
+    node.y = options.startY + row * options.spacingY
+  })
+}
+
+function applyHierarchicalLayout(
+  nodes: ErTableNode[],
+  edges: ErLayoutResult['edges'],
+  options: ErLayoutOptions
+): void {
+  const nodeMap = new Map<string, ErTableNode>()
+  nodes.forEach(node => nodeMap.set(node.id, node))
+  
+  const inDegree = new Map<string, number>()
+  nodes.forEach(node => inDegree.set(node.id, 0))
+  
+  edges.forEach(edge => {
+    const current = inDegree.get(edge.sourceId) || 0
+    inDegree.set(edge.sourceId, current + 1)
+  })
+  
+  const levels: string[][] = []
+  const assigned = new Set<string>()
+  
+  const rootNodes = nodes.filter(n => (inDegree.get(n.id) || 0) === 0)
+  if (rootNodes.length > 0) {
+    levels.push(rootNodes.map(n => n.id))
+    rootNodes.forEach(n => assigned.add(n.id))
+  }
+  
+  while (assigned.size < nodes.length) {
+    const nextLevel: string[] = []
+    
+    for (const nodeId of Array.from(assigned)) {
+      for (const edge of edges) {
+        if (edge.targetId === nodeId && !assigned.has(edge.sourceId)) {
+          nextLevel.push(edge.sourceId)
+          assigned.add(edge.sourceId)
+        }
+      }
+    }
+    
+    if (nextLevel.length === 0) {
+      const remaining = nodes.filter(n => !assigned.has(n.id))
+      if (remaining.length > 0) {
+        levels.push(remaining.map(n => n.id))
+        remaining.forEach(n => assigned.add(n.id))
+      }
+      break
+    }
+    
+    levels.push(nextLevel)
+  }
+  
+  levels.forEach((level, levelIndex) => {
+    const levelWidth = level.length * options.spacingX
+    const startX = options.startX + (Math.max(0, nodes.length * options.spacingX - levelWidth) / 2)
+    
+    level.forEach((nodeId, colIndex) => {
+      const node = nodeMap.get(nodeId)
+      if (node) {
+        node.x = startX + colIndex * options.spacingX
+        node.y = options.startY + levelIndex * options.spacingY
+      }
+    })
+  })
+}
+
+function applyForceLayout(
+  nodes: ErTableNode[],
+  edges: ErLayoutResult['edges'],
+  options: ErLayoutOptions
+): void {
+  const centerX = options.startX + (options.columnsPerRow * options.spacingX) / 2
+  const centerY = options.startY + options.spacingY
+  
+  nodes.forEach((node, index) => {
+    const angle = (2 * Math.PI * index) / nodes.length
+    const radius = Math.min(options.spacingX, options.spacingY) * Math.sqrt(nodes.length) / 2
+    node.x = centerX + radius * Math.cos(angle)
+    node.y = centerY + radius * Math.sin(angle)
+  })
+  
+  const iterations = 50
+  const k = Math.sqrt((options.spacingX * options.spacingY * nodes.length) / nodes.length)
+  
+  for (let iter = 0; iter < iterations; iter++) {
+    const displacements = nodes.map(() => ({ x: 0, y: 0 }))
+    
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        const dx = nodes[j].x - nodes[i].x
+        const dy = nodes[j].y - nodes[i].y
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1
+        
+        const force = (k * k) / distance
+        const fx = (dx / distance) * force
+        const fy = (dy / distance) * force
+        
+        displacements[i].x -= fx
+        displacements[i].y -= fy
+        displacements[j].x += fx
+        displacements[j].y += fy
+      }
+    }
+    
+    const edgeSet = new Set<string>()
+    edges.forEach(e => {
+      edgeSet.add(`${e.sourceId}-${e.targetId}`)
+      edgeSet.add(`${e.targetId}-${e.sourceId}`)
+    })
+    
+    for (const edge of edges) {
+      const sourceIndex = nodes.findIndex(n => n.id === edge.sourceId)
+      const targetIndex = nodes.findIndex(n => n.id === edge.targetId)
+      
+      if (sourceIndex !== -1 && targetIndex !== -1) {
+        const dx = nodes[targetIndex].x - nodes[sourceIndex].x
+        const dy = nodes[targetIndex].y - nodes[sourceIndex].y
+        const distance = Math.sqrt(dx * dx + dy * dy) || 1
+        
+        const attractiveForce = (distance * distance) / k
+        const fx = (dx / distance) * attractiveForce
+        const fy = (dy / distance) * attractiveForce
+        
+        displacements[sourceIndex].x += fx
+        displacements[sourceIndex].y += fy
+        displacements[targetIndex].x -= fx
+        displacements[targetIndex].y -= fy
+      }
+    }
+    
+    const temperature = Math.max(0.1, 1 - iter / iterations)
+    
+    nodes.forEach((node, i) => {
+      const disp = displacements[i]
+      const dispLength = Math.sqrt(disp.x * disp.x + disp.y * disp.y) || 1
+      const limitedDisp = Math.min(dispLength, temperature * 100)
+      
+      node.x += (disp.x / dispLength) * limitedDisp
+      node.y += (disp.y / dispLength) * limitedDisp
+      
+      node.x = Math.max(options.startX, node.x)
+      node.y = Math.max(options.startY, node.y)
+    })
+  }
 }
