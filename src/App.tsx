@@ -18,6 +18,7 @@ import useClipboardStore from '@stores/clipboardStore'
 import { useTheme } from '@hooks/useTheme'
 import { v4 as uuidv4 } from 'uuid'
 import { generateErNodesFromTables, calculateErLayout, type ParsedSqlTable } from '@utils/erExporter'
+import { optimizeErLayout } from '@utils/smartRouter'
 import './styles/theme.css'
 
 const { TabPane } = Tabs
@@ -151,6 +152,7 @@ const App: React.FC = () => {
     importFromJson,
     exportToJson,
     setTool,
+    graph,
   } = useX6GraphStore()
 
   const { copy, cut, paste } = useClipboardStore()
@@ -269,6 +271,16 @@ const App: React.FC = () => {
     })
     message.success('已添加时间戳字段')
   }, [nodes, selectedNodeIds, updateNode])
+
+  const handleOptimizeRouting = useCallback(() => {
+    if (!graph) {
+      message.warning('画布未初始化')
+      return
+    }
+    
+    optimizeErLayout(graph)
+    message.success('关系线路由已优化')
+  }, [graph])
 
   const handleSqlImport = useCallback((tables: ParsedSqlTable[]) => {
     const erNodes = generateErNodesFromTables(tables)
@@ -449,6 +461,7 @@ const App: React.FC = () => {
             onAutoLayout={handleAutoLayout}
             onAddPrimaryKey={handleAddPrimaryKey}
             onAddTimestamps={handleAddTimestamps}
+            onOptimizeRouting={handleOptimizeRouting}
             onExport={() => setShowErExport(true)}
           />
           <div style={{ flex: 1, overflow: 'hidden' }}>

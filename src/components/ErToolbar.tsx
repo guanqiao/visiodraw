@@ -4,7 +4,8 @@ import {
   TableOutlined, LinkOutlined, LayoutOutlined, 
   PlusOutlined, OrderedListOutlined, ApartmentOutlined,
   ThunderboltOutlined, KeyOutlined, ClockCircleOutlined,
-  DatabaseOutlined, GroupOutlined, DownloadOutlined, ExportOutlined
+  DatabaseOutlined, GroupOutlined, DownloadOutlined, ExportOutlined,
+  BranchesOutlined
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 
@@ -14,6 +15,7 @@ interface ErToolbarProps {
   onAutoLayout: (algorithm: 'grid' | 'hierarchical' | 'force') => void
   onAddPrimaryKey: () => void
   onAddTimestamps: () => void
+  onOptimizeRouting?: () => void
   onExport?: () => void
   disabled?: boolean
 }
@@ -24,6 +26,7 @@ const ErToolbar: React.FC<ErToolbarProps> = ({
   onAutoLayout,
   onAddPrimaryKey,
   onAddTimestamps,
+  onOptimizeRouting,
   onExport,
   disabled = false,
 }) => {
@@ -128,6 +131,21 @@ const ErToolbar: React.FC<ErToolbarProps> = ({
           </Button>
         </Tooltip>
       </Dropdown>
+
+      {onOptimizeRouting && (
+        <>
+          <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
+          <Tooltip title="优化关系线路由">
+            <Button
+              icon={<BranchesOutlined />}
+              onClick={onOptimizeRouting}
+              disabled={disabled}
+            >
+              路由优化
+            </Button>
+          </Tooltip>
+        </>
+      )}
 
       <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
 
