@@ -513,6 +513,289 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
   return { tables, errors, warnings }
 }
 
+export interface ParsedAlterStatement {
+  type: 'ADD_COLUMN' | 'DROP_COLUMN' | 'MODIFY_COLUMN' | 'ADD_CONSTRAINT' | 'ADD_FOREIGN_KEY' | 'ADD_INDEX'
+  tableName: string
+  columnName?: string
+  columnType?: string
+  constraints?: ErConstraint[]
+  foreignKey?: { column: string; refTable: string; refColumn: string }
+  indexName?: string
+  indexColumns?: string[]
+}
+
+export interface ParsedView {
+  name: string
+  definition: string
+  columns?: string[]
+}
+
+export interface ParsedIndex {
+  name: string
+  tableName: string
+  columns: string[]
+  isUnique: boolean
+}
+
+export interface ExtendedSqlParseResult extends SqlParseResult {
+  alterStatements: ParsedAlterStatement[]
+  views: ParsedView[]
+  indexes: ParsedIndex[]
+}
+
+export function parseAlterTableSQL(sql: string): ParsedAlterStatement[] {
+  const statements: ParsedAlterStatement[] = []
+  const cleanedSql = sql
+    .replace(/--.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const alterRegex = /ALTER\s+TABLE\s+[`"[\w\]]+\s+([\s\S]*?)(?:;|$)/gi
+  
+  let match
+  while ((match = alterRegex.exec(cleanedSql)) !== null) {
+    const fullMatch = match[0]
+    const alterBody = match[1]
+    
+    const tableNameMatch = fullMatch.match(/ALTER\s+TABLE\s+([`"[\w\]]+)/i)
+    if (!tableNameMatch) continue
+    
+    const tableName = tableNameMatch[1].replace(/[`"[\]]/g, '')
+    
+    const addColumnMatch = alterBody.match(/ADD\s+(?:COLUMN\s+)?([`"[\w\]]+)\s+(\w+(?:\s*\([^)]*\))?)/i)
+    if (addColumnMatch) {
+      const columnName = addColumnMatch[1].replace(/[`"[\]]/g, '')
+      const columnType = addColumnMatch[2].toUpperCase()
+      const constraints: ErConstraint[] = []
+      
+      if (/\bNOT\s+NULL\b/i.test(alterBody)) constraints.push('notnull')
+      if (/\bUNIQUE\b/i.test(alterBody)) constraints.push('unique')
+      
+      statements.push({
+        type: 'ADD_COLUMN',
+        tableName,
+        columnName,
+        columnType,
+        constraints,
+      })
+      continue
+    }
+    
+    const dropColumnMatch = alterBody.match(/DROP\s+(?:COLUMN\s+)?([`"[\w\]]+)/i)
+    if (dropColumnMatch) {
+      statements.push({
+        type: 'DROP_COLUMN',
+        tableName,
+        columnName: dropColumnMatch[1].replace(/[`"[\]]/g, ''),
+      })
+      continue
+    }
+    
+    const modifyColumnMatch = alterBody.match(/MODIFY\s+(?:COLUMN\s+)?([`"[\w\]]+)\s+(\w+(?:\s*\([^)]*\))?)/i)
+    if (modifyColumnMatch) {
+      statements.push({
+        type: 'MODIFY_COLUMN',
+        tableName,
+        columnName: modifyColumnMatch[1].replace(/[`"[\]]/g, ''),
+        columnType: modifyColumnMatch[2].toUpperCase(),
+      })
+      continue
+    }
+    
+    const addFkMatch = alterBody.match(/ADD\s+(?:CONSTRAINT\s+[`"]?(\w+)[`"]?\s+)?FOREIGN\s+KEY\s*\(([^)]+)\)\s*REFERENCES\s+[`"[\w\]]+\s*\(([^)]+)\)/i)
+    if (addFkMatch) {
+      const refMatch = alterBody.match(/REFERENCES\s+([`"[\w\]]+)\s*\(([^)]+)\)/i)
+      if (refMatch) {
+        statements.push({
+          type: 'ADD_FOREIGN_KEY',
+          tableName,
+          foreignKey: {
+            column: addFkMatch[2].replace(/[`"[\]]/g, '').trim(),
+            refTable: refMatch[1].replace(/[`"[\]]/g, ''),
+            refColumn: refMatch[2].replace(/[`"[\]]/g, '').trim(),
+          },
+        })
+      }
+      continue
+    }
+    
+    const addIndexMatch = alterBody.match(/ADD\s+(UNIQUE\s+)?(?:INDEX|KEY)\s+[`"]?(\w+)[`"]?\s*\(([^)]+)\)/i)
+    if (addIndexMatch) {
+      statements.push({
+        type: 'ADD_INDEX',
+        tableName,
+        indexName: addIndexMatch[2],
+        indexColumns: addIndexMatch[3].split(',').map(c => c.trim().replace(/[`"[\]]/g, '')),
+      })
+      continue
+    }
+    
+    const addConstraintMatch = alterBody.match(/ADD\s+CONSTRAINT\s+[`"]?(\w+)[`"]?\s+(PRIMARY\s+KEY|UNIQUE|CHECK)/i)
+    if (addConstraintMatch) {
+      statements.push({
+        type: 'ADD_CONSTRAINT',
+        tableName,
+        columnName: addConstraintMatch[1],
+      })
+    }
+  }
+  
+  return statements
+}
+
+export function parseCreateViewSQL(sql: string): ParsedView[] {
+  const views: ParsedView[] = []
+  const cleanedSql = sql
+    .replace(/--.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const viewRegex = /CREATE\s+(?:OR\s+REPLACE\s+)?VIEW\s+[`"[\w\]]+(?:\s*\([^)]*\))?\s+AS\s+([\s\S]*?)(?:;|$)/gi
+  
+  let match
+  while ((match = viewRegex.exec(cleanedSql)) !== null) {
+    const fullMatch = match[0]
+    const definition = match[1]
+    
+    const nameMatch = fullMatch.match(/VIEW\s+([`"[\w\]]+)/i)
+    if (!nameMatch) continue
+    
+    const name = nameMatch[1].replace(/[`"[\]]/g, '')
+    
+    const columnsMatch = fullMatch.match(/VIEW\s+[`"[\w\]]+\s*\(([^)]+)\)/i)
+    const columns = columnsMatch 
+      ? columnsMatch[1].split(',').map(c => c.trim().replace(/[`"[\]]/g, ''))
+      : undefined
+    
+    views.push({
+      name,
+      definition: definition.trim(),
+      columns,
+    })
+  }
+  
+  return views
+}
+
+export function parseCreateIndexSQL(sql: string): ParsedIndex[] {
+  const indexes: ParsedIndex[] = []
+  const cleanedSql = sql
+    .replace(/--.*$/gm, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const indexRegex = /CREATE\s+(UNIQUE\s+)?INDEX\s+[`"]?(\w+)[`"]?\s+ON\s+[`"[\w\]]+\s*\(([^)]+)\)/gi
+  
+  let match
+  while ((match = indexRegex.exec(cleanedSql)) !== null) {
+    const isUnique = !!match[1]
+    const indexName = match[2]
+    const tableMatch = match[0].match(/ON\s+([`"[\w\]]+)/i)
+    
+    if (!tableMatch) continue
+    
+    const tableName = tableMatch[1].replace(/[`"[\]]/g, '')
+    const columns = match[3].split(',').map(c => c.trim().replace(/[`"[\]]/g, ''))
+    
+    indexes.push({
+      name: indexName,
+      tableName,
+      columns,
+      isUnique,
+    })
+  }
+  
+  return indexes
+}
+
+export function parseFullSQL(sql: string): ExtendedSqlParseResult {
+  const baseResult = parseCreateTableSQL(sql)
+  const alterStatements = parseAlterTableSQL(sql)
+  const views = parseCreateViewSQL(sql)
+  const indexes = parseCreateIndexSQL(sql)
+  
+  return {
+    ...baseResult,
+    alterStatements,
+    views,
+    indexes,
+  }
+}
+
+export function applyAlterStatements(
+  tables: ParsedSqlTable[],
+  alterStatements: ParsedAlterStatement[]
+): ParsedSqlTable[] {
+  const updatedTables = [...tables]
+  
+  for (const alter of alterStatements) {
+    const tableIndex = updatedTables.findIndex(t => t.name.toLowerCase() === alter.tableName.toLowerCase())
+    if (tableIndex === -1) continue
+    
+    const table = { ...updatedTables[tableIndex] }
+    
+    switch (alter.type) {
+      case 'ADD_COLUMN':
+        if (alter.columnName && alter.columnType) {
+          table.columns = [...table.columns, {
+            name: alter.columnName,
+            type: alter.columnType,
+            constraints: alter.constraints || [],
+          }]
+        }
+        break
+        
+      case 'DROP_COLUMN':
+        if (alter.columnName) {
+          table.columns = table.columns.filter(c => c.name.toLowerCase() !== alter.columnName?.toLowerCase())
+        }
+        break
+        
+      case 'MODIFY_COLUMN':
+        if (alter.columnName && alter.columnType) {
+          table.columns = table.columns.map(c => 
+            c.name.toLowerCase() === alter.columnName?.toLowerCase()
+              ? { ...c, type: alter.columnType! }
+              : c
+          )
+        }
+        break
+        
+      case 'ADD_FOREIGN_KEY':
+        if (alter.foreignKey) {
+          table.foreignKeys = [...(table.foreignKeys || []), alter.foreignKey]
+          const colIndex = table.columns.findIndex(c => 
+            c.name.toLowerCase() === alter.foreignKey!.column.toLowerCase()
+          )
+          if (colIndex !== -1 && !table.columns[colIndex].constraints.includes('fk')) {
+            table.columns[colIndex] = {
+              ...table.columns[colIndex],
+              constraints: [...table.columns[colIndex].constraints, 'fk'],
+            }
+          }
+        }
+        break
+        
+      case 'ADD_INDEX':
+        if (alter.indexName && alter.indexColumns) {
+          table.indexes = [...(table.indexes || []), {
+            name: alter.indexName,
+            columns: alter.indexColumns,
+            isUnique: false,
+          }]
+        }
+        break
+    }
+    
+    updatedTables[tableIndex] = table
+  }
+  
+  return updatedTables
+}
+
 export function generateErNodesFromTables(
   tables: ParsedSqlTable[],
   startX: number = 100,

@@ -6,6 +6,7 @@ import { Keyboard } from '@antv/x6-plugin-keyboard'
 import { Clipboard } from '@antv/x6-plugin-clipboard'
 import { History } from '@antv/x6-plugin-history'
 import { Selection } from '@antv/x6-plugin-selection'
+import { message } from 'antd'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import useFormatPainterStore from '@stores/formatPainterStore'
@@ -15,6 +16,9 @@ import { parseDragData } from '../types/dragDrop'
 import { generateDefaultConnectionPoints, showPorts } from '@utils/connectionPoints'
 import { ConnectorRenderer } from '@utils/connectorRenderer'
 import { renderShape } from '@utils/shapeRenderers'
+import ERRelationQuickSelector, { isErTableNode, getErNodeName } from '@components/ERRelationQuickSelector'
+import type { ERRelationType } from '../types/connection'
+import { erRelations } from '../types/connection'
 
 const X6Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -75,6 +79,14 @@ const X6Canvas: React.FC = () => {
   const pasteEdgeStyle = useFormatPainterStore((state) => state.pasteEdgeStyle)
   const isPersistentMode = useFormatPainterStore((state) => state.isPersistentMode)
   const setPersistentMode = useFormatPainterStore((state) => state.setPersistentMode)
+
+  // ER Relation Quick Selector state
+  const [showERRelationSelector, setShowERRelationSelector] = useState(false)
+  const [pendingEdgeInfo, setPendingEdgeInfo] = useState<{
+    edgeId: string
+    sourceNode: { id: string; type: string; name: string } | null
+    targetNode: { id: string; type: string; name: string } | null
+  } | null>(null)
 
   // Initialize X6 Graph
   useEffect(() => {
@@ -357,11 +369,47 @@ const X6Canvas: React.FC = () => {
       }
     })
 
-    graph.on('edge:connected', ({ edge }: { edge: Edge }) => {
+    graph.on('edge:connected', ({ edge, isNew }: { edge: Edge; isNew?: boolean }) => {
       const source = edge.getSource()
       const target = edge.getTarget()
 
-      if (source && target) {
+      if (source && target && isNew) {
+        const sourceCellId = 'cell' in source ? source.cell : null
+        const targetCellId = 'cell' in target ? target.cell : null
+        
+        if (sourceCellId && targetCellId && typeof sourceCellId === 'string' && typeof targetCellId === 'string') {
+          const sourceCell = graph.getCellById(sourceCellId)
+          const targetCell = graph.getCellById(targetCellId)
+          
+          if (sourceCell?.isNode() && targetCell?.isNode()) {
+            const sourceNode = sourceCell as Node
+            const targetNode = targetCell as Node
+            const sourceType = sourceNode.shape || 'rect'
+            const targetType = targetNode.shape || 'rect'
+            
+            if (isErTableNode(sourceType) && isErTableNode(targetType)) {
+              const sourceData = nodes.find(n => n.id === sourceCellId)
+              const targetData = nodes.find(n => n.id === targetCellId)
+              
+              setPendingEdgeInfo({
+                edgeId: edge.id,
+                sourceNode: {
+                  id: sourceCellId,
+                  type: sourceType,
+                  name: getErNodeName(sourceData),
+                },
+                targetNode: {
+                  id: targetCellId,
+                  type: targetType,
+                  name: getErNodeName(targetData),
+                },
+              })
+              setShowERRelationSelector(true)
+              return
+            }
+          }
+        }
+        
         const connector = ConnectorRenderer.fromX6Edge(edge)
         addEdge(connector)
       }
@@ -706,6 +754,81 @@ const X6Canvas: React.FC = () => {
       })
     })
 
+    // ER Diagram shortcuts
+    graph.bindKey('e', () => {
+      const id = uuidv4()
+      const nodeData = {
+        id,
+        type: 'er-table-entity-with-columns',
+        x: 200 + Math.random() * 200,
+        y: 150 + Math.random() * 150,
+        width: 200,
+        height: 78,
+        fill: '#ffffff',
+        stroke: '#1890ff',
+        strokeWidth: 2,
+        text: 'new_entity\nid\tint\t[pk]',
+        connectionPoints: generateDefaultConnectionPoints('er-table-entity-with-columns'),
+      }
+      addNode(nodeData)
+      message.success('已创建实体 (快捷键 E)')
+    })
+
+    graph.bindKey('r', () => {
+      setTool('connector')
+      message.info('关系连接模式：点击源实体，拖拽到目标实体')
+    })
+
+    graph.bindKey(['ctrl+l', 'meta+l'], () => {
+      const erNodes = nodes.filter(n => 
+        n.type === 'er-table-entity-with-columns' || 
+        n.type === 'er-table-entity'
+      )
+      
+      if (erNodes.length === 0) {
+        message.warning('没有ER实体可以布局')
+        return
+      }
+
+      erNodes.forEach((node, index) => {
+        const row = Math.floor(index / 3)
+        const col = index % 3
+        updateNode(node.id, {
+          x: 100 + col * 280,
+          y: 100 + row * 350,
+        })
+      })
+      message.success('已应用网格布局 (Ctrl+L)')
+    })
+
+    graph.bindKey('a', () => {
+      const selectedCells = graph.getSelectedCells()
+      if (selectedCells.length !== 1) {
+        message.info('请先选择一个实体')
+        return
+      }
+      
+      const cell = selectedCells[0]
+      if (cell.isNode()) {
+        const node = cell as Node
+        const nodeData = nodes.find(n => n.id === node.id)
+        
+        if (nodeData && (nodeData.type === 'er-table-entity-with-columns' || nodeData.type === 'er-table-entity')) {
+          const lines = (nodeData.text || '').split('\n')
+          const tableName = lines[0]
+          const existingColumns = lines.slice(1)
+          const newColumn = `column_${existingColumns.length + 1}\tvarchar`
+          const newText = [tableName, ...existingColumns, newColumn].join('\n')
+          
+          updateNode(nodeData.id, { 
+            text: newText,
+            height: nodeData.height + 28,
+          })
+          message.success('已添加属性 (快捷键 A)')
+        }
+      }
+    })
+
     graphRef.current = graph
     setGraph(graph)
 
@@ -947,24 +1070,92 @@ const X6Canvas: React.FC = () => {
     }
   }
 
+  // Handle ER relation type selection
+  const handleERRelationSelect = useCallback((relationType: ERRelationType) => {
+    if (!pendingEdgeInfo || !graphRef.current) return
+    
+    const { edgeId } = pendingEdgeInfo
+    const graph = graphRef.current
+    const edge = graph.getCellById(edgeId) as Edge
+    
+    if (edge) {
+      const config = erRelations[relationType]
+      if (config) {
+        edge.setAttrs({
+          line: {
+            stroke: config.stroke,
+            strokeWidth: config.strokeWidth,
+            strokeDasharray: config.lineStyle === 'dashed' ? '5,5' : 
+                            config.lineStyle === 'dotted' ? '2,2' : undefined,
+            sourceMarker: config.startStyle !== 'none' ? {
+              name: config.startStyle,
+              size: 10,
+            } : null,
+            targetMarker: config.endStyle !== 'none' ? {
+              name: config.endStyle,
+              size: 10,
+            } : null,
+          },
+        })
+        
+        if (config.lineStyle === 'dashed' || config.lineStyle === 'dotted') {
+          edge.attr('line/style/animation', 'dash')
+        }
+        
+        const connector = ConnectorRenderer.fromX6Edge(edge)
+        connector.lineStyle = config.lineStyle
+        connector.startStyle = config.startStyle
+        connector.endStyle = config.endStyle
+        connector.stroke = config.stroke
+        connector.strokeWidth = config.strokeWidth
+        
+        addEdge(connector)
+      }
+    }
+    
+    setShowERRelationSelector(false)
+    setPendingEdgeInfo(null)
+  }, [pendingEdgeInfo, addEdge])
+
+  const handleERRelationCancel = useCallback(() => {
+    if (pendingEdgeInfo && graphRef.current) {
+      const edge = graphRef.current.getCellById(pendingEdgeInfo.edgeId) as Edge
+      if (edge) {
+        graphRef.current.removeCell(edge)
+      }
+    }
+    setShowERRelationSelector(false)
+    setPendingEdgeInfo(null)
+  }, [pendingEdgeInfo])
+
   return (
-    <div
-      ref={containerRef}
-      className="x6-graph"
-      data-testid="x6-canvas"
-      data-grid-type={gridType}
-      data-tool={currentTool}
-      style={{
-        width: '100%',
-        height: '100%',
-        overflow: 'hidden',
-        backgroundColor: canvasBgColor,
-        cursor: getCursorStyle(),
-      }}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-      onClick={handleCanvasClick}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="x6-graph"
+        data-testid="x6-canvas"
+        data-grid-type={gridType}
+        data-tool={currentTool}
+        style={{
+          width: '100%',
+          height: '100%',
+          overflow: 'hidden',
+          backgroundColor: canvasBgColor,
+          cursor: getCursorStyle(),
+        }}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={handleCanvasClick}
+      />
+      
+      <ERRelationQuickSelector
+        visible={showERRelationSelector}
+        sourceNodeInfo={pendingEdgeInfo?.sourceNode || null}
+        targetNodeInfo={pendingEdgeInfo?.targetNode || null}
+        onSelect={handleERRelationSelect}
+        onCancel={handleERRelationCancel}
+      />
+    </>
   )
 }
 

@@ -11,11 +11,12 @@ import CanvasHistoryPanel from '@components/CanvasHistoryPanel'
 import SequenceScriptEditor from '@components/SequenceScriptEditor'
 import SqlExportDialog from '@components/SqlExportDialog'
 import SqlImportDialog from '@components/SqlImportDialog'
+import ErToolbar from '@components/ErToolbar'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { useTheme } from '@hooks/useTheme'
 import { v4 as uuidv4 } from 'uuid'
-import { generateErNodesFromTables, type ParsedSqlTable } from '@utils/erExporter'
+import { generateErNodesFromTables, calculateErLayout, type ParsedSqlTable } from '@utils/erExporter'
 import './styles/theme.css'
 
 const { TabPane } = Tabs
@@ -138,16 +139,134 @@ const App: React.FC = () => {
   const {
     newGraph,
     nodes,
+    edges,
     selectedNodeIds,
     deleteNodes,
     addNodes,
     addEdge,
+    updateNode,
     selectNode,
     importFromJson,
     exportToJson,
+    setTool,
   } = useX6GraphStore()
 
   const { copy, cut, paste } = useClipboardStore()
+
+  const [erMode, setErMode] = useState(false)
+
+  const handleCreateErEntity = useCallback((withDefaults: boolean = false) => {
+    const id = uuidv4()
+    const defaultColumns = withDefaults 
+      ? ['id\tint\t[pk,auto]', 'created_at\ttimestamp', 'updated_at\ttimestamp']
+      : ['id\tint\t[pk]']
+    
+    const nodeData = {
+      id,
+      type: 'er-table-entity-with-columns',
+      x: 200 + Math.random() * 200,
+      y: 150 + Math.random() * 150,
+      width: 200,
+      height: 50 + defaultColumns.length * 28,
+      fill: '#ffffff',
+      stroke: '#1890ff',
+      strokeWidth: 2,
+      text: `new_entity\n${defaultColumns.join('\n')}`,
+    }
+    addNodes([nodeData])
+    selectNode(id)
+    message.success('已创建实体')
+  }, [addNodes, selectNode])
+
+  const handleCreateErRelation = useCallback(() => {
+    setTool('connector')
+    message.info('请点击源实体，然后拖拽到目标实体')
+  }, [setTool])
+
+  const handleAutoLayout = useCallback((algorithm: 'grid' | 'hierarchical' | 'force') => {
+    const erNodes = nodes.filter(n => 
+      n.type === 'er-table-entity-with-columns' || 
+      n.type === 'er-table-entity'
+    )
+    
+    if (erNodes.length === 0) {
+      message.warning('没有ER实体可以布局')
+      return
+    }
+
+    const tables = erNodes.map(n => ({
+      name: n.text?.split('\n')[0] || 'untitled',
+      columns: parseColumnsFromText(n.text || ''),
+      foreignKeys: [],
+      indexes: [],
+    }))
+
+    const layoutResult = calculateErLayout(tables, { algorithm })
+    
+    layoutResult.nodes.forEach((layoutNode, index) => {
+      const originalNode = erNodes[index]
+      if (originalNode) {
+        updateNode(originalNode.id, {
+          x: layoutNode.x,
+          y: layoutNode.y,
+        })
+      }
+    })
+
+    message.success(`已应用${algorithm === 'grid' ? '网格' : algorithm === 'hierarchical' ? '层次' : '力导向'}布局`)
+  }, [nodes, updateNode])
+
+  const handleAddPrimaryKey = useCallback(() => {
+    const selectedNode = nodes.find(n => selectedNodeIds.includes(n.id) && 
+      (n.type === 'er-table-entity-with-columns' || n.type === 'er-table-entity'))
+    
+    if (!selectedNode) {
+      message.warning('请先选择一个ER实体')
+      return
+    }
+
+    const lines = (selectedNode.text || '').split('\n')
+    const tableName = lines[0]
+    const existingColumns = lines.slice(1)
+    
+    const hasPk = existingColumns.some(col => col.includes('[pk]'))
+    if (hasPk) {
+      message.info('该实体已有主键')
+      return
+    }
+
+    const newColumn = 'id\tint\t[pk,auto]'
+    const newText = [tableName, newColumn, ...existingColumns].join('\n')
+    
+    updateNode(selectedNode.id, { 
+      text: newText,
+      height: selectedNode.height + 28,
+    })
+    message.success('已添加主键列')
+  }, [nodes, selectedNodeIds, updateNode])
+
+  const handleAddTimestamps = useCallback(() => {
+    const selectedNode = nodes.find(n => selectedNodeIds.includes(n.id) && 
+      (n.type === 'er-table-entity-with-columns' || n.type === 'er-table-entity'))
+    
+    if (!selectedNode) {
+      message.warning('请先选择一个ER实体')
+      return
+    }
+
+    const lines = (selectedNode.text || '').split('\n')
+    const tableName = lines[0]
+    const existingColumns = lines.slice(1)
+    
+    const timestampColumns = ['created_at\ttimestamp', 'updated_at\ttimestamp']
+    const newText = [tableName, ...existingColumns, ...timestampColumns].join('\n')
+    
+    updateNode(selectedNode.id, { 
+      text: newText,
+      height: selectedNode.height + 56,
+    })
+    message.success('已添加时间戳字段')
+  }, [nodes, selectedNodeIds, updateNode])
 
   const handleSqlImport = useCallback((tables: ParsedSqlTable[]) => {
     const erNodes = generateErNodesFromTables(tables)
@@ -321,8 +440,17 @@ const App: React.FC = () => {
           <ShapeLibrary />
         </ResizableSider>
 
-        <div style={{ position: 'relative', overflow: 'hidden', flex: 1, height: '100%' }}>
-          <X6Canvas />
+        <div style={{ position: 'relative', overflow: 'hidden', flex: 1, height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <ErToolbar
+            onCreateEntity={handleCreateErEntity}
+            onCreateRelation={handleCreateErRelation}
+            onAutoLayout={handleAutoLayout}
+            onAddPrimaryKey={handleAddPrimaryKey}
+            onAddTimestamps={handleAddTimestamps}
+          />
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <X6Canvas />
+          </div>
         </div>
 
         <ResizableSider
