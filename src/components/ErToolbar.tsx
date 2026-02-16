@@ -4,7 +4,7 @@ import {
   TableOutlined, LinkOutlined, LayoutOutlined, 
   PlusOutlined, OrderedListOutlined, ApartmentOutlined,
   ThunderboltOutlined, KeyOutlined, ClockCircleOutlined,
-  DatabaseOutlined, GroupOutlined
+  DatabaseOutlined, GroupOutlined, DownloadOutlined, ExportOutlined
 } from '@ant-design/icons'
 import type { MenuProps } from 'antd'
 
@@ -14,6 +14,7 @@ interface ErToolbarProps {
   onAutoLayout: (algorithm: 'grid' | 'hierarchical' | 'force') => void
   onAddPrimaryKey: () => void
   onAddTimestamps: () => void
+  onExport?: () => void
   disabled?: boolean
 }
 
@@ -23,6 +24,7 @@ const ErToolbar: React.FC<ErToolbarProps> = ({
   onAutoLayout,
   onAddPrimaryKey,
   onAddTimestamps,
+  onExport,
   disabled = false,
 }) => {
   const layoutMenuItems: MenuProps['items'] = [
@@ -117,7 +119,7 @@ const ErToolbar: React.FC<ErToolbarProps> = ({
       <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
 
       <Dropdown menu={{ items: layoutMenuItems }} trigger={['click']}>
-        <Tooltip title="自动布局">
+        <Tooltip title="自动布局 (Ctrl+L)">
           <Button
             icon={<LayoutOutlined />}
             disabled={disabled}
@@ -141,6 +143,22 @@ const ErToolbar: React.FC<ErToolbarProps> = ({
       </Tooltip>
 
       <div style={{ flex: 1 }} />
+
+      {onExport && (
+        <>
+          <Tooltip title="导出ER图 (Mermaid/PlantUML/DBML/HTML)">
+            <Button
+              type="primary"
+              icon={<ExportOutlined />}
+              onClick={onExport}
+              disabled={disabled}
+            >
+              导出
+            </Button>
+          </Tooltip>
+          <div style={{ width: 1, height: 24, background: '#e8e8e8' }} />
+        </>
+      )}
 
       <Space>
         <Tooltip title="ER图模式已启用">

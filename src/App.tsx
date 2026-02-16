@@ -12,6 +12,7 @@ import SequenceScriptEditor from '@components/SequenceScriptEditor'
 import SqlExportDialog from '@components/SqlExportDialog'
 import SqlImportDialog from '@components/SqlImportDialog'
 import ErToolbar from '@components/ErToolbar'
+import ErExportDialog from '@components/ErExportDialog'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { useTheme } from '@hooks/useTheme'
@@ -114,6 +115,7 @@ const App: React.FC = () => {
   const [showScriptEditor, setShowScriptEditor] = useState(false)
   const [showSqlExport, setShowSqlExport] = useState(false)
   const [showSqlImport, setShowSqlImport] = useState(false)
+  const [showErExport, setShowErExport] = useState(false)
 
   const [leftWidth, setLeftWidth] = useState(() => {
     const saved = localStorage.getItem('left-panel-width')
@@ -447,6 +449,7 @@ const App: React.FC = () => {
             onAutoLayout={handleAutoLayout}
             onAddPrimaryKey={handleAddPrimaryKey}
             onAddTimestamps={handleAddTimestamps}
+            onExport={() => setShowErExport(true)}
           />
           <div style={{ flex: 1, overflow: 'hidden' }}>
             <X6Canvas />
@@ -512,6 +515,17 @@ const App: React.FC = () => {
             columns: parseColumnsFromText(n.text || ''),
           }))}
         onCancel={() => setShowSqlExport(false)}
+      />
+      <ErExportDialog
+        visible={showErExport}
+        tables={nodes
+          .filter((n) => n.type === 'er-table-entity-with-columns' || n.type === 'er-table-entity')
+          .map((n) => ({
+            id: n.id,
+            name: n.text?.split('\n')[0] || 'untitled',
+            columns: parseColumnsFromText(n.text || ''),
+          }))}
+        onClose={() => setShowErExport(false)}
       />
     </Layout>
   )
