@@ -275,6 +275,44 @@ export const renderCircle = (config: ShapeRenderConfig): Node => {
   })
 }
 
+export const renderPieSlice = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config, { ...MERMAID_SHADOW })
+  const cx = config.centerX ?? config.x + config.width / 2
+  const cy = config.centerY ?? config.y + config.height / 2
+  const r = config.radius ?? Math.min(config.width, config.height) / 2 - 2
+  const startAngle = config.startAngle ?? 0
+  const endAngle = config.endAngle ?? Math.PI / 2
+
+  const x1 = cx + r * Math.cos(startAngle)
+  const y1 = cy + r * Math.sin(startAngle)
+  const x2 = cx + r * Math.cos(endAngle)
+  const y2 = cy + r * Math.sin(endAngle)
+
+  const angleDiff = endAngle - startAngle
+  const largeArcFlag = angleDiff > Math.PI ? 1 : 0
+
+  const path = `
+    M${cx},${cy}
+    L${x1},${y1}
+    A${r},${r} 0 ${largeArcFlag},1 ${x2},${y2}
+    Z
+  `
+
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        refD: path,
+        fill: config.fill || '#1890ff',
+        stroke: config.stroke || '#fff',
+        strokeWidth: config.strokeWidth ?? 1,
+      },
+    },
+  })
+}
+
 export const renderRhombus = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
   const width = config.width
@@ -652,6 +690,7 @@ export const mermaidRenderers = {
   'mermaid-double-circle': renderDoubleCircle,
   'mermaid-asymmetric': renderAsymmetric,
   'mermaid-circle': renderCircle,
+  'mermaid-pie-slice': renderPieSlice,
   'mermaid-rhombus': renderRhombus,
   'mermaid-cloud': renderCloud,
   'mermaid-banner': renderBanner,

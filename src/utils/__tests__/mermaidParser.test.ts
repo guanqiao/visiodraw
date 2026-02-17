@@ -6,6 +6,7 @@ import {
   parseSequenceDiagram,
   parseStateDiagram,
   parseErDiagram,
+  parsePieDiagram,
 } from '../mermaidParser'
 import type { MermaidParseResult } from '../../types/diagramTemplate'
 
@@ -379,6 +380,85 @@ describe('MermaidParser', () => {
 
       expect(result.success).toBe(true)
       expect(result.nodes!.length).toBe(2)
+    })
+  })
+
+  describe('parsePieDiagram', () => {
+    it('should parse simple pie diagram', () => {
+      const code = `pie
+    "Chrome" : 65
+    "Safari" : 19
+    "Firefox" : 8`
+
+      const result = parsePieDiagram(code)
+
+      expect(result.success).toBe(true)
+      expect(result.diagramType).toBe('pie')
+      expect(result.nodes!.length).toBeGreaterThan(0)
+    })
+
+    it('should parse pie diagram with title', () => {
+      const code = `pie showtitle
+    title 浏览器市场份额
+    "Chrome" : 65
+    "Safari" : 19`
+
+      const result = parsePieDiagram(code)
+
+      expect(result.success).toBe(true)
+      const titleNode = result.nodes!.find(n => n.id === 'pie-title')
+      expect(titleNode).toBeDefined()
+      expect(titleNode!.text).toBe('浏览器市场份额')
+    })
+
+    it('should generate pie slice nodes', () => {
+      const code = `pie
+    "Chrome" : 65
+    "Safari" : 35`
+
+      const result = parsePieDiagram(code)
+
+      expect(result.success).toBe(true)
+      const sliceNodes = result.nodes!.filter(n => n.type === 'mermaid-pie-slice')
+      expect(sliceNodes.length).toBe(2)
+    })
+
+    it('should generate label nodes for slices', () => {
+      const code = `pie
+    "Chrome" : 65
+    "Safari" : 35`
+
+      const result = parsePieDiagram(code)
+
+      expect(result.success).toBe(true)
+      const labelNodes = result.nodes!.filter(n => n.id.startsWith('slice-label-'))
+      expect(labelNodes.length).toBe(2)
+      expect(labelNodes[0].text).toContain('Chrome')
+      expect(labelNodes[1].text).toContain('Safari')
+    })
+
+    it('should assign different colors to slices', () => {
+      const code = `pie
+    "A" : 25
+    "B" : 25
+    "C" : 25
+    "D" : 25`
+
+      const result = parsePieDiagram(code)
+
+      expect(result.success).toBe(true)
+      const sliceNodes = result.nodes!.filter(n => n.type === 'mermaid-pie-slice')
+      const colors = sliceNodes.map(n => n.fill)
+      expect(new Set(colors).size).toBe(4)
+    })
+
+    it('should handle empty pie diagram', () => {
+      const code = 'pie'
+
+      const result = parsePieDiagram(code)
+
+      expect(result.success).toBe(true)
+      expect(result.nodes!.length).toBe(0)
     })
   })
 })

@@ -230,6 +230,7 @@ export const defaultConnectionPointsConfig: Record<string, ConnectionPointPositi
   'uml-object': ['top', 'bottom', 'left', 'right'],
   'uml-activity': ['top', 'bottom', 'left', 'right'],
   'uml-action': ['top', 'bottom', 'left', 'right'],
+  'mermaid-pie-slice': [],
   'uml-decision': ['top', 'bottom', 'left', 'right'],
   'uml-fork': ['top', 'bottom', 'left', 'right'],
   'uml-initial': ['top', 'bottom', 'left', 'right'],

@@ -1405,7 +1405,7 @@ export function parsePieDiagram(code: string): MermaidParseResult {
 
   const centerX = 250
   const centerY = 200
-  const radius = 150
+  const radius = 120
   const total = slices.reduce((sum, s) => sum + s.value, 0)
 
   if (title) {
@@ -1434,11 +1434,30 @@ export function parsePieDiagram(code: string): MermaidParseResult {
     const endAngle = startAngle + sliceAngle
     const midAngle = startAngle + sliceAngle / 2
 
-    const labelX = centerX + Math.cos(midAngle) * (radius + 40)
-    const labelY = centerY + Math.sin(midAngle) * (radius + 40)
+    nodes.push({
+      id: `pie-slice-${index}`,
+      type: 'mermaid-pie-slice',
+      x: centerX - radius,
+      y: centerY - radius,
+      width: radius * 2,
+      height: radius * 2,
+      text: '',
+      fill: colors[index % colors.length],
+      stroke: '#fff',
+      strokeWidth: 2,
+      startAngle,
+      endAngle,
+      centerX,
+      centerY,
+      radius,
+    })
+
+    const labelRadius = radius + 50
+    const labelX = centerX + Math.cos(midAngle) * labelRadius
+    const labelY = centerY + Math.sin(midAngle) * labelRadius
 
     nodes.push({
-      id: `slice-${index}`,
+      id: `slice-label-${index}`,
       type: 'uml-action',
       x: labelX - 50,
       y: labelY - 15,
@@ -1451,19 +1470,6 @@ export function parsePieDiagram(code: string): MermaidParseResult {
     })
 
     startAngle = endAngle
-  })
-
-  nodes.push({
-    id: 'pie-center',
-    type: 'mermaid-circle',
-    x: centerX - radius,
-    y: centerY - radius,
-    width: radius * 2,
-    height: radius * 2,
-    text: '',
-    fill: '#f0f0f0',
-    stroke: '#999',
-    strokeWidth: 2,
   })
 
   return {

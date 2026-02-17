@@ -13,6 +13,11 @@ export interface ShapeRenderConfig {
   rx?: number
   ry?: number
   shapeType?: string
+  startAngle?: number
+  endAngle?: number
+  centerX?: number
+  centerY?: number
+  radius?: number
 }
 
 export interface PortGroup {

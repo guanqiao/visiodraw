@@ -11,6 +11,7 @@ import {
   renderDoubleCircle,
   renderAsymmetric,
   renderCircle,
+  renderPieSlice,
   renderRhombus,
   mermaidRenderers,
 } from '../mermaidShapes'
@@ -174,6 +175,65 @@ describe('Mermaid Shapes', () => {
     })
   })
 
+  describe('renderPieSlice', () => {
+    const pieSliceConfig: ShapeRenderConfig = {
+      ...baseConfig,
+      centerX: 250,
+      centerY: 200,
+      radius: 100,
+      startAngle: -Math.PI / 2,
+      endAngle: 0,
+    }
+
+    it('should render pie slice shape', () => {
+      const node = renderPieSlice(pieSliceConfig)
+      expect(node).toBeDefined()
+      expect(node.shape).toBe('path')
+    })
+
+    it('should have path data for slice', () => {
+      const node = renderPieSlice(pieSliceConfig)
+      const d = node.attr('body/refD') as string
+      expect(d).toBeDefined()
+      expect(d).toContain('M')
+      expect(d).toContain('L')
+      expect(d).toContain('A')
+      expect(d).toContain('Z')
+    })
+
+    it('should start from center', () => {
+      const node = renderPieSlice(pieSliceConfig)
+      const d = node.attr('body/refD') as string
+      expect(d).toContain('M250,200')
+    })
+
+    it('should apply custom fill color', () => {
+      const config = { ...pieSliceConfig, fill: '#1890ff' }
+      const node = renderPieSlice(config)
+      expect(node.attr('body/fill')).toBe('#1890ff')
+    })
+
+    it('should use white stroke by default', () => {
+      const config = { ...pieSliceConfig, stroke: undefined }
+      const node = renderPieSlice(config)
+      expect(node.attr('body/stroke')).toBe('#fff')
+    })
+
+    it('should handle large arc flag for slices > 180 degrees', () => {
+      const config: ShapeRenderConfig = {
+        ...baseConfig,
+        centerX: 250,
+        centerY: 200,
+        radius: 100,
+        startAngle: 0,
+        endAngle: Math.PI * 1.5,
+      }
+      const node = renderPieSlice(config)
+      const d = node.attr('body/refD') as string
+      expect(d).toContain('1,1')
+    })
+  })
+
   describe('renderRhombus', () => {
     it('should render rhombus shape', () => {
       const node = renderRhombus(baseConfig)
@@ -202,6 +262,7 @@ describe('Mermaid Shapes', () => {
       expect(mermaidRenderers).toHaveProperty('mermaid-double-circle')
       expect(mermaidRenderers).toHaveProperty('mermaid-asymmetric')
       expect(mermaidRenderers).toHaveProperty('mermaid-circle')
+      expect(mermaidRenderers).toHaveProperty('mermaid-pie-slice')
       expect(mermaidRenderers).toHaveProperty('mermaid-rhombus')
     })
 
