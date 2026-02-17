@@ -7,7 +7,9 @@ import { erRenderers } from './er'
 import { bpmnRenderers } from './bpmn'
 import { cloudRenderers } from './cloud'
 import { renderDatabase } from './flowchart'
+import { cloudProviderRenderers } from './cloudProviders'
 import { globalShapeCache } from '../rendering/ShapeCache'
+import { renderLogger, devWarn } from '../logger'
 
 export * from './types'
 export * from './base'
@@ -16,6 +18,7 @@ export * from './uml'
 export * from './er'
 export * from './bpmn'
 export * from './cloud'
+export * from './cloudProviders'
 
 const awsRenderers: ShapeRendererMap = {
   'aws-ec2': cloudRenderers.server,
@@ -26,21 +29,21 @@ const awsRenderers: ShapeRendererMap = {
   'aws-ebs': renderDatabase,
   'aws-rds': renderDatabase,
   'aws-dynamodb': renderDatabase,
-  'aws-vpc': baseRenderers.rectangle,
-  'aws-elb': baseRenderers.rectangle,
+  'aws-vpc': cloudProviderRenderers['aws-vpc'],
+  'aws-elb': cloudProviderRenderers['aws-elb'],
   'aws-cloudfront': cloudRenderers.cloud,
-  'aws-sqs': baseRenderers.rectangle,
-  'aws-sns': baseRenderers.rectangle,
-  'aws-iam': baseRenderers.rectangle,
-  'aws-cloudwatch': baseRenderers.rectangle,
+  'aws-sqs': cloudProviderRenderers['aws-sqs'],
+  'aws-sns': cloudProviderRenderers['aws-sns'],
+  'aws-iam': cloudProviderRenderers['aws-iam'],
+  'aws-cloudwatch': cloudProviderRenderers['aws-cloudwatch'],
   'aws-apigateway': cloudRenderers.cloud,
-  'aws-kinesis': baseRenderers.rectangle,
+  'aws-kinesis': cloudProviderRenderers['aws-kinesis'],
   'aws-redshift': renderDatabase,
   'aws-elasticache': renderDatabase,
-  'aws-eventbridge': baseRenderers.rectangle,
-  'aws-stepfunctions': baseRenderers.rectangle,
+  'aws-eventbridge': cloudProviderRenderers['aws-eventbridge'],
+  'aws-stepfunctions': cloudProviderRenderers['aws-stepfunctions'],
   'aws-codebuild': cloudRenderers.server,
-  'aws-cloudformation': baseRenderers.rectangle,
+  'aws-cloudformation': cloudProviderRenderers['aws-cloudformation'],
 }
 
 const azureRenderers: ShapeRendererMap = {
@@ -51,17 +54,17 @@ const azureRenderers: ShapeRendererMap = {
   'azure-storage': renderDatabase,
   'azure-sql': renderDatabase,
   'azure-cosmosdb': renderDatabase,
-  'azure-vnet': baseRenderers.rectangle,
-  'azure-lb': baseRenderers.rectangle,
+  'azure-vnet': cloudProviderRenderers['azure-vnet'],
+  'azure-lb': cloudProviderRenderers['azure-lb'],
   'azure-cdn': cloudRenderers.cloud,
-  'azure-eventhub': baseRenderers.rectangle,
-  'azure-servicebus': baseRenderers.rectangle,
-  'azure-keyvault': baseRenderers.rectangle,
+  'azure-eventhub': cloudProviderRenderers['azure-eventhub'],
+  'azure-servicebus': cloudProviderRenderers['azure-servicebus'],
+  'azure-keyvault': cloudProviderRenderers['azure-keyvault'],
   'azure-redis': renderDatabase,
   'azure-apim': cloudRenderers.cloud,
-  'azure-logicapps': baseRenderers.rectangle,
-  'azure-eventgrid': baseRenderers.rectangle,
-  'azure-devops': baseRenderers.rectangle,
+  'azure-logicapps': cloudProviderRenderers['azure-logicapps'],
+  'azure-eventgrid': cloudProviderRenderers['azure-eventgrid'],
+  'azure-devops': cloudProviderRenderers['azure-devops'],
 }
 
 const gcpRenderers: ShapeRendererMap = {
@@ -71,13 +74,13 @@ const gcpRenderers: ShapeRendererMap = {
   'gcp-storage': renderDatabase,
   'gcp-cloudsql': renderDatabase,
   'gcp-firestore': renderDatabase,
-  'gcp-vpc': baseRenderers.rectangle,
-  'gcp-lb': baseRenderers.rectangle,
+  'gcp-vpc': cloudProviderRenderers['gcp-vpc'],
+  'gcp-lb': cloudProviderRenderers['gcp-lb'],
   'gcp-bigquery': renderDatabase,
-  'gcp-pubsub': baseRenderers.rectangle,
+  'gcp-pubsub': cloudProviderRenderers['gcp-pubsub'],
   'gcp-cloudrun': cloudRenderers.server,
   'gcp-apigee': cloudRenderers.cloud,
-  'gcp-dataflow': baseRenderers.rectangle,
+  'gcp-dataflow': cloudProviderRenderers['gcp-dataflow'],
   'gcp-cloudbuild': cloudRenderers.server,
 }
 
@@ -85,10 +88,10 @@ const aliyunRenderers: ShapeRendererMap = {
   'aliyun-ecs': cloudRenderers.server,
   'aliyun-oss': renderDatabase,
   'aliyun-rds': renderDatabase,
-  'aliyun-slb': baseRenderers.rectangle,
-  'aliyun-vpc': baseRenderers.rectangle,
+  'aliyun-slb': cloudProviderRenderers['aliyun-slb'],
+  'aliyun-vpc': cloudProviderRenderers['aliyun-vpc'],
   'aliyun-ack': cloudRenderers.server,
-  'aliyun-rocketmq': baseRenderers.rectangle,
+  'aliyun-rocketmq': cloudProviderRenderers['aliyun-rocketmq'],
   'aliyun-cdn': cloudRenderers.cloud,
   'aliyun-apigateway': cloudRenderers.cloud,
 }
@@ -97,22 +100,22 @@ const tencentRenderers: ShapeRendererMap = {
   'tencent-cvm': cloudRenderers.server,
   'tencent-cos': renderDatabase,
   'tencent-cdb': renderDatabase,
-  'tencent-clb': baseRenderers.rectangle,
+  'tencent-clb': cloudProviderRenderers['tencent-clb'],
   'tencent-tke': cloudRenderers.server,
-  'tencent-cmq': baseRenderers.rectangle,
+  'tencent-cmq': cloudProviderRenderers['tencent-cmq'],
   'tencent-apigateway': cloudRenderers.cloud,
-  'tencent-cls': baseRenderers.rectangle,
+  'tencent-cls': cloudProviderRenderers['tencent-cls'],
 }
 
 const genericCloudRenderers: ShapeRendererMap = {
   'cloud-generic': cloudRenderers.cloud,
   'cloud-server': cloudRenderers.server,
   'cloud-database': renderDatabase,
-  'cloud-loadbalancer': baseRenderers.rectangle,
-  'cloud-firewall': baseRenderers.rectangle,
+  'cloud-loadbalancer': cloudProviderRenderers['cloud-loadbalancer'],
+  'cloud-firewall': cloudRenderers.firewall,
   'cloud-cdn': cloudRenderers.cloud,
   'cloud-api-gateway': cloudRenderers.cloud,
-  'cloud-mq': baseRenderers.rectangle,
+  'cloud-mq': cloudProviderRenderers['cloud-mq'],
 }
 
 export const shapeRenderers: ShapeRendererMap = {
@@ -135,7 +138,7 @@ export const renderShape = (type: string, config: ShapeRenderConfig): Node => {
   const configWithType = { ...config, shapeType: type }
 
   if (!renderer) {
-    console.warn(`[renderShape] 未找到渲染器: ${type}，使用默认矩形`)
+    devWarn(`[renderShape] 未找到渲染器: ${type}，使用默认矩形`)
     return baseRenderers.rectangle(configWithType)
   }
 
@@ -148,24 +151,24 @@ export const renderShape = (type: string, config: ShapeRenderConfig): Node => {
         cachedNode.attr('label/text', config.text)
       }
       cachedNode.setData({ fromStore: true, shapeType: type })
-      console.log(`[renderShape] 从缓存克隆: ${type}, id: ${config.id}`)
+      renderLogger.debug(`从缓存克隆: ${type}, id: ${config.id}`)
       return cachedNode
     }
 
     const node = renderer(configWithType)
     node.setData({ fromStore: true, shapeType: type })
-    
+
     const cacheConfig = { ...config }
     delete (cacheConfig as any).id
     delete (cacheConfig as any).x
     delete (cacheConfig as any).y
     delete (cacheConfig as any).text
     globalShapeCache.set(type, cacheConfig, node)
-    
-    console.log(`[renderShape] 成功渲染: ${type}, id: ${config.id}`)
+
+    renderLogger.debug(`成功渲染: ${type}, id: ${config.id}`)
     return node
   } catch (error) {
-    console.error(`[renderShape] 渲染失败: ${type}, id: ${config.id}`, error)
+    renderLogger.error(`渲染失败: ${type}, id: ${config.id}`, error)
     return baseRenderers.rectangle(configWithType)
   }
 }

@@ -69,10 +69,20 @@ export const renderUmlClass = (config: ShapeRenderConfig): Node => {
 
 export const renderUmlInterface = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { rx: 5, ry: 5, ...MERMAID_SHADOW })
-  return new Shape.Rect({
+  const lollipopR = Math.min(config.width, config.height) * 0.08
+  const lollipopX = config.width - lollipopR * 2
+  const lollipopY = config.height / 2
+
+  const lollipopPath = `M${lollipopX},${lollipopY} L${config.width},${lollipopY} M${config.width + lollipopR},${lollipopY} A${lollipopR},${lollipopR} 0 1,1 ${config.width + lollipopR},${lollipopY + 0.01}`
+
+  return new Shape.Path({
     ...base,
     attrs: {
       ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: `M0,0 L${lollipopX},0 L${lollipopX},${config.height} L0,${config.height} Z ${lollipopPath}`,
+      },
       label: {
         ...base.attrs.label,
         text: config.text ? `«interface»\n${config.text}` : '«interface»',
@@ -192,14 +202,39 @@ export const renderUmlActivation = (config: ShapeRenderConfig): Node => {
 
 export const renderUmlFragment = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { rx: 4, ry: 4, ...MERMAID_SHADOW })
-  return new Shape.Rect({
+  const foldSize = Math.min(config.width, config.height) * 0.12
+  const headerHeight = Math.min(config.height * 0.2, 25)
+
+  const fragmentPath = `M0,0 L${config.width - foldSize},0 L${config.width},${foldSize} L${config.width},${config.height} L0,${config.height} Z
+    M${config.width - foldSize},0 L${config.width - foldSize},${foldSize} L${config.width},${foldSize}
+    M0,${headerHeight} L${config.width},${headerHeight}`
+
+  return new Shape.Path({
     ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        d: fragmentPath,
+      },
+      label: {
+        ...base.attrs.label,
+        text: config.text || 'alt',
+        textVerticalAnchor: 'top',
+        refY: headerHeight / 2,
+        fontSize: 12,
+        fontWeight: 'bold',
+      },
+    },
   })
 }
 
 export const renderUmlSwimlanePool = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
-  const path = createUmlSwimlanePoolPath(config.width, config.height, 3, 80)
+  const laneCount = 3
+  const headerWidth = Math.min(config.width * 0.15, 80)
+  const path = createUmlSwimlanePoolPath(config.width, config.height, laneCount, headerWidth)
+
   return new Shape.Path({
     ...base,
     attrs: {
@@ -207,6 +242,13 @@ export const renderUmlSwimlanePool = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fillRule: 'evenodd',
+      },
+      label: {
+        ...base.attrs.label,
+        refX: headerWidth / 2,
+        textVerticalAnchor: 'middle',
+        transform: `rotate(-90, ${headerWidth / 2}, ${config.height / 2})`,
       },
     },
   })
@@ -214,7 +256,9 @@ export const renderUmlSwimlanePool = (config: ShapeRenderConfig): Node => {
 
 export const renderUmlSwimlaneHorizontal = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
-  const path = createUmlSwimlaneHorizontalPath(config.width, config.height, 80)
+  const headerWidth = Math.min(config.width * 0.2, 80)
+  const path = createUmlSwimlaneHorizontalPath(config.width, config.height, headerWidth)
+
   return new Shape.Path({
     ...base,
     attrs: {
@@ -222,6 +266,13 @@ export const renderUmlSwimlaneHorizontal = (config: ShapeRenderConfig): Node => 
       body: {
         ...base.attrs.body,
         d: path,
+        fillRule: 'evenodd',
+      },
+      label: {
+        ...base.attrs.label,
+        refX: headerWidth / 2,
+        textVerticalAnchor: 'middle',
+        transform: `rotate(-90, ${headerWidth / 2}, ${config.height / 2})`,
       },
     },
   })
@@ -229,7 +280,9 @@ export const renderUmlSwimlaneHorizontal = (config: ShapeRenderConfig): Node => 
 
 export const renderUmlSwimlaneVertical = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
-  const path = createUmlSwimlaneVerticalPath(config.width, config.height, 40)
+  const headerHeight = Math.min(config.height * 0.15, 40)
+  const path = createUmlSwimlaneVerticalPath(config.width, config.height, headerHeight)
+
   return new Shape.Path({
     ...base,
     attrs: {
@@ -237,6 +290,12 @@ export const renderUmlSwimlaneVertical = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fillRule: 'evenodd',
+      },
+      label: {
+        ...base.attrs.label,
+        refY: headerHeight / 2,
+        textVerticalAnchor: 'middle',
       },
     },
   })
@@ -245,6 +304,7 @@ export const renderUmlSwimlaneVertical = (config: ShapeRenderConfig): Node => {
 export const renderUmlSwimlaneSeparator = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
   const path = createUmlSwimlaneSeparatorPath(config.width, config.height)
+
   return new Shape.Path({
     ...base,
     attrs: {
@@ -261,10 +321,11 @@ export const renderUmlSwimlaneSeparator = (config: ShapeRenderConfig): Node => {
 
 export const renderUmlSwimlane = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
-  const headerWidth = 80
+  const headerWidth = Math.min(config.width * 0.2, 80)
   const width = config.width
   const height = config.height
-  const path = `M 0 0 L ${width} 0 L ${width} ${height} L 0 ${height} Z M ${headerWidth} 0 L ${headerWidth} ${height}`
+  const path = `M0,0 L${width},0 L${width},${height} L0,${height} Z M${headerWidth},0 L${headerWidth},${height}`
+
   return new Shape.Path({
     ...base,
     attrs: {
@@ -272,6 +333,13 @@ export const renderUmlSwimlane = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fillRule: 'evenodd',
+      },
+      label: {
+        ...base.attrs.label,
+        refX: headerWidth / 2,
+        textVerticalAnchor: 'middle',
+        transform: `rotate(-90, ${headerWidth / 2}, ${height / 2})`,
       },
     },
   })

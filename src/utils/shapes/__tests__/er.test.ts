@@ -26,11 +26,11 @@ describe('ER shape renderers', () => {
   }
 
   describe('renderErEntity', () => {
-    it('should create an ER entity shape (rectangle)', () => {
+    it('should create an ER entity shape (rounded rectangle)', () => {
       const node = renderErEntity(defaultConfig)
       
       expect(node.id).toBe('test-er')
-      expect(node.shape).toBe('rect')
+      expect(node.shape).toBe('path')
     })
   })
 

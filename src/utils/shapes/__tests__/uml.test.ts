@@ -45,7 +45,7 @@ describe('UML shape renderers', () => {
       const node = renderUmlInterface(defaultConfig)
       
       expect(node.id).toBe('test-uml')
-      expect(node.shape).toBe('rect')
+      expect(node.shape).toBe('path')
       expect(node.attr('label/text')).toContain('«interface»')
     })
 
@@ -133,7 +133,7 @@ describe('UML shape renderers', () => {
       const node = renderUmlFragment(defaultConfig)
 
       expect(node.id).toBe('test-uml')
-      expect(node.shape).toBe('rect')
+      expect(node.shape).toBe('path')
     })
   })
 

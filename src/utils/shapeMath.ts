@@ -899,14 +899,14 @@ export function createUmlSwimlanePoolPath(
   laneCount: number = 3,
   headerWidth: number = 80
 ): string {
-  let path = `M 0 0 L ${width} 0 L ${width} ${height} L 0 ${height} Z`
-  path += ` M ${headerWidth} 0 L ${headerWidth} ${height}`
+  let path = `M0,0 L${width},0 L${width},${height} L0,${height} Z`
+  path += ` M${headerWidth},0 L${headerWidth},${height}`
 
   if (laneCount > 1) {
     const laneHeight = height / laneCount
     for (let i = 1; i < laneCount; i++) {
-      const y = i * laneHeight
-      path += ` M ${headerWidth} ${y} L ${width} ${y}`
+      const y = Math.round(i * laneHeight)
+      path += ` M${headerWidth},${y} L${width},${y}`
     }
   }
 
@@ -918,7 +918,7 @@ export function createUmlSwimlaneHorizontalPath(
   height: number,
   headerWidth: number = 80
 ): string {
-  return `M 0 0 L ${width} 0 L ${width} ${height} L 0 ${height} Z M ${headerWidth} 0 L ${headerWidth} ${height}`
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z M${headerWidth},0 L${headerWidth},${height}`
 }
 
 export function createUmlSwimlaneVerticalPath(
@@ -926,10 +926,476 @@ export function createUmlSwimlaneVerticalPath(
   height: number,
   headerHeight: number = 40
 ): string {
-  return `M 0 0 L ${width} 0 L ${width} ${height} L 0 ${height} Z M 0 ${headerHeight} L ${width} ${headerHeight}`
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z M0,${headerHeight} L${width},${headerHeight}`
 }
 
 export function createUmlSwimlaneSeparatorPath(width: number, height: number): string {
-  const y = height / 2
-  return `M 0 ${y} L ${width} ${y}`
+  const y = Math.round(height / 2)
+  return `M0,${y} L${width},${y}`
+}
+
+// ==================== AWS 云服务路径函数 ====================
+
+export function createAwsVpcPath(width: number, height: number): string {
+  const cx = width / 2
+  const cy = height / 2
+  const r = Math.min(width, height) * 0.35
+  const smallR = r * 0.4
+
+  return `M${cx},${cy - r}
+    A${r},${r} 0 1,1 ${cx},${cy + r}
+    A${r},${r} 0 1,1 ${cx},${cy - r}
+    M${cx - smallR},${cy}
+    A${smallR},${smallR} 0 1,1 ${cx + smallR},${cy}
+    A${smallR},${smallR} 0 1,1 ${cx - smallR},${cy}
+    M${cx},${cy - smallR} L${cx},${cy - r * 0.7}
+    M${cx},${cy + smallR} L${cx},${cy + r * 0.7}
+    M${cx - smallR},${cy} L${cx - r * 0.7},${cy}
+    M${cx + smallR},${cy} L${cx + r * 0.7},${cy}`
+}
+
+export function createAwsElbPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const layerHeight = (height - margin * 2) / 3
+  const layerWidth = width - margin * 2
+  const arrowSize = Math.min(width, height) * 0.08
+  const cx = width / 2
+
+  let path = ''
+  for (let i = 0; i < 3; i++) {
+    const y = margin + i * layerHeight
+    const nextY = margin + (i + 1) * layerHeight
+    path += `M${margin},${y + layerHeight * 0.2} L${margin + layerWidth},${y + layerHeight * 0.2} L${margin + layerWidth},${y + layerHeight * 0.8} L${margin},${y + layerHeight * 0.8} Z`
+    if (i < 2) {
+      path += ` M${cx},${y + layerHeight * 0.8} L${cx},${nextY + layerHeight * 0.2}`
+      path += ` M${cx - arrowSize},${nextY + layerHeight * 0.2 - arrowSize} L${cx},${nextY + layerHeight * 0.2} L${cx + arrowSize},${nextY + layerHeight * 0.2 - arrowSize}`
+    }
+  }
+  return path
+}
+
+export function createAwsSqsPath(width: number, height: number): string {
+  const margin = width * 0.15
+  const queueWidth = (width - margin * 2) / 3
+  const queueHeight = height - margin * 2
+  const cx = width / 2
+
+  let path = ''
+  for (let i = 0; i < 3; i++) {
+    const x = margin + i * queueWidth
+    path += ` M${x},${margin} L${x + queueWidth * 0.8},${margin} L${x + queueWidth * 0.8},${margin + queueHeight} L${x},${margin + queueHeight} Z`
+  }
+  path += ` M${cx},${margin * 0.5} L${cx},${margin}`
+  path += ` M${cx - margin * 0.3},${margin * 0.8} L${cx},${margin * 0.5} L${cx + margin * 0.3},${margin * 0.8}`
+
+  return path
+}
+
+export function createAwsSnsPath(width: number, height: number): string {
+  const cx = width / 2
+  const cy = height * 0.6
+  const bellR = Math.min(width, height) * 0.25
+  const waveR = bellR * 1.5
+
+  return `M${cx},${cy - bellR}
+    Q${cx + bellR},${cy - bellR} ${cx + bellR},${cy}
+    L${cx + bellR * 0.3},${cy + bellR * 1.2}
+    L${cx - bellR * 0.3},${cy + bellR * 1.2}
+    L${cx - bellR},${cy}
+    Q${cx - bellR},${cy - bellR} ${cx},${cy - bellR}
+    M${cx},${cy - bellR} L${cx},${cy - bellR * 1.3}
+    M${cx + waveR},${cy - bellR * 0.5}
+    A${waveR * 0.3},${waveR * 0.3} 0 0,1 ${cx + waveR + waveR * 0.2},${cy - bellR * 0.5 - waveR * 0.2}
+    M${cx - waveR},${cy - bellR * 0.5}
+    A${waveR * 0.3},${waveR * 0.3} 0 0,0 ${cx - waveR - waveR * 0.2},${cy - bellR * 0.5 - waveR * 0.2}`
+}
+
+export function createAwsIamPath(width: number, height: number): string {
+  const cx = width / 2
+  const headR = Math.min(width, height) * 0.15
+  const headCy = height * 0.25
+  const bodyTop = headCy + headR + height * 0.05
+  const bodyBottom = height * 0.75
+  const shieldW = width * 0.25
+  const shieldH = height * 0.3
+  const shieldX = width * 0.65
+  const shieldY = height * 0.45
+
+  return `M${cx},${headCy - headR}
+    A${headR},${headR} 0 1,1 ${cx},${headCy + headR}
+    A${headR},${headR} 0 1,1 ${cx},${headCy - headR}
+    M${cx},${bodyTop} L${cx},${bodyBottom}
+    M${cx - width * 0.2},${bodyTop + (bodyBottom - bodyTop) * 0.3} L${cx + width * 0.2},${bodyTop + (bodyBottom - bodyTop) * 0.3}
+    M${shieldX},${shieldY}
+    Q${shieldX + shieldW / 2},${shieldY - shieldH * 0.2} ${shieldX + shieldW},${shieldY}
+    L${shieldX + shieldW},${shieldY + shieldH * 0.7}
+    Q${shieldX + shieldW / 2},${shieldY + shieldH} ${shieldX},${shieldY + shieldH * 0.7}
+    L${shieldX},${shieldY}
+    M${shieldX + shieldW * 0.5},${shieldY + shieldH * 0.3} L${shieldX + shieldW * 0.5},${shieldY + shieldH * 0.6}
+    M${shieldX + shieldW * 0.35},${shieldY + shieldH * 0.45} L${shieldX + shieldW * 0.65},${shieldY + shieldH * 0.45}`
+}
+
+export function createAwsCloudWatchPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const chartW = width - margin * 2
+  const chartH = height * 0.5
+  const chartY = height * 0.35
+  const cx = width / 2
+
+  const points = [
+    { x: margin, y: chartY + chartH },
+    { x: margin + chartW * 0.2, y: chartY + chartH * 0.6 },
+    { x: margin + chartW * 0.4, y: chartY + chartH * 0.8 },
+    { x: margin + chartW * 0.6, y: chartY + chartH * 0.3 },
+    { x: margin + chartW * 0.8, y: chartY + chartH * 0.5 },
+    { x: margin + chartW, y: chartY + chartH * 0.2 },
+  ]
+
+  let path = `M${points[0].x},${points[0].y}`
+  for (let i = 1; i < points.length; i++) {
+    path += ` L${points[i].x},${points[i].y}`
+  }
+
+  path += ` M${margin},${chartY + chartH} L${margin + chartW},${chartY + chartH}`
+  path += ` M${margin},${chartY} L${margin},${chartY + chartH}`
+
+  const dialR = Math.min(width, height) * 0.12
+  const dialY = height * 0.15
+  path += ` M${cx},${dialY}
+    A${dialR},${dialR} 0 1,1 ${cx},${dialY + 0.01}
+    M${cx},${dialY} L${cx + dialR * 0.6},${dialY - dialR * 0.3}`
+
+  return path
+}
+
+export function createAwsKinesisPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const waveCount = 3
+  const waveWidth = (width - margin * 2) / waveCount
+  const amplitude = height * 0.15
+  const cy = height / 2
+
+  let path = ''
+  for (let i = 0; i < waveCount; i++) {
+    const x1 = margin + i * waveWidth
+    const x2 = x1 + waveWidth / 2
+    const x3 = x1 + waveWidth
+    path += ` M${x1},${cy} Q${x2},${cy - amplitude} ${x3},${cy}`
+    path += ` M${x1},${cy} Q${x2},${cy + amplitude} ${x3},${cy}`
+  }
+
+  return path
+}
+
+export function createAwsEventBridgePath(width: number, height: number): string {
+  const cx = width / 2
+  const cy = height / 2
+  const centerR = Math.min(width, height) * 0.12
+  const spokeLength = Math.min(width, height) * 0.35
+  const spokeCount = 6
+
+  let path = `M${cx},${cy - centerR}
+    A${centerR},${centerR} 0 1,1 ${cx},${cy + centerR}
+    A${centerR},${centerR} 0 1,1 ${cx},${cy - centerR}`
+
+  for (let i = 0; i < spokeCount; i++) {
+    const angle = (i / spokeCount) * Math.PI * 2 - Math.PI / 2
+    const x1 = cx + Math.cos(angle) * centerR
+    const y1 = cy + Math.sin(angle) * centerR
+    const x2 = cx + Math.cos(angle) * spokeLength
+    const y2 = cy + Math.sin(angle) * spokeLength
+    path += ` M${x1},${y1} L${x2},${y2}`
+    path += ` M${x2},${y2 - 3} L${x2 + 3},${y2} L${x2},${y2 + 3}`
+  }
+
+  return path
+}
+
+export function createAwsStepFunctionsPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const stepWidth = (width - margin * 2) / 4
+  const stepHeight = height * 0.25
+  const cy = height / 2
+
+  let path = ''
+  for (let i = 0; i < 4; i++) {
+    const x = margin + i * stepWidth
+    const y = cy - stepHeight / 2
+    path += ` M${x + stepWidth * 0.1},${y} L${x + stepWidth * 0.9},${y} L${x + stepWidth * 0.9},${y + stepHeight} L${x + stepWidth * 0.1},${y + stepHeight} Z`
+    if (i < 3) {
+      path += ` M${x + stepWidth * 0.9},${cy} L${x + stepWidth},${cy}`
+      path += ` M${x + stepWidth - 4},${cy - 3} L${x + stepWidth},${cy} L${x + stepWidth - 4},${cy + 3}`
+    }
+  }
+
+  return path
+}
+
+export function createAwsCloudFormationPath(width: number, height: number): string {
+  const margin = width * 0.15
+  const boxSize = Math.min(width, height) * 0.25
+  const offset = boxSize * 0.3
+
+  return `M${margin},${margin + offset} L${margin + boxSize},${margin + offset} L${margin + boxSize},${margin + offset + boxSize} L${margin},${margin + offset + boxSize} Z
+    M${margin + offset},${margin} L${margin + offset + boxSize},${margin} L${margin + offset + boxSize},${margin + boxSize} L${margin + offset},${margin + boxSize} Z
+    M${margin + offset * 2},${margin - offset} L${margin + offset * 2 + boxSize},${margin - offset} L${margin + offset * 2 + boxSize},${margin - offset + boxSize} L${margin + offset * 2},${margin - offset + boxSize} Z`
+}
+
+// ==================== Azure 云服务路径函数 ====================
+
+export function createAzureVnetPath(width: number, height: number): string {
+  return createAwsVpcPath(width, height)
+}
+
+export function createAzureLoadBalancerPath(width: number, height: number): string {
+  return createAwsElbPath(width, height)
+}
+
+export function createAzureEventHubPath(width: number, height: number): string {
+  const cx = width / 2
+  const cy = height / 2
+  const hubR = Math.min(width, height) * 0.2
+  const spokeLength = Math.min(width, height) * 0.35
+
+  let path = `M${cx},${cy - hubR}
+    A${hubR},${hubR} 0 1,1 ${cx},${cy + hubR}
+    A${hubR},${hubR} 0 1,1 ${cx},${cy - hubR}`
+
+  const directions = [
+    { x: 0, y: -1 }, { x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 },
+  ]
+  directions.forEach(dir => {
+    const x1 = cx + dir.x * hubR
+    const y1 = cy + dir.y * hubR
+    const x2 = cx + dir.x * spokeLength
+    const y2 = cy + dir.y * spokeLength
+    path += ` M${x1},${y1} L${x2},${y2}`
+  })
+
+  return path
+}
+
+export function createAzureServiceBusPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const busY = height / 2
+  const busHeight = height * 0.15
+  const nodeCount = 4
+  const nodeSpacing = (width - margin * 2) / (nodeCount - 1)
+
+  let path = `M${margin},${busY - busHeight / 2} L${width - margin},${busY - busHeight / 2} L${width - margin},${busY + busHeight / 2} L${margin},${busY + busHeight / 2} Z`
+
+  for (let i = 0; i < nodeCount; i++) {
+    const x = margin + i * nodeSpacing
+    const nodeR = Math.min(width, height) * 0.08
+    path += ` M${x},${busY - nodeR}
+      A${nodeR},${nodeR} 0 1,1 ${x},${busY + nodeR}
+      A${nodeR},${nodeR} 0 1,1 ${x},${busY - nodeR}`
+  }
+
+  return path
+}
+
+export function createAzureKeyVaultPath(width: number, height: number): string {
+  const cx = width / 2
+  const shieldW = width * 0.35
+  const shieldH = height * 0.5
+  const shieldX = cx - shieldW / 2
+  const shieldY = height * 0.15
+
+  let path = `M${cx},${shieldY}
+    Q${shieldX + shieldW},${shieldY - shieldH * 0.1} ${shieldX + shieldW},${shieldY + shieldH * 0.3}
+    L${shieldX + shieldW},${shieldY + shieldH * 0.7}
+    Q${cx},${shieldY + shieldH} ${shieldX},${shieldY + shieldH * 0.7}
+    L${shieldX},${shieldY + shieldH * 0.3}
+    Q${shieldX},${shieldY - shieldH * 0.1} ${cx},${shieldY}
+    M${cx},${shieldY + shieldH * 0.35} L${cx},${shieldY + shieldH * 0.65}
+    M${cx - shieldW * 0.1},${shieldY + shieldH * 0.5} L${cx + shieldW * 0.1},${shieldY + shieldH * 0.5}`
+
+  const keyY = height * 0.75
+  const keyR = Math.min(width, height) * 0.08
+  path += ` M${cx - shieldW * 0.3},${keyY}
+    A${keyR},${keyR} 0 1,1 ${cx - shieldW * 0.3 + 0.01},${keyY}
+    L${cx + shieldW * 0.3},${keyY}
+    L${cx + shieldW * 0.3},${keyY + 3}
+    L${cx + shieldW * 0.25},${keyY + 3}
+    L${cx + shieldW * 0.25},${keyY - 2}
+    L${cx + shieldW * 0.2},${keyY - 2}
+    L${cx + shieldW * 0.2},${keyY}`
+
+  return path
+}
+
+export function createAzureLogicAppsPath(width: number, height: number): string {
+  const margin = width * 0.15
+  const puzzleSize = Math.min(width, height) * 0.25
+  const gap = puzzleSize * 0.2
+
+  const positions = [
+    { x: margin, y: margin },
+    { x: margin + puzzleSize + gap, y: margin },
+    { x: margin, y: margin + puzzleSize + gap },
+    { x: margin + puzzleSize + gap, y: margin + puzzleSize + gap },
+  ]
+
+  let path = ''
+  positions.forEach((pos, i) => {
+    const inset = puzzleSize * 0.15
+    if (i === 0) {
+      path += ` M${pos.x},${pos.y} L${pos.x + puzzleSize},${pos.y} L${pos.x + puzzleSize},${pos.y + puzzleSize} L${pos.x},${pos.y + puzzleSize} Z`
+    } else {
+      path += ` M${pos.x + inset},${pos.y} L${pos.x + puzzleSize - inset},${pos.y} L${pos.x + puzzleSize},${pos.y + inset} L${pos.x + puzzleSize},${pos.y + puzzleSize - inset} L${pos.x + puzzleSize - inset},${pos.y + puzzleSize} L${pos.x + inset},${pos.y + puzzleSize} L${pos.x},${pos.y + puzzleSize - inset} L${pos.x},${pos.y + inset} Z`
+    }
+  })
+
+  return path
+}
+
+export function createAzureEventGridPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const rows = 3
+  const cols = 3
+  const cellW = (width - margin * 2) / cols
+  const cellH = (height - margin * 2) / rows
+
+  let path = ''
+  for (let row = 0; row <= rows; row++) {
+    const y = margin + row * cellH
+    path += ` M${margin},${y} L${width - margin},${y}`
+  }
+  for (let col = 0; col <= cols; col++) {
+    const x = margin + col * cellW
+    path += ` M${x},${margin} L${x},${height - margin}`
+  }
+
+  return path
+}
+
+export function createAzureDevOpsPath(width: number, height: number): string {
+  const cx = width / 2
+  const cy = height / 2
+  const r = Math.min(width, height) * 0.3
+
+  return `M${cx - r},${cy}
+    A${r},${r} 0 1,0 ${cx + r},${cy}
+    A${r},${r} 0 1,0 ${cx - r},${cy}
+    M${cx - r * 0.5},${cy - r * 0.3}
+    L${cx + r * 0.5},${cy + r * 0.3}
+    M${cx - r * 0.5},${cy + r * 0.3}
+    L${cx + r * 0.5},${cy - r * 0.3}`
+}
+
+// ==================== GCP 云服务路径函数 ====================
+
+export function createGcpVpcPath(width: number, height: number): string {
+  return createAwsVpcPath(width, height)
+}
+
+export function createGcpLoadBalancerPath(width: number, height: number): string {
+  return createAwsElbPath(width, height)
+}
+
+export function createGcpPubSubPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const pubW = width * 0.25
+  const pubH = height * 0.3
+  const subW = width * 0.25
+  const subH = height * 0.3
+  const arrowSize = Math.min(width, height) * 0.05
+
+  const pubX = margin
+  const pubY = height * 0.1
+  const subX = width - margin - subW
+  const subY = height * 0.6
+
+  return `M${pubX},${pubY} L${pubX + pubW},${pubY} L${pubX + pubW},${pubY + pubH} L${pubX},${pubY + pubH} Z
+    M${subX},${subY} L${subX + subW},${subY} L${subX + subW},${subY + subH} L${subX},${subY + subH} Z
+    M${pubX + pubW},${pubY + pubH / 2} L${subX},${subY + subH / 2}
+    M${subX - arrowSize},${subY + subH / 2 - arrowSize} L${subX},${subY + subH / 2} L${subX - arrowSize},${subY + subH / 2 + arrowSize}
+    M${pubX + pubW / 2},${pubY - margin * 0.5} L${pubX + pubW / 2},${pubY}
+    M${pubX + pubW / 2 - arrowSize},${pubY - margin * 0.5 + arrowSize} L${pubX + pubW / 2},${pubY - margin * 0.5} L${pubX + pubW / 2 + arrowSize},${pubY - margin * 0.5 + arrowSize}`
+}
+
+export function createGcpDataflowPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const pipeY = height / 2
+  const pipeHeight = height * 0.15
+  const waveCount = 4
+  const waveWidth = (width - margin * 2) / waveCount
+
+  let path = `M${margin},${pipeY - pipeHeight / 2} L${width - margin},${pipeY - pipeHeight / 2} L${width - margin},${pipeY + pipeHeight / 2} L${margin},${pipeY + pipeHeight / 2} Z`
+
+  for (let i = 0; i < waveCount; i++) {
+    const x = margin + i * waveWidth + waveWidth / 2
+    path += ` M${x},${pipeY - pipeHeight / 2} L${x + waveWidth * 0.3},${pipeY}`
+    path += ` M${x},${pipeY + pipeHeight / 2} L${x + waveWidth * 0.3},${pipeY}`
+  }
+
+  return path
+}
+
+// ==================== 阿里云/腾讯云路径函数 ====================
+
+export function createAliyunVpcPath(width: number, height: number): string {
+  return createAwsVpcPath(width, height)
+}
+
+export function createAliyunSlbPath(width: number, height: number): string {
+  return createAwsElbPath(width, height)
+}
+
+export function createAliyunRocketMqPath(width: number, height: number): string {
+  const margin = width * 0.1
+  const rocketW = width * 0.3
+  const rocketH = height * 0.5
+  const rocketX = margin
+  const rocketY = height * 0.25
+  const queueX = width - margin - rocketW
+
+  return `M${rocketX + rocketW * 0.5},${rocketY}
+    L${rocketX + rocketW},${rocketY + rocketH * 0.3}
+    L${rocketX + rocketW * 0.7},${rocketY + rocketH * 0.3}
+    L${rocketX + rocketW * 0.7},${rocketY + rocketH}
+    L${rocketX + rocketW * 0.3},${rocketY + rocketH}
+    L${rocketX + rocketW * 0.3},${rocketY + rocketH * 0.3}
+    L${rocketX},${rocketY + rocketH * 0.3}
+    Z
+    M${rocketX + rocketW * 0.5},${rocketY - margin * 0.3} L${rocketX + rocketW * 0.5},${rocketY}
+    M${queueX},${rocketY} L${queueX + rocketW},${rocketY} L${queueX + rocketW},${rocketY + rocketH} L${queueX},${rocketY + rocketH} Z
+    M${queueX + rocketW},${rocketY + rocketH * 0.5} L${queueX + rocketW + margin * 0.5},${rocketY + rocketH * 0.5}`
+}
+
+export function createTencentClbPath(width: number, height: number): string {
+  return createAwsElbPath(width, height)
+}
+
+export function createTencentCmqPath(width: number, height: number): string {
+  return createAwsSqsPath(width, height)
+}
+
+export function createTencentClsPath(width: number, height: number): string {
+  const margin = width * 0.15
+  const fileW = width * 0.35
+  const fileH = height * 0.6
+  const foldSize = fileW * 0.25
+
+  return `M${margin},${margin}
+    L${margin + fileW - foldSize},${margin}
+    L${margin + fileW},${margin + foldSize}
+    L${margin + fileW},${margin + fileH}
+    L${margin},${margin + fileH}
+    Z
+    M${margin + fileW - foldSize},${margin} L${margin + fileW - foldSize},${margin + foldSize} L${margin + fileW},${margin + foldSize}
+    M${margin + fileW * 1.3},${margin + fileH * 0.3} L${margin + fileW * 1.6},${margin + fileH * 0.3}
+    M${margin + fileW * 1.3},${margin + fileH * 0.5} L${margin + fileW * 1.6},${margin + fileH * 0.5}
+    M${margin + fileW * 1.3},${margin + fileH * 0.7} L${margin + fileW * 1.6},${margin + fileH * 0.7}`
+}
+
+// ==================== 通用云服务路径函数 ====================
+
+export function createCloudLoadBalancerPath(width: number, height: number): string {
+  return createAwsElbPath(width, height)
+}
+
+export function createCloudMqPath(width: number, height: number): string {
+  return createAwsSqsPath(width, height)
 }
