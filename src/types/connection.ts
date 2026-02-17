@@ -9,6 +9,7 @@ export interface ConnectionPoint {
   isConnected: boolean
   connectedLineIds: string[]
   isDynamic?: boolean
+  isCustom?: boolean
 }
 
 export type ConnectorStyle = 'straight' | 'orthogonal' | 'curved' | 'bezier' | 'metro' | 'manhattan'

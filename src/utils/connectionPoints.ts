@@ -339,6 +339,22 @@ export function getX6PortGroups() {
         },
       },
     },
+    custom: {
+      position: {
+        name: 'absolute',
+        args: { x: 0.5, y: 0 },
+      },
+      attrs: {
+        circle: {
+          r: 6,
+          magnet: true,
+          stroke: '#52c41a',
+          strokeWidth: 2,
+          fill: '#fff',
+          opacity: 0.8,
+        },
+      },
+    },
   }
 }
 
@@ -397,4 +413,180 @@ export function clearPendingPortVisibility() {
     portVisibilityTimer = null
   }
   pendingPortVisibility.clear()
+}
+
+/**
+ * 检查点是否在节点边缘附近
+ */
+export function isNearNodeEdge(
+  node: any,
+  clientX: number,
+  clientY: number,
+  threshold: number = 15
+): boolean {
+  const position = node.getPosition()
+  const size = node.getSize()
+  
+  const x = position.x
+  const y = position.y
+  const width = size.width
+  const height = size.height
+
+  const inBounds = clientX >= x - threshold &&
+    clientX <= x + width + threshold &&
+    clientY >= y - threshold &&
+    clientY <= y + height + threshold
+
+  if (!inBounds) return false
+
+  const nearEdge = clientX <= x + threshold ||
+    clientX >= x + width - threshold ||
+    clientY <= y + threshold ||
+    clientY >= y + height - threshold
+
+  return nearEdge
+}
+
+/**
+ * 计算鼠标位置对应的图形边缘坐标（相对于节点）
+ */
+export function getEdgePointFromMouse(
+  node: any,
+  clientX: number,
+  clientY: number
+): { x: number; y: number; edge: 'top' | 'bottom' | 'left' | 'right' } | null {
+  const position = node.getPosition()
+  const size = node.getSize()
+  
+  const nodeX = position.x
+  const nodeY = position.y
+  const width = size.width
+  const height = size.height
+
+  const distances = [
+    { edge: 'top' as const, distance: Math.abs(clientY - nodeY), x: clientX, y: nodeY },
+    { edge: 'bottom' as const, distance: Math.abs(clientY - (nodeY + height)), x: clientX, y: nodeY + height },
+    { edge: 'left' as const, distance: Math.abs(clientX - nodeX), x: nodeX, y: clientY },
+    { edge: 'right' as const, distance: Math.abs(clientX - (nodeX + width)), x: nodeX + width, y: clientY },
+  ]
+
+  const nearest = distances.reduce((min, current) => 
+    current.distance < min.distance ? current : min
+  )
+
+  let finalX = nearest.x
+  let finalY = nearest.y
+
+  if (nearest.edge === 'top' || nearest.edge === 'bottom') {
+    finalX = Math.max(nodeX, Math.min(nodeX + width, clientX))
+  } else {
+    finalY = Math.max(nodeY, Math.min(nodeY + height, clientY))
+  }
+
+  const relativeX = (finalX - nodeX) / width
+  const relativeY = (finalY - nodeY) / height
+
+  return {
+    x: relativeX,
+    y: relativeY,
+    edge: nearest.edge,
+  }
+}
+
+/**
+ * 动态添加自定义 Port 到节点
+ */
+export function addCustomPort(
+  node: any,
+  relativeX: number,
+  relativeY: number
+): { id: string; x: number; y: number } {
+  const portId = `custom-${uuidv4()}`
+  const size = node.getSize()
+  
+  const absoluteX = relativeX * size.width
+  const absoluteY = relativeY * size.height
+
+  node.addPort({
+    id: portId,
+    group: 'custom',
+    args: {
+      x: absoluteX,
+      y: absoluteY,
+    },
+    attrs: {
+      circle: {
+        r: 6,
+        magnet: true,
+        stroke: '#52c41a',
+        strokeWidth: 2,
+        fill: '#fff',
+        opacity: 1,
+      },
+    },
+  })
+
+  return {
+    id: portId,
+    x: relativeX,
+    y: relativeY,
+  }
+}
+
+/**
+ * 删除自定义 Port
+ */
+export function removeCustomPort(node: any, portId: string): boolean {
+  const port = node.getPort(portId)
+  if (port && portId.startsWith('custom-')) {
+    node.removePort(portId)
+    return true
+  }
+  return false
+}
+
+/**
+ * 创建自定义连接点数据
+ */
+export function createCustomConnectionPoint(
+  relativeX: number,
+  relativeY: number
+): ConnectionPoint {
+  return {
+    id: `custom-${uuidv4()}`,
+    x: relativeX,
+    y: relativeY,
+    position: 'custom',
+    isVisible: true,
+    isConnected: false,
+    connectedLineIds: [],
+    isDynamic: false,
+    isCustom: true,
+  }
+}
+
+/**
+ * 更新 showPorts 函数以支持 custom 组
+ */
+export function showPortsWithCustom(node: any, visible: boolean) {
+  const ports = node.getPorts()
+  if (ports.length === 0) return
+
+  const opacity = visible ? 1 : 0.3
+  
+  const groups: Record<string, { attrs: { circle: { opacity: number } } }> = {
+    top: { attrs: { circle: { opacity } } },
+    bottom: { attrs: { circle: { opacity } } },
+    left: { attrs: { circle: { opacity } } },
+    right: { attrs: { circle: { opacity } } },
+  }
+
+  const hasCustomPorts = ports.some((p: any) => p.id?.startsWith('custom-'))
+  if (hasCustomPorts) {
+    groups.custom = { attrs: { circle: { opacity: visible ? 1 : 0.5 } } }
+  }
+
+  node.attr({
+    ports: { groups },
+  })
 }
