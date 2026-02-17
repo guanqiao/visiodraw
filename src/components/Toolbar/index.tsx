@@ -40,6 +40,7 @@ import {
   CodeOutlined,
   DatabaseOutlined,
   ImportOutlined,
+  AimOutlined,
 } from '@ant-design/icons'
 import { HandIcon } from './HandIcon'
 import { Button, Space, Divider, Tooltip, Dropdown } from 'antd'
@@ -341,6 +342,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
               type={currentTool === 'triangle' ? 'primary' : 'default'}
               icon={<WarningOutlined />}
               onClick={() => handleToolClick('triangle')}
+              className={styles.toolbarButton}
+            />
+          </Tooltip>
+          <Tooltip title="连接点工具 (Ctrl+Shift+1) - 点击图形添加连接点">
+            <Button
+              data-testid="tool-connection-point"
+              type={currentTool === 'connection-point' ? 'primary' : 'default'}
+              icon={<AimOutlined />}
+              onClick={() => handleToolClick('connection-point')}
               className={styles.toolbarButton}
             />
           </Tooltip>

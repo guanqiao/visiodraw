@@ -352,6 +352,27 @@ export function getNodeColors(type: string): { fill: string; stroke: string; tex
       return { fill: '#f5f5f5', stroke: '#434343', text: theme.textColor }
     case 'mermaid-circle':
       return { fill: '#f0f5ff', stroke: '#2f54eb', text: theme.textColor }
+    case 'mermaid-cloud':
+      return { fill: '#f0f5ff', stroke: '#2f54eb', text: theme.textColor }
+    case 'mermaid-banner':
+      return { fill: '#fff4dd', stroke: '#d4b46a', text: theme.textColor }
+    case 'mermaid-document':
+      return { fill: '#fffbe6', stroke: '#fadb14', text: theme.textColor }
+    case 'mermaid-delay':
+      return { fill: '#f6ffed', stroke: '#52c41a', text: theme.textColor }
+    case 'mermaid-lightning':
+      return { fill: '#fff7e6', stroke: '#fa8c16', text: theme.textColor }
+    case 'mermaid-lean-left':
+    case 'mermaid-lean-right':
+      return { fill: '#f9f0ff', stroke: '#722ed1', text: theme.textColor }
+    case 'mermaid-divided-rect':
+      return { fill: '#e6f7ff', stroke: '#1890ff', text: theme.textColor }
+    case 'mermaid-lined-document':
+      return { fill: '#fffbe6', stroke: '#fadb14', text: theme.textColor }
+    case 'mermaid-stadium-end':
+      return { fill: '#e6fffb', stroke: '#13c2c2', text: theme.textColor }
+    case 'mermaid-label-rect':
+      return { fill: '#f0f5ff', stroke: '#2f54eb', text: theme.textColor }
     case 'uml-class':
       return { fill: theme.nodeBkg, stroke: theme.nodeBorder, text: theme.textColor }
     case 'uml-lifeline':

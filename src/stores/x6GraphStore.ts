@@ -311,6 +311,8 @@ const useX6GraphStore = create<X6GraphState>()(
         const { graph, zoom: currentZoom } = get()
         const newZoom = typeof zoomOrFn === 'function' ? zoomOrFn(currentZoom) : zoomOrFn
 
+        if (newZoom === currentZoom) return
+
         if (graph) {
           graph.zoomTo(newZoom)
         }

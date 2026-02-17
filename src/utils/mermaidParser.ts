@@ -450,7 +450,11 @@ function getActivityNodeType(bracket: string, fullText: string = ''): string {
       'cylinder': 'mermaid-cylinder',
       'hexagon': 'mermaid-hexagon',
       'parallelogram': 'mermaid-parallelogram-left',
+      'parallelogram-l': 'mermaid-parallelogram-left',
+      'parallelogram-r': 'mermaid-parallelogram-right',
       'trapezoid': 'mermaid-trapezoid-top',
+      'trapezoid-top': 'mermaid-trapezoid-top',
+      'trapezoid-bottom': 'mermaid-trapezoid-bottom',
       'subroutine': 'mermaid-subroutine',
       'circle': 'mermaid-circle',
       'doublecircle': 'mermaid-double-circle',
@@ -460,6 +464,17 @@ function getActivityNodeType(bracket: string, fullText: string = ''): string {
       'rect': 'uml-action',
       'rectangle': 'uml-action',
       'roundrect': 'uml-initial',
+      'cloud': 'mermaid-cloud',
+      'banner': 'mermaid-banner',
+      'document': 'mermaid-document',
+      'delay': 'mermaid-delay',
+      'lightning': 'mermaid-lightning',
+      'lean-l': 'mermaid-lean-left',
+      'lean-r': 'mermaid-lean-right',
+      'divided': 'mermaid-divided-rect',
+      'lined-doc': 'mermaid-lined-document',
+      'stadium-end': 'mermaid-stadium-end',
+      'label': 'mermaid-label-rect',
     }
     return shapeMap[shapeName] || 'uml-action'
   }
@@ -479,6 +494,12 @@ function getActivityNodeType(bracket: string, fullText: string = ''): string {
   if (fullText.includes('{{') && fullText.includes('}}')) {
     return 'mermaid-hexagon'
   }
+  if (fullText.includes('[\\') && fullText.includes('/]')) {
+    return 'mermaid-trapezoid-top'
+  }
+  if (fullText.includes('[/') && fullText.includes('\\]')) {
+    return 'mermaid-trapezoid-bottom'
+  }
 
   switch (bracket) {
     case '(':
@@ -493,6 +514,8 @@ function getActivityNodeType(bracket: string, fullText: string = ''): string {
       return 'mermaid-asymmetric'
     case '[/':
       return 'mermaid-parallelogram-left'
+    case '[\\':
+      return 'mermaid-parallelogram-right'
     case '((':
       return 'mermaid-circle'
     case '[[':

@@ -344,20 +344,13 @@ export function getX6PortGroups() {
         name: 'absolute',
         args: { x: 0.5, y: 0 },
       },
-      markup: [
-        {
-          tagName: 'path',
-          selector: 'xmark',
-        },
-      ],
       attrs: {
-        xmark: {
-          d: 'M-5,-5 L5,5 M-5,5 L5,-5',
+        circle: {
+          r: 6,
+          magnet: true,
           stroke: '#52c41a',
           strokeWidth: 2,
-          strokeLinecap: 'round',
-          fill: 'none',
-          magnet: true,
+          fill: '#fff',
           opacity: 0.9,
         },
       },
@@ -548,20 +541,13 @@ export function addCustomPort(
       x: absoluteX,
       y: absoluteY,
     },
-    markup: [
-      {
-        tagName: 'path',
-        selector: 'xmark',
-      },
-    ],
     attrs: {
-      xmark: {
-        d: 'M-5,-5 L5,5 M-5,5 L5,-5',
+      circle: {
+        r: 6,
+        magnet: true,
         stroke: '#52c41a',
         strokeWidth: 2,
-        strokeLinecap: 'round',
-        fill: 'none',
-        magnet: true,
+        fill: '#fff',
         opacity: 1,
       },
     },
@@ -654,7 +640,7 @@ export function showPortsWithCustom(node: any, visible: boolean) {
   if (hasCustomPorts) {
     node.getPorts().forEach((p: any) => {
       if (p.id?.startsWith('custom-')) {
-        node.setPortProp(p.id, 'attrs/xmark/opacity', visible ? 1 : 0.5)
+        node.setPortProp(p.id, 'attrs/circle/opacity', visible ? 1 : 0.5)
       }
     })
   }
