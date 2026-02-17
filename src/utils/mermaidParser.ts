@@ -156,20 +156,42 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
     }
 
     // 解析节点定义: A[text] 或 A{text} 或 A((text)) 或 A([text]) 等
-    const nodeMatch = line.match(/^(\w+)\s*((?:\[\/)?\[|\(|\{|\(\(|\(\[|<)\s*([^\]]+)\s*(\]|\)|\}|\)\)|\]>)?\s*(?:-->.*)?$/)
-    if (nodeMatch) {
-      const [, nodeId, openBracket, text] = nodeMatch
+    // 支持新语法: A@{ shape: stadium }
+    const nodeMatch = line.match(/^(\w+)\s*((?:\[\/)?\[|\(|\{|\(\(|\(\[|<|\[\[|\[\(|\[\\/|\\/\]|\{\{)\s*([^\]]*)\s*(\]|\)|\}|\)\)|\]\)|\]\]|\}\})?\s*(?:-->.*)?$/)
+    const newSyntaxMatch = line.match(/^(\w+)\s*@\{\s*shape:\s*\w+\s*\}\s*(?:-->.*)?$/)
+
+    if (nodeMatch || newSyntaxMatch) {
+      let nodeId: string
+      let openBracket: string
+      let text: string
+      let fullLine: string
+
+      if (newSyntaxMatch) {
+        // 新语法: A@{ shape: xxx }
+        const match = line.match(/^(\w+)\s*@\{\s*shape:\s*(\w+)\s*\}(?:\s*:\s*(.+))?$/)
+        if (match) {
+          [, nodeId, , text = ''] = match
+          openBracket = ''
+          fullLine = line
+        } else {
+          continue
+        }
+      } else {
+        // 传统语法
+        [, nodeId, openBracket, text] = nodeMatch!
+        fullLine = line
+      }
 
       if (!nodeMap.has(nodeId)) {
-        const nodeType = getActivityNodeType(openBracket)
-        const node = createActivityNode(nodeId, text.trim(), direction, nodes.length, nodeType)
+        const nodeType = getActivityNodeType(openBracket, fullLine)
+        const node = createActivityNode(nodeId, text?.trim() || nodeId, direction, nodes.length, nodeType)
         nodes.push(node)
         nodeMap.set(nodeId, node)
       } else {
         // 更新现有节点的文本和类型
         const existingNode = nodeMap.get(nodeId)!
-        existingNode.text = text.trim()
-        existingNode.type = getActivityNodeType(openBracket)
+        existingNode.text = text?.trim() || nodeId
+        existingNode.type = getActivityNodeType(openBracket, fullLine)
       }
     }
   }
@@ -225,13 +247,58 @@ function createActivityNode(
       height = 30
       break
     case 'uml-decision':
-      width = 60
-      height = 60
+    case 'mermaid-rhombus':
+      width = 80
+      height = 80
       break
     case 'uml-fork':
       width = 20
       height = 80
       break
+    case 'mermaid-stadium':
+      width = 120
+      height = 50
+      break
+    case 'mermaid-cylinder':
+      width = 100
+      height = 70
+      break
+    case 'mermaid-hexagon':
+      width = 110
+      height = 70
+      break
+    case 'mermaid-parallelogram-left':
+    case 'mermaid-parallelogram-right':
+      width = 120
+      height = 60
+      break
+    case 'mermaid-trapezoid-top':
+    case 'mermaid-trapezoid-bottom':
+      width = 120
+      height = 60
+      break
+    case 'mermaid-subroutine':
+      width = 120
+      height = 60
+      break
+    case 'mermaid-double-circle':
+      width = 60
+      height = 60
+      break
+    case 'mermaid-asymmetric':
+      width = 120
+      height = 50
+      break
+    case 'mermaid-circle':
+      width = 60
+      height = 60
+      break
+  }
+
+  // 根据文本长度调整宽度
+  const textLength = text.length
+  if (textLength > 10) {
+    width = Math.max(width, textLength * 10 + 20)
   }
 
   // 使用主题颜色
@@ -253,25 +320,59 @@ function createActivityNode(
 
 /**
  * 根据括号类型获取活动图节点类型
+ * 支持Mermaid Flowchart所有标准形状
  */
-function getActivityNodeType(bracket: string): string {
+function getActivityNodeType(bracket: string, fullText: string = ''): string {
+  // 检查新的语法格式: A@{ shape: stadium }
+  const newSyntaxMatch = fullText.match(/@\{\s*shape:\s*(\w+)\s*\}/)
+  if (newSyntaxMatch) {
+    const shapeName = newSyntaxMatch[1].toLowerCase()
+    const shapeMap: Record<string, string> = {
+      'stadium': 'mermaid-stadium',
+      'cylinder': 'mermaid-cylinder',
+      'hexagon': 'mermaid-hexagon',
+      'parallelogram': 'mermaid-parallelogram-left',
+      'trapezoid': 'mermaid-trapezoid-top',
+      'subroutine': 'mermaid-subroutine',
+      'circle': 'mermaid-circle',
+      'doublecircle': 'mermaid-double-circle',
+      'asymmetric': 'mermaid-asymmetric',
+      'rhombus': 'mermaid-rhombus',
+      'diamond': 'mermaid-rhombus',
+      'rect': 'uml-action',
+      'rectangle': 'uml-action',
+      'roundrect': 'uml-initial',
+    }
+    return shapeMap[shapeName] || 'uml-action'
+  }
+
   switch (bracket) {
     case '(':
       return 'uml-initial' // 圆角矩形作为开始/结束
     case '([':
-      return 'uml-initial' //  stadium 形状作为开始/结束
+      return 'mermaid-stadium' // stadium 形状
     case '{':
-      return 'uml-decision' // 菱形作为判断
+      return 'mermaid-rhombus' // 菱形作为判断
     case '(((':
-      return 'uml-initial' // 圆形
+      return 'mermaid-double-circle' // 双圆
     case '>':
-      return 'uml-signal-send' // 不对称形状
+      return 'mermaid-asymmetric' // 不对称形状
     case '[/':
-      return 'uml-action' // 平行四边形
+      return 'mermaid-parallelogram-left' // 平行四边形左斜
+    case '\\[':
+      return 'mermaid-parallelogram-right' // 平行四边形右斜
+    case '[\\/':
+      return 'mermaid-trapezoid-top' // 梯形上宽下窄
+    case '\\/]':
+      return 'mermaid-trapezoid-bottom' // 梯形上窄下宽
     case '((':
-      return 'uml-initial' // 双圆
-    case '([':
-      return 'uml-initial' // stadium
+      return 'mermaid-circle' // 圆形
+    case '[[':
+      return 'mermaid-subroutine' // 子程序双边框
+    case '[(]':
+      return 'mermaid-cylinder' // 圆柱形/数据库
+    case '{{':
+      return 'mermaid-hexagon' // 六边形
     default:
       // 检查是否是方括号
       if (bracket === '[' || bracket?.startsWith('[')) {

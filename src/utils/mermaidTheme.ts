@@ -373,6 +373,7 @@ export function getNodeColors(type: string): { fill: string; stroke: string; tex
     case 'end':
       return { fill: '#f5222d', stroke: '#f5222d', text: '#fff' }
     case 'uml-decision':
+    case 'mermaid-rhombus':
       return { fill: '#fff7e6', stroke: '#fa8c16', text: theme.textColor }
     case 'uml-fork':
     case 'uml-join':
@@ -392,6 +393,27 @@ export function getNodeColors(type: string): { fill: string; stroke: string; tex
     case 'er-table-entity':
     case 'er-table-entity-with-columns':
       return { fill: '#e6f7ff', stroke: '#1890ff', text: theme.textColor }
+    // Mermaid 特定形状
+    case 'mermaid-stadium':
+      return { fill: '#e6fffb', stroke: '#13c2c2', text: theme.textColor }
+    case 'mermaid-cylinder':
+      return { fill: '#f6ffed', stroke: '#52c41a', text: theme.textColor }
+    case 'mermaid-hexagon':
+      return { fill: '#fff2e8', stroke: '#fa8c16', text: theme.textColor }
+    case 'mermaid-parallelogram-left':
+    case 'mermaid-parallelogram-right':
+      return { fill: '#f9f0ff', stroke: '#722ed1', text: theme.textColor }
+    case 'mermaid-trapezoid-top':
+    case 'mermaid-trapezoid-bottom':
+      return { fill: '#fff0f6', stroke: '#eb2f96', text: theme.textColor }
+    case 'mermaid-subroutine':
+      return { fill: '#e6f7ff', stroke: '#1890ff', text: theme.textColor }
+    case 'mermaid-double-circle':
+      return { fill: '#fff7e6', stroke: '#fa8c16', text: theme.textColor }
+    case 'mermaid-asymmetric':
+      return { fill: '#f5f5f5', stroke: '#434343', text: theme.textColor }
+    case 'mermaid-circle':
+      return { fill: '#f0f5ff', stroke: '#2f54eb', text: theme.textColor }
     default:
       return {
         fill: theme.nodeBkg,

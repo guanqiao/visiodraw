@@ -95,6 +95,8 @@ export const useGraphEvents = (options: UseGraphEventsOptions) => {
     }
 
     const handleNodeResized = ({ node }: { node: Node }) => {
+      console.log(`[handleNodeResized] node.id: ${node.id}, node.shape: ${node.shape}`)
+      console.log(`[handleNodeResized] node.getData():`, node.getData())
       onNodeResized(node.id, node.size().width, node.size().height)
       if (needsPathUpdate(node)) {
         updateNodePathOnResize(node)

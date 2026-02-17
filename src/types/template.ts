@@ -17,6 +17,6 @@ export interface TemplateRegistry {
   getCustomTemplates(): Template[]
   saveCustomTemplate(template: Omit<Template, 'id'>): Template
   deleteCustomTemplate(id: string): void
-  importTemplate(template: Template): void
+  importTemplate(json: string): Template | null
   exportTemplate(id: string): string
 }

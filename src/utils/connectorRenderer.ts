@@ -7,6 +7,7 @@ import type {
 } from '../types/connection'
 import { connectorMarkers } from '../types/connection'
 import { getConnectorRouter } from './connectorRouter'
+import { getCurrentTheme } from './mermaidTheme'
 
 export interface EdgeAttributes {
   line: {
@@ -40,7 +41,42 @@ export class ConnectorRenderer {
    * Convert connector data to X6 edge configuration
    */
   static toX6Edge(connector: Connector): X6EdgeConfig {
-    const router = getConnectorRouter()
+    const style: ConnectorStyle = connector.style || 'orthogonal'
+
+    // X6 内置 router 配置
+    const routerConfig = (() => {
+      switch (style) {
+        case 'orthogonal':
+        case 'manhattan':
+          return { name: 'manhattan' }
+        case 'metro':
+          return { name: 'metro' }
+        case 'curved':
+          return { name: 'er' }
+        case 'bezier':
+          return { name: 'normal' }
+        case 'straight':
+        default:
+          return undefined
+      }
+    })()
+
+    // X6 内置 connector 配置
+    const connectorConfig = (() => {
+      switch (style) {
+        case 'bezier':
+          return { name: 'smooth' }
+        case 'curved':
+          return { name: 'rounded' }
+        case 'orthogonal':
+        case 'manhattan':
+        case 'metro':
+          return { name: 'rounded' }
+        case 'straight':
+        default:
+          return undefined
+      }
+    })()
 
     return {
       id: connector.id,
@@ -52,8 +88,8 @@ export class ConnectorRenderer {
         cell: connector.targetShapeId,
         port: connector.targetPointId,
       },
-      router: router.getRouterConfig(connector.style),
-      connector: router.getConnectorConfig(connector.style),
+      router: routerConfig,
+      connector: connectorConfig,
       attrs: this.buildEdgeAttributes(connector),
       labels: this.buildLabels(connector.labels),
       data: { fromStore: true },
@@ -64,23 +100,26 @@ export class ConnectorRenderer {
    * Build edge attributes for X6
    */
   private static buildEdgeAttributes(connector: Connector): EdgeAttributes {
+    const theme = getCurrentTheme()
     const attrs: EdgeAttributes = {
       line: {
-        stroke: connector.stroke || '#333333',
+        stroke: connector.stroke || theme.lineColor,
         strokeWidth: connector.strokeWidth || 2,
       },
     }
 
-    // Apply line style
+    // Apply line style - Mermaid style
     if (connector.lineStyle === 'dashed') {
-      attrs.line.strokeDasharray = '5,5'
+      // Mermaid 虚线样式: 长虚线
+      attrs.line.strokeDasharray = '8,4'
     } else if (connector.lineStyle === 'dotted') {
-      attrs.line.strokeDasharray = '2,2'
+      // Mermaid 点线样式
+      attrs.line.strokeDasharray = '2,4'
     }
 
-    // Apply markers
-    const targetMarker = connectorMarkers[connector.endStyle]
-    const sourceMarker = connectorMarkers[connector.startStyle]
+    // Apply markers with Mermaid style
+    const targetMarker = this.getMermaidMarker(connector.endStyle)
+    const sourceMarker = this.getMermaidMarker(connector.startStyle)
 
     if (targetMarker) {
       attrs.line.targetMarker = targetMarker
@@ -91,6 +130,66 @@ export class ConnectorRenderer {
     }
 
     return attrs
+  }
+
+  /**
+   * Get Mermaid style marker
+   */
+  private static getMermaidMarker(style: ConnectorEndStyle): any {
+    const theme = getCurrentTheme()
+    
+    switch (style) {
+      case 'arrow':
+        return {
+          name: 'classic',
+          width: 12,
+          height: 12,
+          fill: theme.lineColor,
+          stroke: theme.lineColor,
+        }
+      case 'dot':
+        return {
+          name: 'circle',
+          r: 4,
+          fill: theme.lineColor,
+          stroke: theme.lineColor,
+          strokeWidth: 1,
+        }
+      case 'diamond':
+        return {
+          name: 'diamond',
+          width: 10,
+          height: 10,
+          fill: theme.lineColor,
+          stroke: theme.lineColor,
+        }
+      case 'circle':
+        return {
+          name: 'circle',
+          r: 4,
+          fill: 'white',
+          stroke: theme.lineColor,
+          strokeWidth: 2,
+        }
+      case 'triangle':
+        return {
+          name: 'block',
+          width: 12,
+          height: 12,
+          fill: theme.lineColor,
+        }
+      case 'open-arrow':
+        return {
+          name: 'open',
+          width: 12,
+          height: 12,
+          stroke: theme.lineColor,
+          strokeWidth: 2,
+        }
+      case 'none':
+      default:
+        return null
+    }
   }
 
   /**

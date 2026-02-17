@@ -8,6 +8,7 @@ import { bpmnRenderers } from './bpmn'
 import { cloudRenderers } from './cloud'
 import { renderDatabase } from './flowchart'
 import { cloudProviderRenderers } from './cloudProviders'
+import { mermaidRenderers } from './mermaidShapes'
 import { globalShapeCache } from '../rendering/ShapeCache'
 import { renderLogger, devWarn } from '../logger'
 
@@ -19,6 +20,7 @@ export * from './er'
 export * from './bpmn'
 export * from './cloud'
 export * from './cloudProviders'
+export * from './mermaidShapes'
 
 const awsRenderers: ShapeRendererMap = {
   'aws-ec2': cloudRenderers.server,
@@ -131,6 +133,7 @@ export const shapeRenderers: ShapeRendererMap = {
   ...aliyunRenderers,
   ...tencentRenderers,
   ...genericCloudRenderers,
+  ...mermaidRenderers,
 }
 
 export const renderShape = (type: string, config: ShapeRenderConfig): Node => {

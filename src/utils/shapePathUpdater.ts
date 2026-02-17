@@ -199,17 +199,26 @@ export function updateNodePathOnResize(node: Node): void {
   const width = size.width
   const height = size.height
 
+  console.log(`[updateNodePathOnResize] shapeType: ${shapeType}, size: ${width}x${height}`)
+
   const pathType = getPathType(shapeType)
-  if (!pathType) return
+  if (!pathType) {
+    console.log(`[updateNodePathOnResize] No pathType found for shapeType: ${shapeType}`)
+    return
+  }
+
+  console.log(`[updateNodePathOnResize] pathType: ${pathType}`)
 
   if (pathGenerators[pathType]) {
     const newPath = pathGenerators[pathType](width, height)
+    console.log(`[updateNodePathOnResize] Updating path for ${pathType}`)
     node.attr('body/d', newPath)
     return
   }
 
   if (polygonGenerators[pathType]) {
     const newPoints = polygonGenerators[pathType](width, height)
+    console.log(`[updateNodePathOnResize] Updating polygon points for ${pathType}`)
     node.attr('body/refPoints', newPoints)
     return
   }
@@ -218,7 +227,9 @@ export function updateNodePathOnResize(node: Node): void {
 export function needsPathUpdate(node: Node): boolean {
   const nodeData = node.getData() as { shapeType?: string } | undefined
   const shapeType = nodeData?.shapeType || ''
-  return getPathType(shapeType) !== null
+  const result = getPathType(shapeType) !== null
+  console.log(`[needsPathUpdate] shapeType: ${shapeType}, needsUpdate: ${result}`)
+  return result
 }
 
 export const pathGeneratorList = Object.keys(pathGenerators)

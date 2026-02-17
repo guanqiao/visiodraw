@@ -342,9 +342,59 @@ export function getX6PortGroups() {
   }
 }
 
+/**
+ * 批量显示/隐藏连接点
+ * 使用批量更新 API 提升性能
+ */
 export function showPorts(node: any, visible: boolean) {
+  // 使用批量更新减少渲染次数
   const ports = node.getPorts()
-  ports.forEach((port: any) => {
-    node.portProp(port.id, 'attrs/circle/opacity', visible ? 1 : 0.3)
+  if (ports.length === 0) return
+
+  // 使用 X6 的 attr 方法批量更新
+  const opacity = visible ? 1 : 0.3
+  node.attr({
+    ports: {
+      groups: {
+        top: { attrs: { circle: { opacity } } },
+        bottom: { attrs: { circle: { opacity } } },
+        left: { attrs: { circle: { opacity } } },
+        right: { attrs: { circle: { opacity } } },
+      },
+    },
   })
+}
+
+/**
+ * 延迟显示连接点 - 用于优化鼠标悬停性能
+ */
+let pendingPortVisibility: Map<string, { node: any; visible: boolean }> = new Map()
+let portVisibilityTimer: ReturnType<typeof setTimeout> | null = null
+
+export function showPortsDebounced(node: any, visible: boolean, delay: number = 50) {
+  pendingPortVisibility.set(node.id, { node, visible })
+
+  if (portVisibilityTimer) {
+    clearTimeout(portVisibilityTimer)
+  }
+
+  portVisibilityTimer = setTimeout(() => {
+    // 批量处理所有待处理的连接点显示/隐藏
+    pendingPortVisibility.forEach(({ node, visible }) => {
+      showPorts(node, visible)
+    })
+    pendingPortVisibility.clear()
+    portVisibilityTimer = null
+  }, delay)
+}
+
+/**
+ * 清除待处理的连接点显示/隐藏
+ */
+export function clearPendingPortVisibility() {
+  if (portVisibilityTimer) {
+    clearTimeout(portVisibilityTimer)
+    portVisibilityTimer = null
+  }
+  pendingPortVisibility.clear()
 }

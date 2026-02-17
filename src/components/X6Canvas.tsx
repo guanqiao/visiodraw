@@ -11,9 +11,10 @@ import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import useFormatPainterStore from '@stores/formatPainterStore'
 import { THEME_CHANGE_EVENT } from '@hooks/useTheme'
+import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
 import { v4 as uuidv4 } from 'uuid'
 import { parseDragData } from '../types/dragDrop'
-import { generateDefaultConnectionPoints, showPorts } from '@utils/connectionPoints'
+import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVisibility } from '@utils/connectionPoints'
 import { ConnectorRenderer } from '@utils/connectorRenderer'
 import { renderShape } from '@utils/shapeRenderers'
 import ERRelationQuickSelector, { isErTableNode, getErNodeName } from '@components/ERRelationQuickSelector'
@@ -211,23 +212,25 @@ const X6Canvas: React.FC = () => {
       })
     )
 
-    // Event handlers for connection points visibility
+    // Event handlers for connection points visibility - 使用延迟显示优化性能
     graph.on('node:mouseenter', ({ node }: { node: Node }) => {
-      showPorts(node, true)
+      showPortsDebounced(node, true, 50)
     })
 
     graph.on('node:mouseleave', ({ node }: { node: Node }) => {
-      showPorts(node, false)
+      showPortsDebounced(node, false, 50)
     })
 
-    // Debug connecting events
-    graph.on('edge:connected', ({ edge, type }: { edge: Edge; type: string }) => {
-      console.log('Edge connected:', type, edge.id)
-    })
+    // Debug connecting events - 只在开发环境输出
+    if (import.meta.env.DEV) {
+      graph.on('edge:connected', ({ edge, type }: { edge: Edge; type: string }) => {
+        console.log('Edge connected:', type, edge.id)
+      })
 
-    graph.on('edge:created', ({ edge }: { edge: Edge }) => {
-      console.log('Edge created:', edge.id)
-    })
+      graph.on('edge:created', ({ edge }: { edge: Edge }) => {
+        console.log('Edge created:', edge.id)
+      })
+    }
 
     // Event handlers
     graph.on('node:added', ({ node }: { node: Node }) => {
@@ -683,7 +686,9 @@ const X6Canvas: React.FC = () => {
           fontColor: (node.attr('label/fill') as string) || '#333333',
         }
         copyNodeStyle(style)
-        console.log('Node style copied:', style)
+        if (import.meta.env.DEV) {
+          console.log('Node style copied:', style)
+        }
       } else if (firstCell.isEdge()) {
         const edge = firstCell as Edge
         const lineStyle: 'solid' | 'dashed' | 'dotted' = (edge.attr('line/style/animation') as string) === 'dash' ? 'dashed' : 'solid'
@@ -696,7 +701,9 @@ const X6Canvas: React.FC = () => {
           router: (edge.getRouter() as any)?.name || 'normal',
         }
         copyEdgeStyle(style)
-        console.log('Edge style copied:', style)
+        if (import.meta.env.DEV) {
+          console.log('Edge style copied:', style)
+        }
       }
     })
 
@@ -842,92 +849,17 @@ const X6Canvas: React.FC = () => {
 
     return () => {
       clearInterval(autoSaveInterval)
+      clearPendingPortVisibility() // 清理待处理的连接点显示
       graph.dispose()
       graphRef.current = null
     }
   }, [])
 
-  // Sync nodes to graph when nodes change
-  useEffect(() => {
-    const graph = graphRef.current
-    if (!graph) return
-
-    // Get current node IDs in graph
-    const currentNodeIds = new Set(graph.getNodes().map(n => n.id))
-    const storeNodeIds = new Set(nodes.map(n => n.id))
-
-    // Remove nodes that are no longer in store
-    currentNodeIds.forEach(id => {
-      if (!storeNodeIds.has(id)) {
-        const cell = graph.getCellById(id)
-        if (cell) {
-          graph.removeCell(cell)
-        }
-      }
-    })
-
-    // Add or update nodes from store
-    nodes.forEach(node => {
-      const existingCell = graph.getCellById(node.id)
-      if (!existingCell) {
-        // Node doesn't exist in graph, create it
-        const x6Node = createX6NodeFromData(node)
-        graph.addNode(x6Node)
-      } else if (existingCell.isNode()) {
-        // Update existing node
-        const existingNode = existingCell as Node
-        existingNode.position(node.x, node.y)
-        existingNode.size(node.width, node.height)
-        existingNode.attr({
-          body: {
-            fill: node.fill,
-            stroke: node.stroke,
-            strokeWidth: node.strokeWidth,
-          },
-          label: {
-            text: node.text || '',
-          },
-        })
-      }
-    })
-  }, [nodes])
-
-  // Sync edges to graph
-  useEffect(() => {
-    const graph = graphRef.current
-    if (!graph) return
-
-    const currentEdgeIds = new Set(graph.getEdges().map(e => e.id))
-    const storeEdgeIds = new Set(edges.map(e => e.id))
-
-    // Remove edges that are no longer in store
-    currentEdgeIds.forEach(id => {
-      if (!storeEdgeIds.has(id)) {
-        const cell = graph.getCellById(id)
-        if (cell) {
-          graph.removeCell(cell)
-        }
-      }
-    })
-
-    // Add or update edges from store
-    edges.forEach(edge => {
-      const existingEdge = graph.getCellById(edge.id) as Edge
-      if (!existingEdge) {
-        const x6EdgeConfig = ConnectorRenderer.toX6Edge(edge)
-        graph.addEdge(x6EdgeConfig)
-      } else {
-        // Update existing edge if needed
-        ConnectorRenderer.updateEdgeStyle(existingEdge, edge.style)
-        ConnectorRenderer.updateEdgeMarkers(existingEdge, edge.startStyle, edge.endStyle)
-        ConnectorRenderer.updateEdgeAppearance(existingEdge, {
-          stroke: edge.stroke,
-          strokeWidth: edge.strokeWidth,
-          lineStyle: edge.lineStyle,
-        })
-      }
-    })
-  }, [edges])
+  // 使用优化的 Store 同步 Hook
+  useOptimizedStoreSync(graphRef.current, nodes, edges, {
+    debounceMs: 16, // 约 60fps
+    batchSize: 50,
+  })
 
   // Handle theme changes - update canvas background and grid
   useEffect(() => {

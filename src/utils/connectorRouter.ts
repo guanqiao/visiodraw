@@ -29,10 +29,10 @@ export class ConnectorRouter {
    * Get router configuration for X6 based on connector style
    */
   getRouterConfig(style: ConnectorStyle): { name: string; args?: any } {
-    const config = connectorStyleConfigs[style]
+    const config = connectorStyleConfigs[style] || connectorStyleConfigs['orthogonal']
     return {
       name: config.router,
-      args: this.getRouterArgs(style),
+      args: this.getRouterArgs(style || 'orthogonal'),
     }
   }
 
@@ -40,7 +40,7 @@ export class ConnectorRouter {
    * Get connector configuration for X6 based on connector style
    */
   getConnectorConfig(style: ConnectorStyle): { name: string; args?: any } {
-    const config = connectorStyleConfigs[style]
+    const config = connectorStyleConfigs[style] || connectorStyleConfigs['orthogonal']
     return {
       name: config.connector,
     }
