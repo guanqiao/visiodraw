@@ -43,7 +43,7 @@ describe('Mermaid Shapes', () => {
 
     it('should have path data', () => {
       const node = renderStadium(baseConfig)
-      const d = node.attr('body/d')
+      const d = node.attr('body/refD')
       expect(d).toContain('M')
       expect(d).toContain('A')
     })
@@ -58,7 +58,7 @@ describe('Mermaid Shapes', () => {
 
     it('should have cylinder path data', () => {
       const node = renderCylinder(baseConfig)
-      const d = node.attr('body/d')
+      const d = node.attr('body/refD')
       expect(d).toContain('Q')
     })
   })
@@ -72,7 +72,7 @@ describe('Mermaid Shapes', () => {
 
     it('should have 6 sides in path', () => {
       const node = renderHexagon(baseConfig)
-      const d = node.attr('body/d')
+      const d = node.attr('body/refD')
       expect(d).toContain('M')
       expect(d).toContain('L')
       expect(d).toContain('Z')
@@ -141,7 +141,7 @@ describe('Mermaid Shapes', () => {
 
     it('should have two circles in path', () => {
       const node = renderDoubleCircle(baseConfig)
-      const d = node.attr('body/d') as string
+      const d = node.attr('body/refD') as string
       const arcCount = (d.match(/A/g) || []).length
       expect(arcCount).toBeGreaterThanOrEqual(4) // 2 circles, each with 2 arcs
     })
@@ -164,7 +164,7 @@ describe('Mermaid Shapes', () => {
 
     it('should have circular path', () => {
       const node = renderCircle(baseConfig)
-      const d = node.attr('body/d')
+      const d = node.attr('body/refD')
       expect(d).toContain('A')
     })
   })
