@@ -50,13 +50,12 @@ export class ShapesHelper {
    */
   async drawRectangle(x: number, y: number, width: number, height: number) {
     await this.selectRectangleTool()
+    await this.page.waitForTimeout(300)
     
-    const bounds = await this.canvas.getCanvasBounds()
-    if (!bounds) throw new Error('Canvas not found')
-    
-    // Click to start drawing
     await this.canvas.clickAt(x, y)
-    await this.page.waitForTimeout(200)
+    await this.page.waitForTimeout(500)
+    
+    await this.selectSelectTool()
   }
 
   /**
@@ -64,9 +63,12 @@ export class ShapesHelper {
    */
   async drawCircle(x: number, y: number, radius: number) {
     await this.selectCircleTool()
+    await this.page.waitForTimeout(300)
     
     await this.canvas.clickAt(x, y)
-    await this.page.waitForTimeout(200)
+    await this.page.waitForTimeout(500)
+    
+    await this.selectSelectTool()
   }
 
   /**
@@ -74,9 +76,12 @@ export class ShapesHelper {
    */
   async drawTriangle(x: number, y: number, size: number) {
     await this.selectTriangleTool()
+    await this.page.waitForTimeout(300)
     
     await this.canvas.clickAt(x, y)
-    await this.page.waitForTimeout(200)
+    await this.page.waitForTimeout(500)
+    
+    await this.selectSelectTool()
   }
 
   /**
@@ -232,35 +237,105 @@ export class ShapesHelper {
   }
 
   /**
+   * Select diamond tool
+   */
+  async selectDiamondTool() {
+    const toolButton = this.page.locator('[data-testid="tool-diamond"]')
+    if (await toolButton.count() > 0) {
+      await toolButton.click()
+      await this.page.waitForTimeout(200)
+    }
+  }
+
+  /**
+   * Select ellipse tool
+   */
+  async selectEllipseTool() {
+    const toolButton = this.page.locator('[data-testid="tool-ellipse"]')
+    if (await toolButton.count() > 0) {
+      await toolButton.click()
+      await this.page.waitForTimeout(200)
+    }
+  }
+
+  /**
+   * Draw diamond at position
+   */
+  async drawDiamond(x: number, y: number, size: number) {
+    await this.selectDiamondTool()
+    await this.page.waitForTimeout(300)
+    
+    await this.canvas.clickAt(x, y)
+    await this.page.waitForTimeout(500)
+    
+    await this.selectSelectTool()
+  }
+
+  /**
+   * Draw ellipse at position
+   */
+  async drawEllipse(x: number, y: number, width: number, height: number) {
+    await this.selectEllipseTool()
+    await this.page.waitForTimeout(300)
+    
+    await this.canvas.clickAt(x, y)
+    await this.page.waitForTimeout(500)
+    
+    await this.selectSelectTool()
+  }
+
+  /**
    * Drag shape from library to canvas
    */
-  async dragShapeToCanvas(shapeType: string, canvasX: number, canvasY: number) {
+  async dragShapeFromLibrary(shapeType: string, canvasX: number, canvasY: number) {
     const shapeItem = this.page.locator(`[data-testid="shape-item"]`).filter({
-      has: this.page.locator(`[data-shape-type="${shapeType}"], [data-type="${shapeType}"]`)
+      has: this.page.locator(`text=${shapeType}`)
     }).first()
+    
+    if (await shapeItem.count() === 0) {
+      throw new Error(`Shape "${shapeType}" not found in library`)
+    }
     
     const canvasBounds = await this.canvas.getCanvasBounds()
     if (!canvasBounds) throw new Error('Canvas not found')
     
-    const targetX = canvasBounds.x + canvasX
-    const targetY = canvasBounds.y + canvasY
+    const box = await shapeItem.boundingBox()
+    if (!box) throw new Error('Shape item not found')
     
-    await shapeItem.dragTo(this.page.locator('.x6-graph'), {
-      targetPosition: { x: canvasX, y: canvasY }
-    })
-    await this.page.waitForTimeout(300)
+    const startX = box.x + box.width / 2
+    const startY = box.y + box.height / 2
+    const endX = canvasBounds.x + canvasX
+    const endY = canvasBounds.y + canvasY
+    
+    await this.page.mouse.move(startX, startY)
+    await this.page.mouse.down()
+    await this.page.waitForTimeout(100)
+    await this.page.mouse.move(endX, endY, { steps: 10 })
+    await this.page.waitForTimeout(100)
+    await this.page.mouse.up()
+    await this.page.waitForTimeout(500)
   }
 
   /**
    * Expand shape category in library
    */
-  async expandCategory(categoryId: string) {
-    const categoryHeader = this.page.locator(`[data-testid="shape-category"]`).getByRole('button', { name: new RegExp(categoryId, 'i') })
+  async expandCategory(categoryName: string) {
+    const allCategories = this.page.locator(`[data-testid="shape-category"]`).getByRole('button')
+    const categoryHeader = allCategories.filter({ hasText: categoryName }).first()
     const isExpanded = await categoryHeader.getAttribute('aria-expanded')
     if (isExpanded !== 'true') {
       await categoryHeader.click()
-      await this.page.waitForTimeout(200)
+      await this.page.waitForTimeout(300)
     }
+  }
+
+  /**
+   * Clear canvas by selecting all and deleting
+   */
+  async clearCanvas() {
+    await this.canvas.selectAll()
+    await this.canvas.deleteSelected()
+    await this.page.waitForTimeout(200)
   }
 
   /**
@@ -307,69 +382,5 @@ export class ShapesHelper {
     await this.page.waitForTimeout(100)
     await this.page.mouse.up()
     await this.page.waitForTimeout(300)
-  }
-
-  /**
-   * Get resize handle position
-   */
-  async getResizeHandlePosition(shapeIndex: number, corner: 'se' | 'sw' | 'ne' | 'nw') {
-    const shape = await this.getShape(shapeIndex)
-    const box = await shape.boundingBox()
-    if (!box) throw new Error('Shape not found')
-    
-    switch (corner) {
-      case 'se':
-        return { x: box.x + box.width, y: box.y + box.height }
-      case 'sw':
-        return { x: box.x, y: box.y + box.height }
-      case 'ne':
-        return { x: box.x + box.width, y: box.y }
-      case 'nw':
-        return { x: box.x, y: box.y }
-    }
-  }
-
-  /**
-   * Check if resize handles are visible
-   */
-  async areResizeHandlesVisible(shapeIndex: number): Promise<boolean> {
-    const shape = await this.getShape(shapeIndex)
-    const seHandle = shape.locator('.x6-resize-se, .x6-widget-transform .x6-resize-se')
-    return await seHandle.isVisible()
-  }
-
-  /**
-   * Get all shape types from library
-   */
-  async getAvailableShapeTypes(): Promise<string[]> {
-    const shapeItems = await this.page.locator('[data-testid="shape-item"]').all()
-    const types: string[] = []
-    for (const item of shapeItems) {
-      const type = await item.getAttribute('data-shape-type') || await item.getAttribute('data-type')
-      if (type) types.push(type)
-    }
-    return types
-  }
-
-  /**
-   * Draw shape by clicking on canvas (for basic shapes with toolbar)
-   */
-  async drawShapeAt(shapeType: string, x: number, y: number) {
-    const toolButton = this.page.locator(`[data-testid="tool-${shapeType}"]`)
-    if (await toolButton.count() > 0) {
-      await toolButton.click()
-      await this.page.waitForTimeout(200)
-      await this.canvas.clickAt(x, y)
-      await this.page.waitForTimeout(300)
-    }
-  }
-
-  /**
-   * Clear canvas by selecting all and deleting
-   */
-  async clearCanvas() {
-    await this.canvas.selectAll()
-    await this.canvas.deleteSelected()
-    await this.page.waitForTimeout(200)
   }
 }

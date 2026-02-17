@@ -41,10 +41,7 @@ const createFullServerPath = (w: number, h: number): string => {
   const dotY1 = h * 0.18
   const dotY2 = h * 0.5
   const dotY3 = h * 0.82
-  return `${path}
-    M${dotX - dotR},${dotY1} A${dotR},${dotR} 0 1,1 ${dotX + dotR},${dotY1} A${dotR},${dotR} 0 1,1 ${dotX - dotR},${dotY1}
-    M${dotX - dotR},${dotY2} A${dotR},${dotR} 0 1,1 ${dotX + dotR},${dotY2} A${dotR},${dotR} 0 1,1 ${dotX - dotR},${dotY2}
-    M${dotX - dotR},${dotY3} A${dotR},${dotR} 0 1,1 ${dotX + dotR},${dotY3} A${dotR},${dotR} 0 1,1 ${dotX - dotR},${dotY3}`
+  return `${path} M${dotX - dotR},${dotY1} A${dotR},${dotR} 0 1,1 ${dotX + dotR},${dotY1} A${dotR},${dotR} 0 1,1 ${dotX - dotR},${dotY1} M${dotX - dotR},${dotY2} A${dotR},${dotR} 0 1,1 ${dotX + dotR},${dotY2} A${dotR},${dotR} 0 1,1 ${dotX - dotR},${dotY2} M${dotX - dotR},${dotY3} A${dotR},${dotR} 0 1,1 ${dotX + dotR},${dotY3} A${dotR},${dotR} 0 1,1 ${dotX - dotR},${dotY3}`
 }
 
 const createFullRouterPath = (w: number, h: number): string => {

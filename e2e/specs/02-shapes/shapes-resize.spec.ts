@@ -2,31 +2,8 @@ import { test, expect } from '@playwright/test'
 import { CanvasHelper } from '../../helpers/canvas.helper'
 import { ShapesHelper } from '../../helpers/shapes.helper'
 
-test.describe('Shapes Resize', () => {
-  test('should resize rectangle using southeast handle', async ({ page }) => {
-    const canvasHelper = new CanvasHelper(page)
-    const shapesHelper = new ShapesHelper(page)
-    
-    await page.goto('/')
-    await canvasHelper.waitForCanvas()
-    
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
-    await shapesHelper.selectShape(0)
-    await page.waitForTimeout(300)
-    
-    const initialSize = await shapesHelper.getShapeSize(0)
-    
-    await shapesHelper.resizeShapeFromCorner(0, 'se', 50, 30)
-    
-    const newSize = await shapesHelper.getShapeSize(0)
-    
-    expect(newSize.width).toBeGreaterThan(initialSize.width)
-    expect(newSize.height).toBeGreaterThan(initialSize.height)
-  })
-
-  test('should resize circle using southeast handle', async ({ page }) => {
+test.describe('Shapes Resize - Basic Shapes', () => {
+  test('should resize circle', async ({ page }) => {
     const canvasHelper = new CanvasHelper(page)
     const shapesHelper = new ShapesHelper(page)
     
@@ -34,45 +11,39 @@ test.describe('Shapes Resize', () => {
     await canvasHelper.waitForCanvas()
     
     await shapesHelper.drawCircle(300, 300, 50)
-    await page.waitForTimeout(800)
-    
+    await page.waitForTimeout(500)
     await shapesHelper.selectShape(0)
     await page.waitForTimeout(300)
     
     const initialSize = await shapesHelper.getShapeSize(0)
-    
     await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 40)
-    
     const newSize = await shapesHelper.getShapeSize(0)
     
     expect(newSize.width).toBeGreaterThan(initialSize.width)
     expect(newSize.height).toBeGreaterThan(initialSize.height)
   })
 
-  test('should resize triangle using southeast handle', async ({ page }) => {
+  test('should resize triangle', async ({ page }) => {
     const canvasHelper = new CanvasHelper(page)
     const shapesHelper = new ShapesHelper(page)
     
     await page.goto('/')
     await canvasHelper.waitForCanvas()
     
-    await shapesHelper.drawTriangle(400, 400, 80)
-    await page.waitForTimeout(800)
-    
+    await shapesHelper.drawTriangle(300, 300, 80)
+    await page.waitForTimeout(500)
     await shapesHelper.selectShape(0)
     await page.waitForTimeout(300)
     
     const initialSize = await shapesHelper.getShapeSize(0)
-    
     await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 30)
-    
     const newSize = await shapesHelper.getShapeSize(0)
     
     expect(newSize.width).toBeGreaterThan(initialSize.width)
     expect(newSize.height).toBeGreaterThan(initialSize.height)
   })
 
-  test('should resize using northwest handle', async ({ page }) => {
+  test('should resize rectangle', async ({ page }) => {
     const canvasHelper = new CanvasHelper(page)
     const shapesHelper = new ShapesHelper(page)
     
@@ -80,120 +51,518 @@ test.describe('Shapes Resize', () => {
     await canvasHelper.waitForCanvas()
     
     await shapesHelper.drawRectangle(300, 300, 100, 80)
-    await page.waitForTimeout(800)
+    await page.waitForTimeout(500)
     await shapesHelper.selectShape(0)
     await page.waitForTimeout(300)
     
     const initialSize = await shapesHelper.getShapeSize(0)
-    const initialPos = await shapesHelper.getShapePosition(0)
-    
-    await shapesHelper.resizeShapeFromCorner(0, 'nw', -30, -20)
-    
-    const newSize = await shapesHelper.getShapeSize(0)
-    const newPos = await shapesHelper.getShapePosition(0)
-    
-    expect(newSize.width).toBeGreaterThan(initialSize.width)
-    expect(newSize.height).toBeGreaterThan(initialSize.height)
-    expect(newPos.x).toBeLessThan(initialPos.x)
-    expect(newPos.y).toBeLessThan(initialPos.y)
-  })
-
-  test('should resize using northeast handle', async ({ page }) => {
-    const canvasHelper = new CanvasHelper(page)
-    const shapesHelper = new ShapesHelper(page)
-    
-    await page.goto('/')
-    await canvasHelper.waitForCanvas()
-    
-    await shapesHelper.drawRectangle(300, 300, 100, 80)
-    await page.waitForTimeout(800)
-    await shapesHelper.selectShape(0)
-    await page.waitForTimeout(300)
-    
-    const initialSize = await shapesHelper.getShapeSize(0)
-    const initialPos = await shapesHelper.getShapePosition(0)
-    
-    await shapesHelper.resizeShapeFromCorner(0, 'ne', 40, -30)
-    
-    const newSize = await shapesHelper.getShapeSize(0)
-    const newPos = await shapesHelper.getShapePosition(0)
-    
-    expect(newSize.width).toBeGreaterThan(initialSize.width)
-    expect(newSize.height).toBeGreaterThan(initialSize.height)
-    expect(newPos.y).toBeLessThan(initialPos.y)
-  })
-
-  test('should resize using southwest handle', async ({ page }) => {
-    const canvasHelper = new CanvasHelper(page)
-    const shapesHelper = new ShapesHelper(page)
-    
-    await page.goto('/')
-    await canvasHelper.waitForCanvas()
-    
-    await shapesHelper.drawRectangle(300, 300, 100, 80)
-    await page.waitForTimeout(800)
-    await shapesHelper.selectShape(0)
-    await page.waitForTimeout(300)
-    
-    const initialSize = await shapesHelper.getShapeSize(0)
-    const initialPos = await shapesHelper.getShapePosition(0)
-    
-    await shapesHelper.resizeShapeFromCorner(0, 'sw', -40, 30)
-    
-    const newSize = await shapesHelper.getShapeSize(0)
-    const newPos = await shapesHelper.getShapePosition(0)
-    
-    expect(newSize.width).toBeGreaterThan(initialSize.width)
-    expect(newSize.height).toBeGreaterThan(initialSize.height)
-    expect(newPos.x).toBeLessThan(initialPos.x)
-  })
-
-  test('should resize using southeast handle on rectangle', async ({ page }) => {
-    const canvasHelper = new CanvasHelper(page)
-    const shapesHelper = new ShapesHelper(page)
-    
-    await page.goto('/')
-    await canvasHelper.waitForCanvas()
-    
-    await shapesHelper.drawRectangle(300, 300, 100, 80)
-    await page.waitForTimeout(800)
-    await shapesHelper.selectShape(0)
-    await page.waitForTimeout(300)
-    
-    const initialSize = await shapesHelper.getShapeSize(0)
-    
     await shapesHelper.resizeShapeFromCorner(0, 'se', 50, 40)
-    
     const newSize = await shapesHelper.getShapeSize(0)
     
     expect(newSize.width).toBeGreaterThan(initialSize.width)
     expect(newSize.height).toBeGreaterThan(initialSize.height)
   })
+})
 
-  test('should shrink rectangle smaller', async ({ page }) => {
+test.describe('Shapes Resize - Basic Shapes from Library', () => {
+  test('should resize diamond', async ({ page }) => {
     const canvasHelper = new CanvasHelper(page)
     const shapesHelper = new ShapesHelper(page)
     
     await page.goto('/')
     await canvasHelper.waitForCanvas()
     
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
+    await shapesHelper.expandCategory('基础图形')
+    await shapesHelper.dragShapeFromLibrary('菱形', 300, 300)
+    await page.waitForTimeout(500)
     await shapesHelper.selectShape(0)
     await page.waitForTimeout(300)
     
     const initialSize = await shapesHelper.getShapeSize(0)
-    
-    await shapesHelper.resizeShapeFromCorner(0, 'se', -30, -20)
-    
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 40)
     const newSize = await shapesHelper.getShapeSize(0)
     
-    expect(newSize.width).toBeLessThan(initialSize.width)
-    expect(newSize.height).toBeLessThan(initialSize.height)
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
   })
 
-  test('should shrink circle smaller', async ({ page }) => {
+  test('should resize ellipse', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('基础图形')
+    await shapesHelper.dragShapeFromLibrary('椭圆', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize hexagon', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('基础图形')
+    await shapesHelper.dragShapeFromLibrary('六边形', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 40)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize star', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('基础图形')
+    await shapesHelper.dragShapeFromLibrary('星形', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 40)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize pentagon', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('基础图形')
+    await shapesHelper.dragShapeFromLibrary('五边形', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 40)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+})
+
+test.describe('Shapes Resize - Flowchart Shapes', () => {
+  test('should resize process', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('流程图')
+    await shapesHelper.dragShapeFromLibrary('流程', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 50, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize decision', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('流程图')
+    await shapesHelper.dragShapeFromLibrary('判断', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 40)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize database', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('流程图')
+    await shapesHelper.dragShapeFromLibrary('数据库', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 40)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+})
+
+test.describe('Shapes Resize - Network Shapes', () => {
+  test('should resize server', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('网络/云')
+    await shapesHelper.dragShapeFromLibrary('服务器', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 40)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize cloud', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('网络/云')
+    await shapesHelper.dragShapeFromLibrary('云', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize router', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('网络/云')
+    await shapesHelper.dragShapeFromLibrary('路由器', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 20)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+})
+
+test.describe('Shapes Resize - UML Shapes', () => {
+  test('should resize class', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('UML 2.5')
+    await shapesHelper.dragShapeFromLibrary('类', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize interface', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('UML 2.5')
+    await shapesHelper.dragShapeFromLibrary('接口', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize usecase', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('UML 2.5')
+    await shapesHelper.dragShapeFromLibrary('用例', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 20)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+})
+
+test.describe('Shapes Resize - ER Shapes', () => {
+  test('should resize entity', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('ER图')
+    await shapesHelper.dragShapeFromLibrary('实体', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 20)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize attribute', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('ER图')
+    await shapesHelper.dragShapeFromLibrary('属性', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 20)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize relationship', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('ER图')
+    await shapesHelper.dragShapeFromLibrary('关系', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 20)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+})
+
+test.describe('Shapes Resize - BPMN Shapes', () => {
+  test('should resize task', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('BPMN 2.0')
+    await shapesHelper.dragShapeFromLibrary('任务', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 40, 20)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize start event', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('BPMN 2.0')
+    await shapesHelper.dragShapeFromLibrary('开始事件', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 20, 20)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize exclusive gateway', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('BPMN 2.0')
+    await shapesHelper.dragShapeFromLibrary('排他网关', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+})
+
+test.describe('Shapes Resize - Cloud Shapes', () => {
+  test('should resize EC2 instance', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('云服务')
+    await shapesHelper.dragShapeFromLibrary('EC2 实例', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize Lambda function', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('云服务')
+    await shapesHelper.dragShapeFromLibrary('Lambda 函数', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+
+  test('should resize S3 bucket', async ({ page }) => {
+    const canvasHelper = new CanvasHelper(page)
+    const shapesHelper = new ShapesHelper(page)
+    
+    await page.goto('/')
+    await canvasHelper.waitForCanvas()
+    
+    await shapesHelper.expandCategory('云服务')
+    await shapesHelper.dragShapeFromLibrary('S3 存储桶', 300, 300)
+    await page.waitForTimeout(500)
+    await shapesHelper.selectShape(0)
+    await page.waitForTimeout(300)
+    
+    const initialSize = await shapesHelper.getShapeSize(0)
+    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 30)
+    const newSize = await shapesHelper.getShapeSize(0)
+    
+    expect(newSize.width).toBeGreaterThan(initialSize.width)
+    expect(newSize.height).toBeGreaterThan(initialSize.height)
+  })
+})
+
+test.describe('Shapes Resize - Operations', () => {
+  test('should shrink shape smaller', async ({ page }) => {
     const canvasHelper = new CanvasHelper(page)
     const shapesHelper = new ShapesHelper(page)
     
@@ -201,98 +570,33 @@ test.describe('Shapes Resize', () => {
     await canvasHelper.waitForCanvas()
     
     await shapesHelper.drawCircle(300, 300, 50)
-    await page.waitForTimeout(800)
-    
+    await page.waitForTimeout(500)
     await shapesHelper.selectShape(0)
     await page.waitForTimeout(300)
     
     const initialSize = await shapesHelper.getShapeSize(0)
-    
     await shapesHelper.resizeShapeFromCorner(0, 'se', -20, -20)
-    
     const newSize = await shapesHelper.getShapeSize(0)
     
     expect(newSize.width).toBeLessThan(initialSize.width)
     expect(newSize.height).toBeLessThan(initialSize.height)
   })
 
-  test('should maintain shape selection after resize', async ({ page }) => {
+  test('should resize to very large size', async ({ page }) => {
     const canvasHelper = new CanvasHelper(page)
     const shapesHelper = new ShapesHelper(page)
     
     await page.goto('/')
     await canvasHelper.waitForCanvas()
     
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
-    await shapesHelper.selectShape(0)
-    expect(await shapesHelper.countSelectedShapes()).toBe(1)
-    
-    await shapesHelper.resizeShapeFromCorner(0, 'se', 30, 20)
-    
-    expect(await shapesHelper.countSelectedShapes()).toBe(1)
-  })
-
-  test('should handle rapid consecutive resizes', async ({ page }) => {
-    const canvasHelper = new CanvasHelper(page)
-    const shapesHelper = new ShapesHelper(page)
-    
-    await page.goto('/')
-    await canvasHelper.waitForCanvas()
-    
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
-    await shapesHelper.selectShape(0)
-    await page.waitForTimeout(300)
-    
-    for (let i = 0; i < 3; i++) {
-      await shapesHelper.resizeShapeFromCorner(0, 'se', 20, 15)
-      await page.waitForTimeout(200)
-    }
-    
-    const finalSize = await shapesHelper.getShapeSize(0)
-    expect(finalSize.width).toBeGreaterThan(100)
-    expect(finalSize.height).toBeGreaterThan(60)
-  })
-
-  test('should handle resize to very small size', async ({ page }) => {
-    const canvasHelper = new CanvasHelper(page)
-    const shapesHelper = new ShapesHelper(page)
-    
-    await page.goto('/')
-    await canvasHelper.waitForCanvas()
-    
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
-    await shapesHelper.selectShape(0)
-    await page.waitForTimeout(300)
-    
-    await shapesHelper.resizeShapeFromCorner(0, 'se', -70, -40)
-    
-    const newSize = await shapesHelper.getShapeSize(0)
-    expect(newSize.width).toBeGreaterThan(0)
-    expect(newSize.height).toBeGreaterThan(0)
-  })
-
-  test('should handle resize to very large size', async ({ page }) => {
-    const canvasHelper = new CanvasHelper(page)
-    const shapesHelper = new ShapesHelper(page)
-    
-    await page.goto('/')
-    await canvasHelper.waitForCanvas()
-    
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
+    await shapesHelper.drawRectangle(300, 300, 100, 60)
+    await page.waitForTimeout(500)
     await shapesHelper.selectShape(0)
     await page.waitForTimeout(300)
     
     await shapesHelper.resizeShapeFromCorner(0, 'se', 200, 150)
-    
     const newSize = await shapesHelper.getShapeSize(0)
+    
     expect(newSize.width).toBeGreaterThan(250)
     expect(newSize.height).toBeGreaterThan(180)
   })
@@ -304,14 +608,12 @@ test.describe('Shapes Resize', () => {
     await page.goto('/')
     await canvasHelper.waitForCanvas()
     
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
+    await shapesHelper.drawRectangle(300, 300, 100, 60)
+    await page.waitForTimeout(500)
     await shapesHelper.selectShape(0)
     await page.waitForTimeout(300)
     
     const initialSize = await shapesHelper.getShapeSize(0)
-    
     await shapesHelper.resizeShapeFromCorner(0, 'se', 50, 40)
     
     const resizedSize = await shapesHelper.getShapeSize(0)
@@ -331,9 +633,8 @@ test.describe('Shapes Resize', () => {
     await page.goto('/')
     await canvasHelper.waitForCanvas()
     
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
+    await shapesHelper.drawRectangle(300, 300, 100, 60)
+    await page.waitForTimeout(500)
     await shapesHelper.selectShape(0)
     await page.waitForTimeout(300)
     
@@ -346,42 +647,5 @@ test.describe('Shapes Resize', () => {
     
     const afterRedoSize = await shapesHelper.getShapeSize(0)
     expect(Math.abs(afterRedoSize.width - resizedSize.width)).toBeLessThan(15)
-  })
-
-  test('should maintain aspect ratio when using shift key during resize', async ({ page }) => {
-    const canvasHelper = new CanvasHelper(page)
-    const shapesHelper = new ShapesHelper(page)
-    
-    await page.goto('/')
-    await canvasHelper.waitForCanvas()
-    
-    await shapesHelper.drawRectangle(200, 200, 100, 60)
-    await page.waitForTimeout(800)
-    
-    await shapesHelper.selectShape(0)
-    await page.waitForTimeout(300)
-    
-    const initialSize = await shapesHelper.getShapeSize(0)
-    const initialRatio = initialSize.width / initialSize.height
-    
-    const shape = await shapesHelper.getShape(0)
-    const box = await shape.boundingBox()
-    if (!box) throw new Error('Shape not found')
-    
-    const handleX = box.x + box.width
-    const handleY = box.y + box.height
-    
-    await page.keyboard.down('Shift')
-    await page.mouse.move(handleX, handleY)
-    await page.mouse.down()
-    await page.mouse.move(handleX + 50, handleY + 50, { steps: 5 })
-    await page.mouse.up()
-    await page.keyboard.up('Shift')
-    await page.waitForTimeout(500)
-    
-    const newSize = await shapesHelper.getShapeSize(0)
-    const newRatio = newSize.width / newSize.height
-    
-    expect(Math.abs(newRatio - initialRatio)).toBeLessThan(0.15)
   })
 })

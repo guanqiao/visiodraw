@@ -82,12 +82,9 @@ export function createCylinderPath(
 ): string {
   const ellipseHeight = height * ellipseRatio
 
-  const topEllipse = `M0,${ellipseHeight} 
-    Q${width / 2},0 ${width},${ellipseHeight}`
-  const body = `L${width},${height - ellipseHeight} 
-    Q${width / 2},${height} 0,${height - ellipseHeight} Z`
-  const bottomEllipseLine = `M0,${ellipseHeight} 
-    Q${width / 2},${ellipseHeight * 2} ${width},${ellipseHeight}`
+  const topEllipse = `M0,${ellipseHeight} Q${width / 2},0 ${width},${ellipseHeight}`
+  const body = `L${width},${height - ellipseHeight} Q${width / 2},${height} 0,${height - ellipseHeight} Z`
+  const bottomEllipseLine = `M0,${ellipseHeight} Q${width / 2},${ellipseHeight * 2} ${width},${ellipseHeight}`
 
   return `${topEllipse} ${body} ${bottomEllipseLine}`
 }
@@ -138,15 +135,7 @@ export function createCloudPath(width: number, height: number): string {
   const p5 = { x: w * 0.9, y: cy + h * 0.1 }
   const p6 = { x: w * 0.85, y: cy + h * 0.3 }
 
-  return `M${p1.x},${p1.y + r1 * 0.5}
-    Q${p1.x - r1},${p1.y} ${p1.x},${p1.y - r1 * 0.5}
-    Q${p2.x - r2},${p2.y - r2} ${p2.x + r2 * 0.5},${p2.y - r2 * 0.3}
-    Q${p3.x - r3},${p3.y - r3} ${p3.x + r3 * 0.3},${p3.y - r3 * 0.5}
-    Q${p4.x - r2 * 0.5},${p4.y - r2} ${p4.x + r2 * 0.5},${p4.y - r2 * 0.3}
-    Q${p5.x + r1},${p5.y - r1 * 0.5} ${p5.x + r1 * 0.3},${p5.y + r1 * 0.5}
-    Q${p6.x + r1 * 0.5},${p6.y + r1} ${p6.x - r1 * 0.5},${p6.y + r1 * 0.5}
-    Q${cx},${h} ${p1.x},${p1.y + r1 * 0.5}
-    Z`
+  return `M${p1.x},${p1.y + r1 * 0.5} Q${p1.x - r1},${p1.y} ${p1.x},${p1.y - r1 * 0.5} Q${p2.x - r2},${p2.y - r2} ${p2.x + r2 * 0.5},${p2.y - r2 * 0.3} Q${p3.x - r3},${p3.y - r3} ${p3.x + r3 * 0.3},${p3.y - r3 * 0.5} Q${p4.x - r2 * 0.5},${p4.y - r2} ${p4.x + r2 * 0.5},${p4.y - r2 * 0.3} Q${p5.x + r1},${p5.y - r1 * 0.5} ${p5.x + r1 * 0.3},${p5.y + r1 * 0.5} Q${p6.x + r1 * 0.5},${p6.y + r1} ${p6.x - r1 * 0.5},${p6.y + r1 * 0.5} Q${cx},${h} ${p1.x},${p1.y + r1 * 0.5} Z`
 }
 
 export function createParallelogramPoints(
@@ -182,96 +171,68 @@ export function createArrowPath(
 }
 
 export function createServerPath(width: number, height: number): string {
-  const unit = Math.min(width, height) / 10
-  const margin = unit
-  const bodyHeight = height - margin * 2
+  const margin = width * 0.08
+  const lineY1 = height * 0.33
+  const lineY2 = height * 0.67
 
-  const lineY1 = margin + bodyHeight * 0.33
-  const lineY2 = margin + bodyHeight * 0.67
-
-  return `M${margin},${margin} 
-    L${width - margin},${margin} 
-    L${width - margin},${height - margin} 
-    L${margin},${height - margin} Z
-    M${margin},${lineY1} L${width - margin},${lineY1}
-    M${margin},${lineY2} L${width - margin},${lineY2}`
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z M${margin},${margin} L${width - margin},${margin} L${width - margin},${height - margin} L${margin},${height - margin} Z M${margin},${lineY1} L${width - margin},${lineY1} M${margin},${lineY2} L${width - margin},${lineY2}`
 }
 
 export function createWifiPath(width: number, height: number): string {
   const cx = width / 2
   const baseY = height * 0.85
-  const dotRadius = Math.min(width, height) * 0.08
+  const dotRadius = width * 0.04
 
-  const r1 = Math.min(width, height) * 0.15
-  const r2 = r1 * 2
-  const r3 = r1 * 3
+  const r1 = width * 0.12
+  const r2 = width * 0.24
+  const r3 = width * 0.36
 
-  const arc1Y = baseY - r1 * 1.5
-  const arc2Y = baseY - r2 * 1.2
-  const arc3Y = baseY - r3 * 0.9
+  const arc1Y = height * 0.65
+  const arc2Y = height * 0.45
+  const arc3Y = height * 0.25
 
-  return `M${cx},${baseY}
-    A${dotRadius},${dotRadius} 0 1,1 ${cx + 0.01},${baseY}
-    M${cx - r1},${arc1Y}
-    A${r1},${r1} 0 0,1 ${cx + r1},${arc1Y}
-    M${cx - r2},${arc2Y}
-    A${r2},${r2} 0 0,1 ${cx + r2},${arc2Y}
-    M${cx - r3},${arc3Y}
-    A${r3},${r3} 0 0,1 ${cx + r3},${arc3Y}`
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z M${cx},${baseY} A${dotRadius},${dotRadius} 0 1,1 ${cx + 0.01},${baseY} M${cx - r1},${arc1Y} A${r1},${r1} 0 0,1 ${cx + r1},${arc1Y} M${cx - r2},${arc2Y} A${r2},${r2} 0 0,1 ${cx + r2},${arc2Y} M${cx - r3},${arc3Y} A${r3},${r3} 0 0,1 ${cx + r3},${arc3Y}`
 }
 
 export function createGlobePath(width: number, height: number): string {
   const cx = width / 2
   const cy = height / 2
-  const r = Math.min(width, height) / 2 - 2
+  const r = Math.min(width, height) * 0.45
 
-  return `M${cx},${cy - r}
-    A${r},${r} 0 1,1 ${cx},${cy + r}
-    A${r},${r} 0 1,1 ${cx},${cy - r}
-    M${cx},${cy - r} L${cx},${cy + r}
-    M${cx - r},${cy} L${cx + r},${cy}
-    M${cx - r * 0.7},${cy - r * 0.7}
-    Q${cx},${cy - r * 0.3} ${cx + r * 0.7},${cy - r * 0.7}
-    M${cx - r * 0.7},${cy + r * 0.7}
-    Q${cx},${cy + r * 0.3} ${cx + r * 0.7},${cy + r * 0.7}`
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z M${cx},${cy - r} A${r},${r} 0 1,1 ${cx},${cy + r} A${r},${r} 0 1,1 ${cx},${cy - r} M${cx},${cy - r} L${cx},${cy + r} M${cx - r},${cy} L${cx + r},${cy} M${cx - r * 0.7},${cy - r * 0.7} Q${cx},${cy - r * 0.3} ${cx + r * 0.7},${cy - r * 0.7} M${cx - r * 0.7},${cy + r * 0.7} Q${cx},${cy + r * 0.3} ${cx + r * 0.7},${cy + r * 0.7}`
 }
 
 export function createFirewallPath(width: number, height: number): string {
   const brickH = height / 3
   const brickW = width / 2
 
-  return `M0,0 L${width},0 L${width},${height} L0,${height} Z
-    M${brickW},0 L${brickW},${brickH}
-    M0,${brickH} L${width},${brickH}
-    M${brickW / 2},${brickH} L${brickW / 2},${brickH * 2}
-    M${brickW * 1.5},${brickH} L${brickW * 1.5},${brickH * 2}
-    M0,${brickH * 2} L${width},${brickH * 2}
-    M${brickW},${brickH * 2} L${brickW},${height}`
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z M${brickW},0 L${brickW},${brickH} M0,${brickH} L${width},${brickH} M${brickW / 2},${brickH} L${brickW / 2},${brickH * 2} M${brickW * 1.5},${brickH} L${brickW * 1.5},${brickH * 2} M0,${brickH * 2} L${width},${brickH * 2} M${brickW},${brickH * 2} L${brickW},${height}`
 }
 
 export function createRouterPath(width: number, height: number): string {
   const margin = width * 0.1
-  const bodyTop = height * 0.3
+  const bodyTop = height * 0.35
   const bodyBottom = height * 0.85
   const bodyLeft = margin
   const bodyRight = width - margin
   const bodyHeight = bodyBottom - bodyTop
 
-  const antennaHeight = height * 0.25
+  const antennaTop = height * 0.1
 
   const a1x = width * 0.25
   const a2x = width * 0.5
   const a3x = width * 0.75
 
-  const dotR = Math.min(width, height) * 0.04
+  const dotR = width * 0.025
   const dotY = bodyTop + bodyHeight * 0.5
   const dots = [width * 0.3, width * 0.5, width * 0.7]
 
-  let path = `M${bodyLeft},${bodyTop} L${bodyRight},${bodyTop} L${bodyRight},${bodyBottom} L${bodyLeft},${bodyBottom} Z`
+  let path = `M0,0 L${width},0 L${width},${height} L0,${height} Z`
+  path += ` M${bodyLeft},${bodyTop} L${bodyRight},${bodyTop} L${bodyRight},${bodyBottom} L${bodyLeft},${bodyBottom} Z`
 
-  path += ` M${a1x},${bodyTop} L${a1x},${bodyTop - antennaHeight}`
-  path += ` M${a2x},${bodyTop} L${a2x},${bodyTop - antennaHeight * 1.2}`
-  path += ` M${a3x},${bodyTop} L${a3x},${bodyTop - antennaHeight}`
+  path += ` M${a1x},${bodyTop} L${a1x},${antennaTop}`
+  path += ` M${a2x},${bodyTop} L${a2x},${antennaTop}`
+  path += ` M${a3x},${bodyTop} L${a3x},${antennaTop}`
 
   dots.forEach((dx) => {
     path += ` M${dx - dotR},${dotY} A${dotR},${dotR} 0 1,1 ${dx + dotR},${dotY} A${dotR},${dotR} 0 1,1 ${dx - dotR},${dotY}`
@@ -287,11 +248,12 @@ export function createSwitchPath(width: number, height: number): string {
   const bodyLeft = margin
   const bodyRight = width - margin
 
-  const dotR = Math.min(width, height) * 0.05
+  const dotR = width * 0.03
   const dotY = (bodyTop + bodyBottom) / 2
   const dots = [width * 0.25, width * 0.5, width * 0.75]
 
-  let path = `M${bodyLeft},${bodyTop} L${bodyRight},${bodyTop} L${bodyRight},${bodyBottom} L${bodyLeft},${bodyBottom} Z`
+  let path = `M0,0 L${width},0 L${width},${height} L0,${height} Z`
+  path += ` M${bodyLeft},${bodyTop} L${bodyRight},${bodyTop} L${bodyRight},${bodyBottom} L${bodyLeft},${bodyBottom} Z`
 
   dots.forEach((dx) => {
     path += ` M${dx - dotR},${dotY} A${dotR},${dotR} 0 1,1 ${dx + dotR},${dotY} A${dotR},${dotR} 0 1,1 ${dx - dotR},${dotY}`
@@ -317,12 +279,7 @@ export function createDesktopPath(width: number, height: number): string {
   const baseLeft = width * 0.2
   const baseRight = width * 0.8
 
-  return `M${monitorLeft},${monitorTop} 
-    L${monitorRight},${monitorTop} 
-    L${monitorRight},${monitorBottom} 
-    L${monitorLeft},${monitorBottom} Z
-    M${standX},${standTop} L${standX + standWidth},${standTop} L${standX + standWidth},${standBottom} L${standX},${standBottom} Z
-    M${baseLeft},${baseTop} L${baseRight},${baseTop} L${baseRight},${baseTop + baseHeight} L${baseLeft},${baseTop + baseHeight} Z`
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z M${monitorLeft},${monitorTop} L${monitorRight},${monitorTop} L${monitorRight},${monitorBottom} L${monitorLeft},${monitorBottom} Z M${standX},${standTop} L${standX + standWidth},${standTop} L${standX + standWidth},${standBottom} L${standX},${standBottom} Z M${baseLeft},${baseTop} L${baseRight},${baseTop} L${baseRight},${baseTop + baseHeight} L${baseLeft},${baseTop + baseHeight} Z`
 }
 
 export function createLaptopPath(width: number, height: number): string {
@@ -338,14 +295,7 @@ export function createLaptopPath(width: number, height: number): string {
   const baseLeft = width * 0.05
   const baseRight = width * 0.95
 
-  return `M${screenLeft},${screenTop} 
-    L${screenRight},${screenTop} 
-    L${screenRight},${screenBottom} 
-    L${screenLeft},${screenBottom} Z
-    M${baseLeft},${baseTop} 
-    L${baseRight},${baseTop} 
-    L${width},${baseBottom} 
-    L0,${baseBottom} Z`
+  return `M0,0 L${width},0 L${width},${height} L0,${height} Z M${screenLeft},${screenTop} L${screenRight},${screenTop} L${screenRight},${screenBottom} L${screenLeft},${screenBottom} Z M${baseLeft},${baseTop} L${baseRight},${baseTop} L${width},${baseBottom} L0,${baseBottom} Z`
 }
 
 export function createUmlActorPath(width: number, height: number): string {
@@ -362,13 +312,7 @@ export function createUmlActorPath(width: number, height: number): string {
   const legSpread = width * 0.3
   const legBottom = height * 0.98
 
-  return `M${cx},${headCy - headR}
-    A${headR},${headR} 0 1,1 ${cx},${headCy + headR}
-    A${headR},${headR} 0 1,1 ${cx},${headCy - headR}
-    M${cx},${neckY} L${cx},${bodyBottom}
-    M${cx - armSpread},${armY} L${cx + armSpread},${armY}
-    M${cx},${bodyBottom} L${cx - legSpread},${legBottom}
-    M${cx},${bodyBottom} L${cx + legSpread},${legBottom}`
+  return `M${cx},${headCy - headR} A${headR},${headR} 0 1,1 ${cx},${headCy + headR} A${headR},${headR} 0 1,1 ${cx},${headCy - headR} M${cx},${neckY} L${cx},${bodyBottom} M${cx - armSpread},${armY} L${cx + armSpread},${armY} M${cx},${bodyBottom} L${cx - legSpread},${legBottom} M${cx},${bodyBottom} L${cx + legSpread},${legBottom}`
 }
 
 export function createUmlClassPath(
@@ -454,15 +398,7 @@ export function createBpmnGatewayPath(width: number, height: number): string {
 export function createBpmnActivityPath(width: number, height: number): string {
   const cornerRadius = Math.min(width, height) * 0.1
 
-  return `M${cornerRadius},0 
-    L${width - cornerRadius},0 
-    Q${width},0 ${width},${cornerRadius}
-    L${width},${height - cornerRadius}
-    Q${width},${height} ${width - cornerRadius},${height}
-    L${cornerRadius},${height}
-    Q0,${height} 0,${height - cornerRadius}
-    L0,${cornerRadius}
-    Q0,0 ${cornerRadius},0 Z`
+  return `M${cornerRadius},0 L${width - cornerRadius},0 Q${width},0 ${width},${cornerRadius} L${width},${height - cornerRadius} Q${width},${height} ${width - cornerRadius},${height} L${cornerRadius},${height} Q0,${height} 0,${height - cornerRadius} L0,${cornerRadius} Q0,0 ${cornerRadius},0 Z`
 }
 
 export function createBpmnUserTaskPath(width: number, height: number): string {
@@ -470,17 +406,7 @@ export function createBpmnUserTaskPath(width: number, height: number): string {
   const lineY = height * 0.85
   const lineHeight = height * 0.05
 
-  return `M${cornerRadius},0 
-    L${width - cornerRadius},0 
-    Q${width},0 ${width},${cornerRadius}
-    L${width},${height - cornerRadius}
-    Q${width},${height} ${width - cornerRadius},${height}
-    L${cornerRadius},${height}
-    Q0,${height} 0,${height - cornerRadius}
-    L0,${cornerRadius}
-    Q0,0 ${cornerRadius},0 Z
-    M0,${lineY} L${width},${lineY}
-    M0,${lineY + lineHeight} L${width},${lineY + lineHeight}`
+  return `M${cornerRadius},0 L${width - cornerRadius},0 Q${width},0 ${width},${cornerRadius} L${width},${height - cornerRadius} Q${width},${height} ${width - cornerRadius},${height} L${cornerRadius},${height} Q0,${height} 0,${height - cornerRadius} L0,${cornerRadius} Q0,0 ${cornerRadius},0 Z M0,${lineY} L${width},${lineY} M0,${lineY + lineHeight} L${width},${lineY + lineHeight}`
 }
 
 export function createBpmnServiceTaskPath(width: number, height: number): string {
@@ -516,34 +442,14 @@ export function createBpmnServiceTaskPath(width: number, height: number): string
 
   const innerCircle = `M${cx},${cy - innerR} A${innerR},${innerR} 0 1,1 ${cx},${cy + innerR} A${innerR},${innerR} 0 1,1 ${cx},${cy - innerR}`
 
-  return `M${cornerRadius},0 
-    L${width - cornerRadius},0 
-    Q${width},0 ${width},${cornerRadius}
-    L${width},${height - cornerRadius}
-    Q${width},${height} ${width - cornerRadius},${height}
-    L${cornerRadius},${height}
-    Q0,${height} 0,${height - cornerRadius}
-    L0,${cornerRadius}
-    Q0,0 ${cornerRadius},0 Z
-    M${gearPath}
-    M${innerCircle}`
+  return `M${cornerRadius},0 L${width - cornerRadius},0 Q${width},0 ${width},${cornerRadius} L${width},${height - cornerRadius} Q${width},${height} ${width - cornerRadius},${height} L${cornerRadius},${height} Q0,${height} 0,${height - cornerRadius} L0,${cornerRadius} Q0,0 ${cornerRadius},0 Z M${gearPath} M${innerCircle}`
 }
 
 export function createBpmnSubprocessPath(width: number, height: number): string {
   const outerRadius = Math.min(width, height) * 0.08
   const innerMargin = 12
 
-  return `M${outerRadius},0 
-    L${width - outerRadius},0 
-    Q${width},0 ${width},${outerRadius}
-    L${width},${height - outerRadius}
-    Q${width},${height} ${width - outerRadius},${height}
-    L${outerRadius},${height}
-    Q0,${height} 0,${height - outerRadius}
-    L0,${outerRadius}
-    Q0,0 ${outerRadius},0 Z
-    M${innerMargin},${innerMargin} L${width - innerMargin},${innerMargin}
-    L${width - innerMargin},${height - innerMargin} L${innerMargin},${height - innerMargin} Z`
+  return `M${outerRadius},0 L${width - outerRadius},0 Q${width},0 ${width},${outerRadius} L${width},${height - outerRadius} Q${width},${height} ${width - outerRadius},${height} L${outerRadius},${height} Q0,${height} 0,${height - outerRadius} L0,${outerRadius} Q0,0 ${outerRadius},0 Z M${innerMargin},${innerMargin} L${width - innerMargin},${innerMargin} L${width - innerMargin},${height - innerMargin} L${innerMargin},${height - innerMargin} Z`
 }
 
 export function createBpmnPoolPath(width: number, height: number): string {
@@ -752,12 +658,7 @@ export function createDoubleEllipsePath(
   const innerRx = outerRx * (1 - innerMargin)
   const innerRy = outerRy * (1 - innerMargin)
 
-  return `M${cx},${cy - outerRy}
-    A${outerRx},${outerRy} 0 1,1 ${cx},${cy + outerRy}
-    A${outerRx},${outerRy} 0 1,1 ${cx},${cy - outerRy}
-    M${cx},${cy - innerRy}
-    A${innerRx},${innerRy} 0 1,1 ${cx},${cy + innerRy}
-    A${innerRx},${innerRy} 0 1,1 ${cx},${cy - innerRy}`
+  return `M${cx},${cy - outerRy} A${outerRx},${outerRy} 0 1,1 ${cx},${cy + outerRy} A${outerRx},${outerRy} 0 1,1 ${cx},${cy - outerRy} M${cx},${cy - innerRy} A${innerRx},${innerRy} 0 1,1 ${cx},${cy + innerRy} A${innerRx},${innerRy} 0 1,1 ${cx},${cy - innerRy}`
 }
 
 export function createErTableEntityPath(
@@ -806,19 +707,7 @@ export function createUmlCompositeStatePath(width: number, height: number): stri
   const innerHeight = height * 0.4
   const innerY = height - innerMargin - innerHeight
 
-  return `M${cornerRadius},0 
-    L${width - cornerRadius},0 
-    Q${width},0 ${width},${cornerRadius}
-    L${width},${height - cornerRadius}
-    Q${width},${height} ${width - cornerRadius},${height}
-    L${cornerRadius},${height}
-    Q0,${height} 0,${height - cornerRadius}
-    L0,${cornerRadius}
-    Q0,0 ${cornerRadius},0 Z
-    M${innerMargin},${innerY} 
-    L${innerMargin + innerWidth},${innerY} 
-    L${innerMargin + innerWidth},${innerY + innerHeight} 
-    L${innerMargin},${innerY + innerHeight} Z`
+  return `M${cornerRadius},0 L${width - cornerRadius},0 Q${width},0 ${width},${cornerRadius} L${width},${height - cornerRadius} Q${width},${height} ${width - cornerRadius},${height} L${cornerRadius},${height} Q0,${height} 0,${height - cornerRadius} L0,${cornerRadius} Q0,0 ${cornerRadius},0 Z M${innerMargin},${innerY} L${innerMargin + innerWidth},${innerY} L${innerMargin + innerWidth},${innerY + innerHeight} L${innerMargin},${innerY + innerHeight} Z`
 }
 
 export function createUmlProvidedInterfacePath(width: number, height: number): string {
@@ -942,16 +831,7 @@ export function createAwsVpcPath(width: number, height: number): string {
   const r = Math.min(width, height) * 0.35
   const smallR = r * 0.4
 
-  return `M${cx},${cy - r}
-    A${r},${r} 0 1,1 ${cx},${cy + r}
-    A${r},${r} 0 1,1 ${cx},${cy - r}
-    M${cx - smallR},${cy}
-    A${smallR},${smallR} 0 1,1 ${cx + smallR},${cy}
-    A${smallR},${smallR} 0 1,1 ${cx - smallR},${cy}
-    M${cx},${cy - smallR} L${cx},${cy - r * 0.7}
-    M${cx},${cy + smallR} L${cx},${cy + r * 0.7}
-    M${cx - smallR},${cy} L${cx - r * 0.7},${cy}
-    M${cx + smallR},${cy} L${cx + r * 0.7},${cy}`
+  return `M${cx},${cy - r} A${r},${r} 0 1,1 ${cx},${cy + r} A${r},${r} 0 1,1 ${cx},${cy - r} M${cx - smallR},${cy} A${smallR},${smallR} 0 1,1 ${cx + smallR},${cy} A${smallR},${smallR} 0 1,1 ${cx - smallR},${cy} M${cx},${cy - smallR} L${cx},${cy - r * 0.7} M${cx},${cy + smallR} L${cx},${cy + r * 0.7} M${cx - smallR},${cy} L${cx - r * 0.7},${cy} M${cx + smallR},${cy} L${cx + r * 0.7},${cy}`
 }
 
 export function createAwsElbPath(width: number, height: number): string {
