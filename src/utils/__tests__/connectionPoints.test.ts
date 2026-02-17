@@ -393,7 +393,7 @@ describe('connectionPoints', () => {
     it('should have custom port group', () => {
       const groups = getX6PortGroups()
       expect(groups).toHaveProperty('custom')
-      expect(groups.custom.attrs.circle.stroke).toBe('#52c41a')
+      expect((groups.custom.attrs as any).xmark.stroke).toBe('#52c41a')
     })
   })
 
@@ -473,6 +473,29 @@ describe('connectionPoints', () => {
       expect(point.isVisible).toBe(true)
       expect(point.isConnected).toBe(false)
       expect(point.connectedLineIds).toEqual([])
+    })
+
+    it('should have direction vector', () => {
+      const topPoint = createCustomConnectionPoint(0.5, 0.05)
+      expect(topPoint.dirX).toBe(0)
+      expect(topPoint.dirY).toBe(-1)
+
+      const bottomPoint = createCustomConnectionPoint(0.5, 0.95)
+      expect(bottomPoint.dirX).toBe(0)
+      expect(bottomPoint.dirY).toBe(1)
+
+      const leftPoint = createCustomConnectionPoint(0.05, 0.5)
+      expect(leftPoint.dirX).toBe(-1)
+      expect(leftPoint.dirY).toBe(0)
+
+      const rightPoint = createCustomConnectionPoint(0.95, 0.5)
+      expect(rightPoint.dirX).toBe(1)
+      expect(rightPoint.dirY).toBe(0)
+    })
+
+    it('should have inward type by default', () => {
+      const point = createCustomConnectionPoint(0.5, 0.5)
+      expect(point.type).toBe('inward')
     })
   })
 })

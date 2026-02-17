@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { Card, Tabs, Space, Form, InputNumber, ColorPicker, Button, Divider } from 'antd'
+import { Card, Tabs, Space, Form, InputNumber, ColorPicker, Button } from 'antd'
 import {
   DatabaseOutlined,
   SettingOutlined,
@@ -7,6 +7,7 @@ import {
   UnlockOutlined,
 } from '@ant-design/icons'
 import useX6GraphStore from '@stores/x6GraphStore'
+import type { ErConstraint } from '../../types/shapeLibrary'
 import ErTableEditor, { type ErTableColumn } from '../ErTableEditor'
 import { EdgePropertyPanel } from './EdgePropertyPanel'
 import { NodePropertyPanel } from './NodePropertyPanel'
@@ -65,7 +66,7 @@ const PropertyPanel: React.FC = () => {
         const typePart = constraintMatch[1].trim().split(/\s+/).slice(1).join(' ') || 'varchar'
         const constraintStr = constraintMatch[2]
         
-        const constraints: string[] = []
+        const constraints: ErConstraint[] = []
         if (constraintStr.includes('pk')) constraints.push('pk')
         if (constraintStr.includes('fk')) constraints.push('fk')
         if (constraintStr.includes('unique')) constraints.push('unique')
