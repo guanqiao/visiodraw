@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { Graph, Node as X6Node, Edge as X6Edge } from '@antv/x6'
-import type { NodeData, EdgeData } from '../stores/x6GraphStore'
+import type { ShapeData as NodeData } from '../stores/x6GraphStore'
+import type { Connector as EdgeData } from '../types/connection'
 import {
   createNodeChangeBatch,
   detectNodeChanges,
@@ -226,8 +227,10 @@ export function useOptimizedStoreSync(
    */
   function hasEdgeChanged(oldEdge: EdgeData, newEdge: EdgeData): boolean {
     return (
-      oldEdge.source !== newEdge.source ||
-      oldEdge.target !== newEdge.target ||
+      oldEdge.sourceShapeId !== newEdge.sourceShapeId ||
+      oldEdge.sourcePointId !== newEdge.sourcePointId ||
+      oldEdge.targetShapeId !== newEdge.targetShapeId ||
+      oldEdge.targetPointId !== newEdge.targetPointId ||
       oldEdge.style !== newEdge.style ||
       oldEdge.startStyle !== newEdge.startStyle ||
       oldEdge.endStyle !== newEdge.endStyle ||

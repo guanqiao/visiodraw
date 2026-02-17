@@ -140,7 +140,7 @@ describe('erTableUtils', () => {
         { name: 'id', type: 'int', constraints: ['pk'] },
         { name: 'user_id', type: 'int', constraints: ['fk'] },
         { name: 'name', type: 'varchar', constraints: [] },
-        { name: 'email', type: 'varchar', constraints: ['not null'] },
+        { name: 'email', type: 'varchar', constraints: ['notnull'] },
       ]
       
       const result = getRegularColumns(columns)

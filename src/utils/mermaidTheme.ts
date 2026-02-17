@@ -1,16 +1,6 @@
-/**
- * Mermaid 主题系统
- * 提供与 Mermaid 官方主题一致的颜色配置
- * 参考: https://mermaid.js.org/config/theming.html
- */
-
 export type MermaidThemeName = 'default' | 'dark' | 'forest' | 'neutral' | 'base'
 
-/**
- * Mermaid 主题变量定义
- */
 export interface MermaidThemeVariables {
-  // 基础颜色
   background: string
   primaryColor: string
   primaryTextColor: string
@@ -23,17 +13,14 @@ export interface MermaidThemeVariables {
   tertiaryTextColor: string
   tertiaryBorderColor: string
 
-  // 特殊元素
   noteBkgColor: string
   noteTextColor: string
   noteBorderColor: string
 
-  // 文本
   textColor: string
   fontFamily: string
   fontSize: string
 
-  // 活动图/流程图
   nodeBkg: string
   nodeBorder: string
   clusterBkg: string
@@ -42,7 +29,6 @@ export interface MermaidThemeVariables {
   titleColor: string
   edgeLabelBackground: string
 
-  // 序列图
   actorBkg: string
   actorBorder: string
   actorTextColor: string
@@ -52,14 +38,11 @@ export interface MermaidThemeVariables {
   activationBkg: string
   activationBorder: string
 
-  // 状态图
   labelColor: string
   altBackground: string
 
-  // 类图
   classText: string
 
-  // 甘特图
   sectionBkgColor: string
   altSectionBkgColor: string
   gridColor: string
@@ -74,12 +57,7 @@ export interface MermaidThemeVariables {
   activeTaskTextColor: string
 }
 
-/**
- * 默认主题 (Default Theme)
- * Mermaid 默认主题颜色配置
- */
 export const defaultTheme: MermaidThemeVariables = {
-  // 基础颜色
   background: '#f4f4f4',
   primaryColor: '#fff4dd',
   primaryTextColor: '#333',
@@ -92,26 +70,22 @@ export const defaultTheme: MermaidThemeVariables = {
   tertiaryTextColor: '#333',
   tertiaryBorderColor: '#ccc',
 
-  // 特殊元素
   noteBkgColor: '#fff5ad',
   noteTextColor: '#333',
   noteBorderColor: '#e8d665',
 
-  // 文本
   textColor: '#333',
-  fontFamily: 'trebuchet ms, verdana, arial, sans-serif',
+  fontFamily: '"trebuchet ms", verdana, arial, sans-serif',
   fontSize: '14px',
 
-  // 活动图/流程图
   nodeBkg: '#fff4dd',
   nodeBorder: '#d4b46a',
   clusterBkg: '#fff',
   clusterBorder: '#ccc',
   defaultLinkColor: '#666',
   titleColor: '#333',
-  edgeLabelBackground: '#fff',
+  edgeLabelBackground: '#eee',
 
-  // 序列图
   actorBkg: '#fff4dd',
   actorBorder: '#d4b46a',
   actorTextColor: '#333',
@@ -121,14 +95,11 @@ export const defaultTheme: MermaidThemeVariables = {
   activationBkg: '#e1e1e1',
   activationBorder: '#999',
 
-  // 状态图
   labelColor: '#333',
   altBackground: '#f4f4f4',
 
-  // 类图
   classText: '#333',
 
-  // 甘特图
   sectionBkgColor: '#fff4dd',
   altSectionBkgColor: '#e1e1e1',
   gridColor: '#ddd',
@@ -143,9 +114,6 @@ export const defaultTheme: MermaidThemeVariables = {
   activeTaskTextColor: '#333',
 }
 
-/**
- * 深色主题 (Dark Theme)
- */
 export const darkTheme: MermaidThemeVariables = {
   ...defaultTheme,
   background: '#1a1a1a',
@@ -202,9 +170,6 @@ export const darkTheme: MermaidThemeVariables = {
   activeTaskTextColor: '#e0e0e0',
 }
 
-/**
- * 森林主题 (Forest Theme)
- */
 export const forestTheme: MermaidThemeVariables = {
   ...defaultTheme,
   background: '#f4f9f4',
@@ -259,9 +224,6 @@ export const forestTheme: MermaidThemeVariables = {
   activeTaskTextColor: '#155724',
 }
 
-/**
- * 中性主题 (Neutral Theme)
- */
 export const neutralTheme: MermaidThemeVariables = {
   ...defaultTheme,
   background: '#fafafa',
@@ -316,11 +278,6 @@ export const neutralTheme: MermaidThemeVariables = {
   activeTaskTextColor: '#333',
 }
 
-/**
- * 获取主题配置
- * @param themeName 主题名称
- * @returns 主题变量
- */
 export function getTheme(themeName: MermaidThemeName): MermaidThemeVariables {
   switch (themeName) {
     case 'dark':
@@ -336,41 +293,27 @@ export function getTheme(themeName: MermaidThemeName): MermaidThemeVariables {
   }
 }
 
-/**
- * 当前使用的主题
- */
 let currentTheme: MermaidThemeVariables = { ...defaultTheme }
 
-/**
- * 设置当前主题
- * @param themeName 主题名称
- */
 export function setTheme(themeName: MermaidThemeName): void {
   currentTheme = getTheme(themeName)
 }
 
-/**
- * 获取当前主题
- * @returns 当前主题变量
- */
 export function getCurrentTheme(): MermaidThemeVariables {
   return currentTheme
 }
 
-/**
- * 获取节点样式
- * @param type 节点类型
- * @returns 填充色和边框色
- */
 export function getNodeColors(type: string): { fill: string; stroke: string; text: string } {
   const theme = getCurrentTheme()
 
   switch (type) {
     case 'uml-initial':
     case 'start':
+    case 'uml-initial-state':
       return { fill: '#52c41a', stroke: '#52c41a', text: '#fff' }
     case 'uml-final':
     case 'end':
+    case 'uml-final-state':
       return { fill: '#f5222d', stroke: '#f5222d', text: '#fff' }
     case 'uml-decision':
     case 'mermaid-rhombus':
@@ -386,14 +329,9 @@ export function getNodeColors(type: string): { fill: string; stroke: string; tex
       return { fill: '#e6fffb', stroke: '#13c2c2', text: theme.textColor }
     case 'uml-state':
       return { fill: '#f0f5ff', stroke: '#2f54eb', text: theme.textColor }
-    case 'uml-initial-state':
-      return { fill: '#52c41a', stroke: '#52c41a', text: '#fff' }
-    case 'uml-final-state':
-      return { fill: '#f5222d', stroke: '#f5222d', text: '#fff' }
     case 'er-table-entity':
     case 'er-table-entity-with-columns':
       return { fill: '#e6f7ff', stroke: '#1890ff', text: theme.textColor }
-    // Mermaid 特定形状
     case 'mermaid-stadium':
       return { fill: '#e6fffb', stroke: '#13c2c2', text: theme.textColor }
     case 'mermaid-cylinder':
@@ -414,6 +352,15 @@ export function getNodeColors(type: string): { fill: string; stroke: string; tex
       return { fill: '#f5f5f5', stroke: '#434343', text: theme.textColor }
     case 'mermaid-circle':
       return { fill: '#f0f5ff', stroke: '#2f54eb', text: theme.textColor }
+    case 'uml-class':
+      return { fill: theme.nodeBkg, stroke: theme.nodeBorder, text: theme.textColor }
+    case 'uml-lifeline':
+      return { fill: theme.actorBkg, stroke: theme.actorBorder, text: theme.textColor }
+    case 'uml-activation':
+      return { fill: theme.activationBkg, stroke: theme.activationBorder, text: theme.textColor }
+    case 'uml-note':
+      return { fill: theme.noteBkgColor, stroke: theme.noteBorderColor, text: theme.noteTextColor }
+    case 'uml-action':
     default:
       return {
         fill: theme.nodeBkg,
@@ -423,24 +370,14 @@ export function getNodeColors(type: string): { fill: string; stroke: string; tex
   }
 }
 
-/**
- * 获取边样式
- * @param style 边样式类型
- * @returns 线条颜色
- */
 export function getEdgeColors(style?: string): { stroke: string; text: string } {
   const theme = getCurrentTheme()
   return {
-    stroke: theme.lineColor,
+    stroke: theme.defaultLinkColor,
     text: theme.textColor,
   }
 }
 
-/**
- * 从 Mermaid 代码中解析主题配置
- * @param code Mermaid 代码
- * @returns 主题名称
- */
 export function parseThemeFromCode(code: string): MermaidThemeName {
   const themeMatch = code.match(/%%\s*theme:\s*(\w+)/i) ||
     code.match(/---\s*\nconfig:\s*\n\s*theme:\s*['"]?(\w+)['"]?/i)

@@ -14,105 +14,21 @@ import SqlImportDialog from '@components/SqlImportDialog'
 import ErToolbar from '@components/ErToolbar'
 import ErExportDialog from '@components/ErExportDialog'
 import MermaidImportDialog from '@components/MermaidImportDialog'
+import ResizableSider from '@components/ResizableSider'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { useTheme } from '@hooks/useTheme'
 import { v4 as uuidv4 } from 'uuid'
 import { generateErNodesFromTables, calculateErLayout, type ParsedSqlTable } from '@utils/erExporter'
 import { optimizeErLayout } from '@utils/smartRouter'
+import { parseColumnsFromText } from '@utils/erTableUtils'
 import './styles/theme.css'
 
 const { TabPane } = Tabs
 
-interface ResizableSiderProps {
-  children: React.ReactNode
-  width: number
-  minWidth: number
-  maxWidth: number
-  side: 'left' | 'right'
-  onWidthChange: (width: number) => void
-  style?: React.CSSProperties
-}
-
-const ResizableSider: React.FC<ResizableSiderProps> = ({
-  children,
-  width,
-  minWidth,
-  maxWidth,
-  side,
-  onWidthChange,
-  style,
-}) => {
-  const [isResizing, setIsResizing] = useState(false)
-  const startXRef = useRef(0)
-  const startWidthRef = useRef(width)
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setIsResizing(true)
-    startXRef.current = e.clientX
-    startWidthRef.current = width
-  }, [width])
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isResizing) return
-
-      const delta = side === 'left'
-        ? e.clientX - startXRef.current
-        : startXRef.current - e.clientX
-
-      let newWidth = startWidthRef.current + delta
-      newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth))
-      onWidthChange(newWidth)
-    }
-
-    const handleMouseUp = () => {
-      setIsResizing(false)
-    }
-
-    if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove)
-      document.addEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = 'col-resize'
-      document.body.style.userSelect = 'none'
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove)
-      document.removeEventListener('mouseup', handleMouseUp)
-      document.body.style.cursor = ''
-      document.body.style.userSelect = ''
-    }
-  }, [isResizing, minWidth, maxWidth, onWidthChange, side])
-
-  return (
-    <div style={{ position: 'relative', display: 'flex', height: '100%', ...style }}>
-      <div style={{ width, overflow: 'auto', flexShrink: 0 }}>
-        {children}
-      </div>
-      <div
-        onMouseDown={handleMouseDown}
-        style={{
-          position: 'absolute',
-          [side]: -4,
-          top: 0,
-          bottom: 0,
-          width: 8,
-          cursor: 'col-resize',
-          zIndex: 10,
-          background: isResizing ? 'var(--accent-color)' : 'transparent',
-          transition: 'background 0.2s',
-        }}
-        className="resize-handle"
-      />
-    </div>
-  )
-}
-
 const App: React.FC = () => {
   const [showTemplates, setShowTemplates] = useState(false)
-  const [, setShowStencils] = useState(false)
+  const [showStencils, setShowStencils] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showScriptEditor, setShowScriptEditor] = useState(false)
   const [showSqlExport, setShowSqlExport] = useState(false)
@@ -555,26 +471,6 @@ const App: React.FC = () => {
       />
     </Layout>
   )
-}
-
-function parseColumnsFromText(text: string) {
-  const lines = text.split('\n').filter((l) => l.trim())
-  if (lines.length <= 1) return []
-  
-  return lines.slice(1).map((line) => {
-    const parts = line.trim().split(/\s+/)
-    const name = parts[0] || ''
-    const type = parts[1] || 'varchar'
-    const constraints: import('./types/shapeLibrary').ErConstraint[] = []
-    
-    if (line.includes('[pk]')) constraints.push('pk')
-    if (line.includes('[fk]')) constraints.push('fk')
-    if (line.includes('[unique]')) constraints.push('unique')
-    if (line.includes('[notnull]')) constraints.push('notnull')
-    if (line.includes('[auto]')) constraints.push('auto')
-    
-    return { name, type, constraints }
-  })
 }
 
 export default App

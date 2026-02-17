@@ -27,6 +27,7 @@ export const createGraph = (options: GraphInitOptions): Graph => {
   const graph: Graph = new Graph({
     container,
     autoResize: true,
+    resizing: true,
     background: {
       color: bgColor,
     },
@@ -44,7 +45,6 @@ export const createGraph = (options: GraphInitOptions): Graph => {
     },
     mousewheel: {
       enabled: true,
-      modifiers: ['ctrl', 'meta'],
       minScale: 0.1,
       maxScale: 3,
     },
@@ -97,7 +97,7 @@ export const createGraph = (options: GraphInitOptions): Graph => {
     new Transform({
       resizing: {
         enabled: true,
-        preserveAspectRatio: true,
+        preserveAspectRatio: false,
       },
       rotating: true,
     })

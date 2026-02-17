@@ -7,7 +7,6 @@ import {
   createDoubleEllipsePath,
 } from '../shapeMath'
 
-// Mermaid 默认阴影
 const MERMAID_SHADOW: ShapeStyleConfig = {
   shadowBlur: 3,
   shadowColor: 'rgba(0,0,0,0.1)',
@@ -15,21 +14,15 @@ const MERMAID_SHADOW: ShapeStyleConfig = {
   shadowOffsetY: 2,
 }
 
-// Mermaid 默认圆角
 const MERMAID_RX = 5
 const MERMAID_RY = 5
 
-/**
- * Stadium 形状 - 跑道形（两端半圆）
- * Mermaid语法: ([text])
- */
 export const renderStadium = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
   const height = config.height
   const width = config.width
   const radius = height / 2
 
-  // 创建跑道形路径：矩形 + 两端半圆
   const path = `
     M${radius},0
     L${width - radius},0
@@ -46,18 +39,16 @@ export const renderStadium = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fill: config.fill || '#e6fffb',
+        stroke: config.stroke || '#13c2c2',
       },
     },
   })
 }
 
-/**
- * Cylinder 形状 - 圆柱形/数据库
- * Mermaid语法: [(text)]
- */
 export const renderCylinder = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
-  const path = createCylinderPath(config.width, config.height, 0.2)
+  const path = createCylinderPath(config.width, config.height, 0.15)
 
   return new Shape.Path({
     ...base,
@@ -66,20 +57,18 @@ export const renderCylinder = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fill: config.fill || '#f6ffed',
+        stroke: config.stroke || '#52c41a',
       },
     },
   })
 }
 
-/**
- * Hexagon 形状 - 六边形
- * Mermaid语法: {{text}}
- */
 export const renderHexagon = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
   const width = config.width
   const height = config.height
-  const cornerWidth = width * 0.2
+  const cornerWidth = width * 0.15
 
   const path = `
     M${cornerWidth},0
@@ -98,18 +87,16 @@ export const renderHexagon = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fill: config.fill || '#fff2e8',
+        stroke: config.stroke || '#fa8c16',
       },
     },
   })
 }
 
-/**
- * Parallelogram 形状 - 平行四边形（左斜）
- * Mermaid语法: [/text/]
- */
 export const renderParallelogramLeft = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
-  const points = createParallelogramPoints(config.width, config.height, 0.2)
+  const points = createParallelogramPoints(config.width, config.height, 0.15)
 
   return new Shape.Polygon({
     ...base,
@@ -118,22 +105,19 @@ export const renderParallelogramLeft = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         points,
+        fill: config.fill || '#f9f0ff',
+        stroke: config.stroke || '#722ed1',
       },
     },
   })
 }
 
-/**
- * Parallelogram 形状 - 平行四边形（右斜）
- * Mermaid语法: [\text\]
- */
 export const renderParallelogramRight = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
   const width = config.width
   const height = config.height
-  const skew = width * 0.2
+  const skew = width * 0.15
 
-  // 右斜平行四边形
   const points = `0,0 ${width - skew},0 ${width},${height} ${skew},${height}`
 
   return new Shape.Polygon({
@@ -143,18 +127,16 @@ export const renderParallelogramRight = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         points,
+        fill: config.fill || '#f9f0ff',
+        stroke: config.stroke || '#722ed1',
       },
     },
   })
 }
 
-/**
- * Trapezoid 形状 - 梯形（上宽下窄）
- * Mermaid语法: [/\text\]
- */
 export const renderTrapezoidTop = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
-  const points = createTrapezoidPoints(config.width, config.height, 0.6)
+  const points = createTrapezoidPoints(config.width, config.height, 0.7)
 
   return new Shape.Polygon({
     ...base,
@@ -163,23 +145,20 @@ export const renderTrapezoidTop = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         points,
+        fill: config.fill || '#fff0f6',
+        stroke: config.stroke || '#eb2f96',
       },
     },
   })
 }
 
-/**
- * Trapezoid 形状 - 梯形（上窄下宽）
- * Mermaid语法: [\text/]
- */
 export const renderTrapezoidBottom = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
   const width = config.width
   const height = config.height
-  const topWidth = width * 0.6
+  const topWidth = width * 0.7
   const leftOffset = (width - topWidth) / 2
 
-  // 上窄下宽的梯形
   const points = `${leftOffset},0 ${leftOffset + topWidth},0 ${width},${height} 0,${height}`
 
   return new Shape.Polygon({
@@ -189,22 +168,19 @@ export const renderTrapezoidBottom = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         points,
+        fill: config.fill || '#fff0f6',
+        stroke: config.stroke || '#eb2f96',
       },
     },
   })
 }
 
-/**
- * Subroutine 形状 - 子程序（双边框矩形）
- * Mermaid语法: [[text]]
- */
 export const renderSubroutine = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { rx: MERMAID_RX, ry: MERMAID_RY, ...MERMAID_SHADOW })
   const width = config.width
   const height = config.height
-  const borderOffset = Math.min(width, height) * 0.08
+  const borderOffset = Math.min(width, height) * 0.06
 
-  // 创建双边框路径
   const path = `
     M0,0 L${width},0 L${width},${height} L0,${height} Z
     M${borderOffset},${borderOffset} L${width - borderOffset},${borderOffset}
@@ -219,18 +195,16 @@ export const renderSubroutine = (config: ShapeRenderConfig): Node => {
         ...base.attrs.body,
         d: path,
         fillRule: 'evenodd',
+        fill: config.fill || '#e6f7ff',
+        stroke: config.stroke || '#1890ff',
       },
     },
   })
 }
 
-/**
- * Double Circle 形状 - 双圆
- * Mermaid语法: (((text)))
- */
 export const renderDoubleCircle = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
-  const path = createDoubleEllipsePath(config.width, config.height, 0.2)
+  const path = createDoubleEllipsePath(config.width, config.height, 0.18)
 
   return new Shape.Path({
     ...base,
@@ -239,20 +213,18 @@ export const renderDoubleCircle = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fill: config.fill || '#fff7e6',
+        stroke: config.stroke || '#fa8c16',
       },
     },
   })
 }
 
-/**
- * Asymmetric 形状 - 不对称形状
- * Mermaid语法: >text]
- */
 export const renderAsymmetric = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
   const width = config.width
   const height = config.height
-  const arrowWidth = width * 0.25
+  const arrowWidth = width * 0.2
 
   const path = `
     M${arrowWidth},0
@@ -270,15 +242,13 @@ export const renderAsymmetric = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fill: config.fill || '#f5f5f5',
+        stroke: config.stroke || '#434343',
       },
     },
   })
 }
 
-/**
- * Circle 形状 - 圆形
- * Mermaid语法: ((text))
- */
 export const renderCircle = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
   const cx = config.width / 2
@@ -298,15 +268,13 @@ export const renderCircle = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         d: path,
+        fill: config.fill || '#f0f5ff',
+        stroke: config.stroke || '#2f54eb',
       },
     },
   })
 }
 
-/**
- * Rhombus 形状 - 菱形（决策）
- * Mermaid语法: {text}
- */
 export const renderRhombus = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config, { ...MERMAID_SHADOW })
   const width = config.width
@@ -321,12 +289,30 @@ export const renderRhombus = (config: ShapeRenderConfig): Node => {
       body: {
         ...base.attrs.body,
         points,
+        fill: config.fill || '#fff7e6',
+        stroke: config.stroke || '#fa8c16',
       },
     },
   })
 }
 
-// Mermaid 形状渲染器映射
+export const renderMermaidAction = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config, { rx: 5, ry: 5, ...MERMAID_SHADOW })
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: config.fill || '#fff4dd',
+        stroke: config.stroke || '#d4b46a',
+        rx: 5,
+        ry: 5,
+      },
+    },
+  })
+}
+
 export const mermaidRenderers = {
   'mermaid-stadium': renderStadium,
   'mermaid-cylinder': renderCylinder,
@@ -340,4 +326,5 @@ export const mermaidRenderers = {
   'mermaid-asymmetric': renderAsymmetric,
   'mermaid-circle': renderCircle,
   'mermaid-rhombus': renderRhombus,
+  'uml-action': renderMermaidAction,
 }

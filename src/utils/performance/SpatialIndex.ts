@@ -1,4 +1,4 @@
-import type { ConnectionPoint } from '../connectionPoints'
+import type { ConnectionPoint } from '../../types/connection'
 
 interface Point {
   x: number

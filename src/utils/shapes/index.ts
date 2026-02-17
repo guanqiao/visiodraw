@@ -20,7 +20,22 @@ export * from './er'
 export * from './bpmn'
 export * from './cloud'
 export * from './cloudProviders'
-export * from './mermaidShapes'
+// 从mermaidShapes选择性导出，避免与base中的renderCircle冲突
+export {
+  renderStadium,
+  renderCylinder,
+  renderHexagon as renderMermaidHexagon,
+  renderParallelogramLeft,
+  renderParallelogramRight,
+  renderTrapezoidTop,
+  renderTrapezoidBottom,
+  renderSubroutine,
+  renderDoubleCircle,
+  renderAsymmetric,
+  renderCircle as renderMermaidCircle,
+  renderRhombus,
+  mermaidRenderers,
+} from './mermaidShapes'
 
 const awsRenderers: ShapeRendererMap = {
   'aws-ec2': cloudRenderers.server,

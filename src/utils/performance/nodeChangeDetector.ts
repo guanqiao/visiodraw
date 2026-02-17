@@ -1,4 +1,4 @@
-import type { NodeData } from '../../stores/x6GraphStore'
+import type { ShapeData as NodeData } from '../../stores/x6GraphStore'
 
 interface NodeChanges {
   positionChanged: boolean

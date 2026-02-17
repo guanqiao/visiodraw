@@ -1,8 +1,6 @@
-export interface ErColumn {
-  name: string
-  type: string
-  constraints: string[]
-}
+import type { ErColumn, ErConstraint } from '../types/shapeLibrary'
+
+export type { ErColumn, ErConstraint }
 
 export interface ErTableData {
   tableName: string
@@ -37,13 +35,13 @@ export const parseErColumns = (text: string, delimiter: RegExp = /\t/): ErTableD
     if (parts.length >= 2) {
       const name = parts[0]
       const type = parts[1]
-      let constraints: string[] = []
+      let constraints: ErConstraint[] = []
       
       if (parts.length >= 3 && parts[2]) {
         const constraintStr = parts[2]
         const match = constraintStr.match(/\[([^\]]+)\]/)
         if (match) {
-          constraints = match[1].split(',').map(c => c.trim()).filter(Boolean)
+          constraints = match[1].split(',').map(c => c.trim() as ErConstraint).filter(Boolean)
         }
       }
       
@@ -115,4 +113,24 @@ export const updateErColumn = (text: string, columnName: string, updates: Partia
     c.name === columnName ? { ...c, ...updates } : c
   )
   return formatErColumns(tableName, newColumns)
+}
+
+export const parseColumnsFromText = (text: string): ErColumn[] => {
+  const lines = text.split('\n').filter((l) => l.trim())
+  if (lines.length <= 1) return []
+  
+  return lines.slice(1).map((line) => {
+    const parts = line.trim().split(/\s+/)
+    const name = parts[0] || ''
+    const type = parts[1] || 'varchar'
+    const constraints: ErConstraint[] = []
+    
+    if (line.includes('[pk]')) constraints.push('pk')
+    if (line.includes('[fk]')) constraints.push('fk')
+    if (line.includes('[unique]')) constraints.push('unique')
+    if (line.includes('[notnull]')) constraints.push('notnull')
+    if (line.includes('[auto]')) constraints.push('auto')
+    
+    return { name, type, constraints }
+  })
 }

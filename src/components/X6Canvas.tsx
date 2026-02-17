@@ -105,6 +105,7 @@ const X6Canvas: React.FC = () => {
     const graph: Graph = new Graph({
       container: containerRef.current,
       autoResize: true,
+      resizing: true,
       background: {
         color: bgColor,
       },
@@ -122,7 +123,6 @@ const X6Canvas: React.FC = () => {
       },
       mousewheel: {
         enabled: true,
-        modifiers: ['ctrl', 'meta'],
         minScale: 0.1,
         maxScale: 3,
       },
@@ -177,7 +177,7 @@ const X6Canvas: React.FC = () => {
       new Transform({
         resizing: {
           enabled: true,
-          preserveAspectRatio: true,
+          preserveAspectRatio: false,
         },
         rotating: true,
       })

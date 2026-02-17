@@ -67,9 +67,27 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
       addNodes(template.shapes)
     }
 
-    // Add template connectors
+    // Add template connectors - convert to Connector format
     if (template.connectors && template.connectors.length > 0) {
-      template.connectors.forEach((connector) => addEdge(connector))
+      template.connectors.forEach((connector) => {
+        const convertedConnector = {
+          id: connector.id,
+          sourceShapeId: connector.source,
+          sourcePointId: 'bottom',
+          targetShapeId: connector.target,
+          targetPointId: 'top',
+          style: 'orthogonal' as const,
+          lineStyle: 'solid' as const,
+          startStyle: 'none' as const,
+          endStyle: 'arrow' as const,
+          stroke: '#333333',
+          strokeWidth: 2,
+          ...(connector.label && {
+            labels: [{ id: `${connector.id}-label`, text: connector.label, position: 0.5 }]
+          }),
+        }
+        addEdge(convertedConnector)
+      })
     }
 
     message.success(`已应用模板: ${template.name}`)

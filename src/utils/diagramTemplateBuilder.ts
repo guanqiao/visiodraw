@@ -1,8 +1,3 @@
-/**
- * 图表模板构建器
- * 将模板数据转换为 X6 节点/边配置
- */
-
 import type {
   DiagramTemplate,
   TemplateNode,
@@ -13,9 +8,6 @@ import type { ShapeData } from '../stores/x6GraphStore'
 import type { Connector, ConnectorEndStyle } from '../types/connection'
 import { getCurrentTheme } from './mermaidTheme'
 
-/**
- * 将模板节点转换为 X6 ShapeData
- */
 export function templateNodeToShapeData(node: TemplateNode): ShapeData {
   return {
     id: node.id,
@@ -31,47 +23,86 @@ export function templateNodeToShapeData(node: TemplateNode): ShapeData {
   }
 }
 
-/**
- * 将模板边转换为 X6 Connector
- */
-export function templateEdgeToConnector(edge: TemplateEdge): Connector {
+export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[]): Connector {
+  const sourceNode = nodes.find(n => n.id === edge.source)
+  const targetNode = nodes.find(n => n.id === edge.target)
+  
+  const { sourcePointId, targetPointId } = calculateConnectionPoints(
+    sourceNode,
+    targetNode,
+    edge.style
+  )
+  
   const startMarker = edge.startMarker || 'none'
   const endMarker = edge.endMarker || 'arrow'
+  
+  const theme = getCurrentTheme()
   
   return {
     id: edge.id,
     sourceShapeId: edge.source,
-    sourcePointId: 'bottom',
+    sourcePointId,
     targetShapeId: edge.target,
-    targetPointId: 'top',
+    targetPointId,
     style: (edge.style as any) || 'orthogonal',
     lineStyle: edge.lineStyle || 'solid',
     startStyle: (startMarker === 'none' ? 'none' : startMarker) as ConnectorEndStyle,
     endStyle: (endMarker === 'arrow' ? 'classic' : endMarker) as ConnectorEndStyle,
-    stroke: '#666',
+    stroke: theme.lineColor || '#666',
     strokeWidth: 2,
-    labels: edge.label ? [{ id: `${edge.id}-label`, text: edge.label, position: 0.5 }] : undefined,
+    labels: edge.label ? [{ 
+      id: `${edge.id}-label`, 
+      text: edge.label, 
+      position: 0.5,
+      fontSize: 12,
+      color: theme.textColor || '#333',
+      backgroundColor: theme.edgeLabelBackground || '#fff',
+    }] : undefined,
   }
 }
 
-/**
- * 构建图表模板
- * @param template 图表模板
- * @returns X6 配置
- */
+function calculateConnectionPoints(
+  sourceNode?: TemplateNode,
+  targetNode?: TemplateNode,
+  style?: string
+): { sourcePointId: string; targetPointId: string } {
+  if (!sourceNode || !targetNode) {
+    return { sourcePointId: 'bottom', targetPointId: 'top' }
+  }
+  
+  const sourceCenterX = sourceNode.x + (sourceNode.width || 100) / 2
+  const sourceCenterY = sourceNode.y + (sourceNode.height || 60) / 2
+  const targetCenterX = targetNode.x + (targetNode.width || 100) / 2
+  const targetCenterY = targetNode.y + (targetNode.height || 60) / 2
+  
+  const dx = targetCenterX - sourceCenterX
+  const dy = targetCenterY - sourceCenterY
+  
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (dx > 0) {
+      return { sourcePointId: 'right', targetPointId: 'left' }
+    } else {
+      return { sourcePointId: 'left', targetPointId: 'right' }
+    }
+  } else {
+    if (dy > 0) {
+      return { sourcePointId: 'bottom', targetPointId: 'top' }
+    } else {
+      return { sourcePointId: 'top', targetPointId: 'bottom' }
+    }
+  }
+}
+
 export function buildDiagramTemplate(template: DiagramTemplate): {
   nodes: ShapeData[]
   edges: Connector[]
 } {
   const nodes = template.nodes.map(templateNodeToShapeData)
-  const edges = template.edges?.map(templateEdgeToConnector) || []
+  const edges = template.edges?.map(edge => templateEdgeToConnector(edge, template.nodes)) || []
 
   return { nodes, edges }
 }
 
-/**
- * 生成模板选项的默认值
- */
 export function getDefaultGenerateOptions(): Required<TemplateGenerateOptions> {
   return {
     startX: 100,
@@ -81,9 +112,6 @@ export function getDefaultGenerateOptions(): Required<TemplateGenerateOptions> {
   }
 }
 
-/**
- * 计算节点位置
- */
 export function calculateNodePosition(
   index: number,
   options: TemplateGenerateOptions = {}
@@ -103,9 +131,6 @@ export function calculateNodePosition(
   }
 }
 
-/**
- * 创建模板节点
- */
 export function createTemplateNode(
   id: string,
   type: string,
@@ -126,7 +151,6 @@ export function createTemplateNode(
     text,
   }
 
-  // 根据类型设置默认样式（使用 Mermaid 主题颜色）
   switch (type) {
     case 'uml-initial':
     case 'uml-final':
@@ -239,9 +263,6 @@ export function createTemplateNode(
   }
 }
 
-/**
- * 创建模板边
- */
 export function createTemplateEdge(
   source: string,
   target: string,
@@ -255,5 +276,75 @@ export function createTemplateEdge(
     label,
     style: 'orthogonal',
     lineStyle: 'solid',
+  }
+}
+
+export function createSequenceDiagramEdge(
+  source: string,
+  target: string,
+  label?: string,
+  lineStyle: 'solid' | 'dashed' = 'solid',
+  index: number = 0
+): TemplateEdge {
+  return {
+    id: `edge-${index}`,
+    source,
+    target,
+    label,
+    style: 'straight',
+    lineStyle,
+    endMarker: 'arrow',
+  }
+}
+
+export function createClassDiagramEdge(
+  source: string,
+  target: string,
+  relation: string,
+  label?: string,
+  index: number = 0
+): TemplateEdge {
+  const lineStyle = relation.includes('.') ? 'dashed' : 'solid'
+  let endMarker: 'arrow' | 'diamond' | 'none' = 'arrow'
+  let startMarker: 'none' | 'diamond' | 'arrow' = 'none'
+  
+  if (relation.includes('<|--')) {
+    endMarker = 'arrow'
+    startMarker = 'none'
+  } else if (relation.includes('*--')) {
+    endMarker = 'diamond'
+  } else if (relation.includes('o--')) {
+    endMarker = 'diamond'
+  } else if (relation.includes('..|>')) {
+    endMarker = 'arrow'
+  }
+  
+  return {
+    id: `edge-${index}`,
+    source,
+    target,
+    label,
+    style: 'orthogonal',
+    lineStyle,
+    startMarker,
+    endMarker,
+  }
+}
+
+export function createERDiagramEdge(
+  source: string,
+  target: string,
+  cardinality: string,
+  label?: string,
+  index: number = 0
+): TemplateEdge {
+  return {
+    id: `edge-${index}`,
+    source,
+    target,
+    label,
+    style: 'orthogonal',
+    lineStyle: 'solid',
+    endMarker: 'none',
   }
 }
