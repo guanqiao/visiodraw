@@ -103,7 +103,7 @@ export const renderAwsIam = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -254,7 +254,7 @@ export const renderAzureKeyVault = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })

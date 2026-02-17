@@ -314,7 +314,10 @@ const useX6GraphStore = create<X6GraphState>()(
         if (newZoom === currentZoom) return
 
         if (graph) {
-          graph.zoomTo(newZoom)
+          const actualZoom = graph.zoom()
+          if (Math.abs(actualZoom - newZoom) > 0.001) {
+            graph.zoomTo(newZoom)
+          }
         }
         set({ zoom: newZoom })
       },

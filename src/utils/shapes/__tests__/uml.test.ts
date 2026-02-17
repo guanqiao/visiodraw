@@ -155,7 +155,7 @@ describe('UML shape renderers', () => {
 
     it('should have valid path data', () => {
       const node = renderUmlSwimlanePool(defaultConfig)
-      const pathData = node.attr('body/refD')
+      const pathData = node.attr('refD')
 
       expect(pathData).toBeDefined()
       expect(pathData).toContain('M')

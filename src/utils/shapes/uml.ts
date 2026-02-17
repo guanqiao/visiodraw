@@ -318,7 +318,7 @@ export const renderUmlSwimlaneVertical = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fillRule: 'evenodd',
         fill: '#fff',
         stroke: '#999',
@@ -342,7 +342,7 @@ export const renderUmlSwimlaneSeparator = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: 'none',
         strokeDasharray: '4,2',
         stroke: '#999',
@@ -364,7 +364,7 @@ export const renderUmlSwimlane = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fillRule: 'evenodd',
         fill: '#fff',
         stroke: '#999',
@@ -410,7 +410,7 @@ export const renderUmlInitialState = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: '#52c41a',
         stroke: '#52c41a',
       },

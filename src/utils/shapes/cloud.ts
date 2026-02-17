@@ -122,7 +122,7 @@ export const renderLaptop = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -137,7 +137,7 @@ export const renderWifi = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: 'none',
       },
     },

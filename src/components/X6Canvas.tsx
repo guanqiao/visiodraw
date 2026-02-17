@@ -1279,21 +1279,4 @@ const X6Canvas: React.FC = () => {
   )
 }
 
-// Helper function to create X6 node from data
-function createX6NodeFromData(node: any): Node {
-  return renderShape(node.type, {
-    id: node.id,
-    x: node.x,
-    y: node.y,
-    width: node.width,
-    height: node.height,
-    fill: node.fill,
-    stroke: node.stroke,
-    strokeWidth: node.strokeWidth,
-    text: node.text,
-    rx: node.rx,
-    ry: node.ry,
-  })
-}
-
 export default X6Canvas
