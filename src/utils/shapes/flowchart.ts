@@ -52,7 +52,7 @@ export const renderDocument = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -67,7 +67,7 @@ export const renderDatabase = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })

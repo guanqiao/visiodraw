@@ -86,6 +86,7 @@ export interface X6GraphState {
   updateNodeConnectionPoints: (id: string, connectionPoints: ConnectionPoint[]) => void
   addConnectionPoint: (nodeId: string, connectionPoint: ConnectionPoint) => void
   removeConnectionPoint: (nodeId: string, connectionPointId: string) => void
+  updateConnectionPoint: (nodeId: string, connectionPointId: string, updates: Partial<ConnectionPoint>) => void
 
   // History
   undo: () => void
@@ -611,6 +612,22 @@ const useX6GraphStore = create<X6GraphState>()(
               ...node,
               connectionPoints: (node.connectionPoints || []).filter(
                 (cp) => cp.id !== connectionPointId
+              ),
+            }
+          }
+          return node
+        })
+        set({ nodes: newNodes, isModified: true })
+      },
+
+      updateConnectionPoint: (nodeId, connectionPointId, updates) => {
+        const { nodes } = get()
+        const newNodes = nodes.map((node) => {
+          if (node.id === nodeId) {
+            return {
+              ...node,
+              connectionPoints: (node.connectionPoints || []).map((cp) =>
+                cp.id === connectionPointId ? { ...cp, ...updates } : cp
               ),
             }
           }

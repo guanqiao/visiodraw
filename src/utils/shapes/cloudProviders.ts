@@ -58,7 +58,7 @@ export const renderAwsElb = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -73,7 +73,7 @@ export const renderAwsSqs = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -88,7 +88,7 @@ export const renderAwsSns = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -118,7 +118,7 @@ export const renderAwsCloudWatch = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -133,7 +133,7 @@ export const renderAwsKinesis = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -148,7 +148,7 @@ export const renderAwsEventBridge = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -163,7 +163,7 @@ export const renderAwsStepFunctions = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -178,7 +178,7 @@ export const renderAwsCloudFormation = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -194,7 +194,7 @@ export const renderAzureVnet = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -209,7 +209,7 @@ export const renderAzureLoadBalancer = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -224,7 +224,7 @@ export const renderAzureEventHub = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -239,7 +239,7 @@ export const renderAzureServiceBus = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -269,7 +269,7 @@ export const renderAzureLogicApps = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -284,7 +284,7 @@ export const renderAzureEventGrid = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -299,7 +299,7 @@ export const renderAzureDevOps = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -315,7 +315,7 @@ export const renderGcpVpc = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -330,7 +330,7 @@ export const renderGcpLoadBalancer = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -345,7 +345,7 @@ export const renderGcpPubSub = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -360,7 +360,7 @@ export const renderGcpDataflow = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -376,7 +376,7 @@ export const renderAliyunVpc = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -391,7 +391,7 @@ export const renderAliyunSlb = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -406,7 +406,7 @@ export const renderAliyunRocketMq = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -422,7 +422,7 @@ export const renderTencentClb = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -437,7 +437,7 @@ export const renderTencentCmq = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -452,7 +452,7 @@ export const renderTencentCls = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -468,7 +468,7 @@ export const renderCloudLoadBalancer = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -483,7 +483,7 @@ export const renderCloudMq = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })

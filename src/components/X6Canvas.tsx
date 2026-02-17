@@ -14,7 +14,7 @@ import { THEME_CHANGE_EVENT } from '@hooks/useTheme'
 import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
 import { v4 as uuidv4 } from 'uuid'
 import { parseDragData } from '../types/dragDrop'
-import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVisibility, isNearNodeEdge, getEdgePointFromMouse, addCustomPort, createCustomConnectionPoint, removeCustomPort } from '@utils/connectionPoints'
+import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVisibility, isNearNodeEdge, getEdgePointFromMouse, addCustomPort, createCustomConnectionPoint, removeCustomPort, updateCustomPortPosition } from '@utils/connectionPoints'
 import { ConnectorRenderer } from '@utils/connectorRenderer'
 import { renderShape } from '@utils/shapeRenderers'
 import ERRelationQuickSelector, { isErTableNode, getErNodeName } from '@components/ERRelationQuickSelector'
@@ -69,6 +69,7 @@ const X6Canvas: React.FC = () => {
   const autoSaveToHistory = useX6GraphStore((state) => state.autoSaveToHistory)
   const addConnectionPoint = useX6GraphStore((state) => state.addConnectionPoint)
   const removeConnectionPoint = useX6GraphStore((state) => state.removeConnectionPoint)
+  const updateConnectionPoint = useX6GraphStore((state) => state.updateConnectionPoint)
 
   const copy = useClipboardStore((state) => state.copy)
   const paste = useClipboardStore((state) => state.paste)
@@ -288,25 +289,53 @@ const X6Canvas: React.FC = () => {
       clearSelection()
     })
 
-    // Ctrl+Click to add custom connection point on node edge
+    // Ctrl+Click to add custom connection point anywhere on node
     graph.on('node:click', ({ node, e }: { node: Node; e: any }) => {
-      if (!e.ctrlKey && !e.metaKey) return
+      if (!e.ctrlKey && !e.metaKey && currentTool !== 'connection-point') return
 
       const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
+      const position = node.getPosition()
+      const size = node.getSize()
       
-      if (!isNearNodeEdge(node, localPoint.x, localPoint.y, 15)) return
+      const relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
+      const relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
 
-      const edgePoint = getEdgePointFromMouse(node, localPoint.x, localPoint.y)
-      if (!edgePoint) return
-
-      const portInfo = addCustomPort(node, edgePoint.x, edgePoint.y)
+      const portInfo = addCustomPort(node, relativeX, relativeY)
       
-      const connectionPoint = createCustomConnectionPoint(edgePoint.x, edgePoint.y)
+      const connectionPoint = createCustomConnectionPoint(relativeX, relativeY)
       connectionPoint.id = portInfo.id
       
       addConnectionPoint(node.id, connectionPoint)
       
       message.success('已添加连接点')
+    })
+
+    // Drag to move custom connection point
+    let draggingPort: { nodeId: string; portId: string } | null = null
+    
+    graph.on('port:mousedown', ({ node, port, e }: { node: Node; port: any; e: any }) => {
+      if (port.id?.startsWith('custom-')) {
+        draggingPort = { nodeId: node.id, portId: port.id }
+        e.stopPropagation()
+      }
+    })
+
+    graph.on('port:mousemove', ({ node, port, e }: { node: Node; port: any; e: any }) => {
+      if (!draggingPort || draggingPort.portId !== port.id) return
+      
+      const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
+      const position = node.getPosition()
+      const size = node.getSize()
+      
+      const relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
+      const relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
+      
+      updateCustomPortPosition(node, port.id, relativeX, relativeY)
+      updateConnectionPoint(node.id, port.id, { x: relativeX, y: relativeY })
+    })
+
+    graph.on('port:mouseup', () => {
+      draggingPort = null
     })
 
     // Right-click on custom port to remove it
@@ -899,6 +928,17 @@ const X6Canvas: React.FC = () => {
       }
     })
 
+    // Connection point tool mode (Ctrl+Shift+1)
+    graph.bindKey(['ctrl+shift+1', 'meta+shift+1'], () => {
+      if (currentTool === 'connection-point') {
+        setTool('select')
+        message.info('已退出连接点工具模式')
+      } else {
+        setTool('connection-point')
+        message.info('连接点工具模式：点击图形添加连接点，Esc 退出')
+      }
+    })
+
     graphRef.current = graph
     setGraph(graph)
 
@@ -1005,27 +1045,23 @@ const X6Canvas: React.FC = () => {
     if (!graph) return
 
     const handleNodeMouseMove = ({ node, e }: { node: Node; e: any }) => {
-      if (!ctrlPressed) {
+      if (!ctrlPressed && currentTool !== 'connection-point') {
         setHoveredEdgePoint(null)
         return
       }
 
       const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
+      const position = node.getPosition()
+      const size = node.getSize()
       
-      if (isNearNodeEdge(node, localPoint.x, localPoint.y, 15)) {
-        const edgePoint = getEdgePointFromMouse(node, localPoint.x, localPoint.y)
-        if (edgePoint) {
-          const position = node.getPosition()
-          const size = node.getSize()
-          const clientPoint = graph.localToClient(
-            position.x + edgePoint.x * size.width,
-            position.y + edgePoint.y * size.height
-          )
-          setHoveredEdgePoint({ x: clientPoint.x, y: clientPoint.y })
-        }
-      } else {
-        setHoveredEdgePoint(null)
-      }
+      const relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
+      const relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
+      
+      const clientPoint = graph.localToClient(
+        position.x + relativeX * size.width,
+        position.y + relativeY * size.height
+      )
+      setHoveredEdgePoint({ x: clientPoint.x, y: clientPoint.y })
     }
 
     const handleBlankMouseMove = () => {
@@ -1039,7 +1075,7 @@ const X6Canvas: React.FC = () => {
       graph.off('node:mousemove', handleNodeMouseMove)
       graph.off('blank:mousemove', handleBlankMouseMove)
     }
-  }, [ctrlPressed])
+  }, [ctrlPressed, currentTool])
 
   // Handle drop events
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -1122,6 +1158,8 @@ const X6Canvas: React.FC = () => {
         return 'default'
       case 'hand':
         return 'grab'
+      case 'connection-point':
+        return 'crosshair'
       case 'rectangle':
       case 'circle':
       case 'triangle':
