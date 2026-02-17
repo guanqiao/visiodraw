@@ -38,7 +38,7 @@ export const renderStadium = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: config.fill || '#e6fffb',
         stroke: config.stroke || '#13c2c2',
       },
@@ -56,7 +56,7 @@ export const renderCylinder = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: config.fill || '#f6ffed',
         stroke: config.stroke || '#52c41a',
       },
@@ -86,7 +86,7 @@ export const renderHexagon = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: config.fill || '#fff2e8',
         stroke: config.stroke || '#fa8c16',
       },
@@ -193,7 +193,7 @@ export const renderSubroutine = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fillRule: 'evenodd',
         fill: config.fill || '#e6f7ff',
         stroke: config.stroke || '#1890ff',
@@ -212,7 +212,7 @@ export const renderDoubleCircle = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: config.fill || '#fff7e6',
         stroke: config.stroke || '#fa8c16',
       },
@@ -241,7 +241,7 @@ export const renderAsymmetric = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: config.fill || '#f5f5f5',
         stroke: config.stroke || '#434343',
       },
@@ -267,7 +267,7 @@ export const renderCircle = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: config.fill || '#f0f5ff',
         stroke: config.stroke || '#2f54eb',
       },

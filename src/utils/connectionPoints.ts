@@ -344,14 +344,21 @@ export function getX6PortGroups() {
         name: 'absolute',
         args: { x: 0.5, y: 0 },
       },
+      markup: [
+        {
+          tagName: 'path',
+          selector: 'xmark',
+        },
+      ],
       attrs: {
-        circle: {
-          r: 6,
-          magnet: true,
+        xmark: {
+          d: 'M-5,-5 L5,5 M-5,5 L5,-5',
           stroke: '#52c41a',
           strokeWidth: 2,
-          fill: '#fff',
-          opacity: 0.8,
+          strokeLinecap: 'round',
+          fill: 'none',
+          magnet: true,
+          opacity: 0.9,
         },
       },
     },
@@ -494,18 +501,45 @@ export function getEdgePointFromMouse(
 }
 
 /**
+ * 计算连接点的方向向量
+ */
+export function calculateDirectionVector(
+  relativeX: number,
+  relativeY: number
+): { dirX: number; dirY: number } {
+  const edgeThreshold = 0.15
+  
+  if (relativeY <= edgeThreshold) {
+    return { dirX: 0, dirY: -1 }
+  }
+  if (relativeY >= 1 - edgeThreshold) {
+    return { dirX: 0, dirY: 1 }
+  }
+  if (relativeX <= edgeThreshold) {
+    return { dirX: -1, dirY: 0 }
+  }
+  if (relativeX >= 1 - edgeThreshold) {
+    return { dirX: 1, dirY: 0 }
+  }
+  
+  return { dirX: 0, dirY: 0 }
+}
+
+/**
  * 动态添加自定义 Port 到节点
  */
 export function addCustomPort(
   node: any,
   relativeX: number,
   relativeY: number
-): { id: string; x: number; y: number } {
+): { id: string; x: number; y: number; dirX: number; dirY: number } {
   const portId = `custom-${uuidv4()}`
   const size = node.getSize()
   
   const absoluteX = relativeX * size.width
   const absoluteY = relativeY * size.height
+  
+  const { dirX, dirY } = calculateDirectionVector(relativeX, relativeY)
 
   node.addPort({
     id: portId,
@@ -514,13 +548,20 @@ export function addCustomPort(
       x: absoluteX,
       y: absoluteY,
     },
+    markup: [
+      {
+        tagName: 'path',
+        selector: 'xmark',
+      },
+    ],
     attrs: {
-      circle: {
-        r: 6,
-        magnet: true,
+      xmark: {
+        d: 'M-5,-5 L5,5 M-5,5 L5,-5',
         stroke: '#52c41a',
         strokeWidth: 2,
-        fill: '#fff',
+        strokeLinecap: 'round',
+        fill: 'none',
+        magnet: true,
         opacity: 1,
       },
     },
@@ -530,6 +571,8 @@ export function addCustomPort(
     id: portId,
     x: relativeX,
     y: relativeY,
+    dirX,
+    dirY,
   }
 }
 
@@ -552,6 +595,8 @@ export function createCustomConnectionPoint(
   relativeX: number,
   relativeY: number
 ): ConnectionPoint {
+  const { dirX, dirY } = calculateDirectionVector(relativeX, relativeY)
+  
   return {
     id: `custom-${uuidv4()}`,
     x: relativeX,
@@ -562,7 +607,31 @@ export function createCustomConnectionPoint(
     connectedLineIds: [],
     isDynamic: false,
     isCustom: true,
+    dirX,
+    dirY,
+    type: 'inward',
   }
+}
+
+/**
+ * 更新自定义连接点位置
+ */
+export function updateCustomPortPosition(
+  node: any,
+  portId: string,
+  newRelativeX: number,
+  newRelativeY: number
+): boolean {
+  const port = node.getPort(portId)
+  if (!port || !portId.startsWith('custom-')) return false
+  
+  const size = node.getSize()
+  const absoluteX = newRelativeX * size.width
+  const absoluteY = newRelativeY * size.height
+  
+  node.setPortProp(portId, 'args', { x: absoluteX, y: absoluteY })
+  
+  return true
 }
 
 /**
@@ -583,7 +652,11 @@ export function showPortsWithCustom(node: any, visible: boolean) {
 
   const hasCustomPorts = ports.some((p: any) => p.id?.startsWith('custom-'))
   if (hasCustomPorts) {
-    groups.custom = { attrs: { circle: { opacity: visible ? 1 : 0.5 } } }
+    node.getPorts().forEach((p: any) => {
+      if (p.id?.startsWith('custom-')) {
+        node.setPortProp(p.id, 'attrs/xmark/opacity', visible ? 1 : 0.5)
+      }
+    })
   }
 
   node.attr({

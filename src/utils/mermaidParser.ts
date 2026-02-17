@@ -15,6 +15,7 @@ import {
   calculateStateLayout,
 } from './layoutEngine'
 import { MermaidSequenceParser, type ParsedSequenceDiagram } from './mermaidSequenceParser'
+import { MermaidStyleParser, parseColorValue } from './mermaidStyleParser'
 
 export function detectDiagramType(code: string): DiagramType | null {
   const trimmedCode = code.trim().toLowerCase()
@@ -124,6 +125,7 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
   const nodeMap = new Map<string, TemplateNode>()
   const subgraphMap = new Map<string, { id: string; title: string; nodes: string[] }>()
   const nodeToSubgraph = new Map<string, string>()
+  const styleParser = new MermaidStyleParser()
 
   const lines = code.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('%%'))
 
@@ -136,6 +138,26 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]
+
+    if (line.startsWith('classDef ')) {
+      styleParser.parseClassDef(line)
+      continue
+    }
+
+    if (line.startsWith('style ')) {
+      styleParser.parseStyle(line)
+      continue
+    }
+
+    if (line.startsWith('linkStyle ')) {
+      styleParser.parseLinkStyle(line)
+      continue
+    }
+
+    if (line.match(/^class\s+[\w,]+\s+\w+/)) {
+      styleParser.parseClassApplication(line)
+      continue
+    }
 
     const subgraphMatch = line.match(/^subgraph\s+(?:(\w+)\s+)?(?:\[?"?([^"\]]+)"?\]?)?$/i)
     if (subgraphMatch) {
@@ -171,7 +193,7 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       const [, sourceId, arrowType, label, targetId] = edgeMatch
 
       if (!nodeMap.has(sourceId)) {
-        const node = createActivityNode(sourceId, sourceId, direction, nodes.length)
+        const node = createActivityNode(sourceId, sourceId, direction, nodes.length, 'uml-action', styleParser)
         nodes.push(node)
         nodeMap.set(sourceId, node)
         if (currentSubgraph) {
@@ -181,7 +203,7 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       }
 
       if (!nodeMap.has(targetId)) {
-        const node = createActivityNode(targetId, targetId, direction, nodes.length)
+        const node = createActivityNode(targetId, targetId, direction, nodes.length, 'uml-action', styleParser)
         nodes.push(node)
         nodeMap.set(targetId, node)
         if (currentSubgraph) {
@@ -191,8 +213,9 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       }
 
       const edgeStyle = getEdgeStyle(arrowType)
+      const edgeIndex = edges.length
       edges.push({
-        id: `edge-${edges.length}`,
+        id: `edge-${edgeIndex}`,
         source: sourceId,
         target: targetId,
         label: label?.trim(),
@@ -210,7 +233,7 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       const [, sourceId, arrowType1, label1, midId, arrowType2, label2, targetId] = chainedEdgeMatch
       
       if (!nodeMap.has(sourceId)) {
-        const node = createActivityNode(sourceId, sourceId, direction, nodes.length)
+        const node = createActivityNode(sourceId, sourceId, direction, nodes.length, 'uml-action', styleParser)
         nodes.push(node)
         nodeMap.set(sourceId, node)
         if (currentSubgraph) {
@@ -220,7 +243,7 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       }
       
       if (!nodeMap.has(midId)) {
-        const node = createActivityNode(midId, midId, direction, nodes.length)
+        const node = createActivityNode(midId, midId, direction, nodes.length, 'uml-action', styleParser)
         nodes.push(node)
         nodeMap.set(midId, node)
         if (currentSubgraph) {
@@ -230,7 +253,7 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       }
       
       if (!nodeMap.has(targetId)) {
-        const node = createActivityNode(targetId, targetId, direction, nodes.length)
+        const node = createActivityNode(targetId, targetId, direction, nodes.length, 'uml-action', styleParser)
         nodes.push(node)
         nodeMap.set(targetId, node)
         if (currentSubgraph) {
@@ -287,7 +310,7 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
 
       if (!nodeMap.has(nodeId)) {
         const nodeType = getActivityNodeType(openBracket, fullLine)
-        const node = createActivityNode(nodeId, text?.trim() || nodeId, direction, nodes.length, nodeType)
+        const node = createActivityNode(nodeId, text?.trim() || nodeId, direction, nodes.length, nodeType, styleParser)
         nodes.push(node)
         nodeMap.set(nodeId, node)
         if (currentSubgraph) {
@@ -301,6 +324,13 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
         const size = calculateNodeSize(existingNode.type, existingNode.text || '')
         existingNode.width = size.width
         existingNode.height = size.height
+        
+        const customStyle = styleParser.getNodeStyle(nodeId)
+        if (customStyle) {
+          if (customStyle.fill) existingNode.fill = parseColorValue(customStyle.fill)
+          if (customStyle.stroke) existingNode.stroke = parseColorValue(customStyle.stroke)
+          if (customStyle.strokeWidth) existingNode.strokeWidth = customStyle.strokeWidth
+        }
       }
     }
   }
@@ -379,12 +409,13 @@ function createActivityNode(
   text: string,
   direction: string,
   index: number,
-  type: string = 'uml-action'
+  type: string = 'uml-action',
+  styleParser?: MermaidStyleParser
 ): TemplateNode {
   const size = calculateNodeSize(type, text)
   const colors = getNodeColors(type)
 
-  return {
+  const baseNode: TemplateNode = {
     id,
     type,
     x: 100,
@@ -396,6 +427,18 @@ function createActivityNode(
     stroke: colors.stroke,
     strokeWidth: 2,
   }
+
+  if (styleParser) {
+    const customStyle = styleParser.getNodeStyle(id)
+    if (customStyle) {
+      if (customStyle.fill) baseNode.fill = parseColorValue(customStyle.fill)
+      if (customStyle.stroke) baseNode.stroke = parseColorValue(customStyle.stroke)
+      if (customStyle.strokeWidth) baseNode.strokeWidth = customStyle.strokeWidth
+      if (customStyle.opacity !== undefined) baseNode.opacity = customStyle.opacity
+    }
+  }
+
+  return baseNode
 }
 
 function getActivityNodeType(bracket: string, fullText: string = ''): string {

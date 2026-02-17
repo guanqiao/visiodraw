@@ -1,5 +1,7 @@
 export type ConnectionPointPosition = 'top' | 'bottom' | 'left' | 'right' | 'center' | 'custom'
 
+export type ConnectionPointType = 'inward' | 'outward' | 'inward-outward'
+
 export interface ConnectionPoint {
   id: string
   x: number
@@ -10,6 +12,9 @@ export interface ConnectionPoint {
   connectedLineIds: string[]
   isDynamic?: boolean
   isCustom?: boolean
+  dirX?: number
+  dirY?: number
+  type?: ConnectionPointType
 }
 
 export type ConnectorStyle = 'straight' | 'orthogonal' | 'curved' | 'bezier' | 'metro' | 'manhattan'

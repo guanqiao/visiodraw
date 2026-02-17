@@ -19,7 +19,7 @@ export const renderBpmnStartEvent = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -34,7 +34,7 @@ export const renderBpmnEndEvent = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         strokeWidth: 3,
       },
     },
@@ -50,7 +50,7 @@ export const renderBpmnIntermediateEvent = (config: ShapeRenderConfig): Node => 
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -65,7 +65,7 @@ export const renderBpmnTask = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -80,7 +80,7 @@ export const renderBpmnUserTask = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -95,7 +95,7 @@ export const renderBpmnServiceTask = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -114,7 +114,7 @@ export const renderBpmnExclusiveGateway = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: `M${points} M${path}`,
+        refD: `M${points} M${path}`,
       },
     },
   })
@@ -133,7 +133,7 @@ export const renderBpmnParallelGateway = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: `M${points} M${path}`,
+        refD: `M${points} M${path}`,
       },
     },
   })
@@ -152,7 +152,7 @@ export const renderBpmnInclusiveGateway = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: `M${points} M${path}`,
+        refD: `M${points} M${path}`,
       },
     },
   })
@@ -167,7 +167,7 @@ export const renderBpmnPool = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })
@@ -182,7 +182,7 @@ export const renderBpmnLane = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
       },
     },
   })

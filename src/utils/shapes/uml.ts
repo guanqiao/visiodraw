@@ -50,7 +50,7 @@ export const renderUmlClass = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: config.fill || '#fff4dd',
         stroke: config.stroke || '#d4b46a',
       },
@@ -82,7 +82,7 @@ export const renderUmlInterface = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: `M0,0 L${lollipopX},0 L${lollipopX},${config.height} L0,${config.height} Z ${lollipopPath}`,
+        refD: `M0,0 L${lollipopX},0 L${lollipopX},${config.height} L0,${config.height} Z ${lollipopPath}`,
         fill: '#f6ffed',
         stroke: '#52c41a',
       },
@@ -104,7 +104,7 @@ export const renderUmlActor = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: 'none',
         stroke: '#333333',
         strokeWidth: 2,
@@ -126,7 +126,7 @@ export const renderUmlPackage = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: '#fff4dd',
         stroke: '#d4b46a',
       },
@@ -143,7 +143,7 @@ export const renderUmlComponent = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: '#e6f7ff',
         stroke: '#1890ff',
       },
@@ -160,7 +160,7 @@ export const renderUmlNode = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: '#f0f5ff',
         stroke: '#2f54eb',
       },
@@ -177,7 +177,7 @@ export const renderUmlNote = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fill: '#fff5ad',
         stroke: '#e8d665',
       },
@@ -196,7 +196,7 @@ export const renderUmlLifeline = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: `M${centerX},0 L${centerX},${height}`,
+        refD: `M${centerX},0 L${centerX},${height}`,
         strokeDasharray: '5,5',
         fill: 'none',
         stroke: '#666666',
@@ -237,7 +237,7 @@ export const renderUmlFragment = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: fragmentPath,
+        refD: fragmentPath,
         fill: '#f4f4f4',
         stroke: '#666',
       },
@@ -266,7 +266,7 @@ export const renderUmlSwimlanePool = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fillRule: 'evenodd',
         fill: '#fff',
         stroke: '#999',
@@ -292,7 +292,7 @@ export const renderUmlSwimlaneHorizontal = (config: ShapeRenderConfig): Node => 
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fillRule: 'evenodd',
         fill: '#fff',
         stroke: '#999',
@@ -434,7 +434,7 @@ export const renderUmlFinalState = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        d: path,
+        refD: path,
         fillRule: 'evenodd',
         fill: '#f5222d',
         stroke: '#f5222d',
