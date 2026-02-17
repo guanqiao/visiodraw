@@ -14,6 +14,7 @@ import {
   calculateERLayout,
   calculateStateLayout,
 } from './layoutEngine'
+import { MermaidSequenceParser, type ParsedSequenceDiagram } from './mermaidSequenceParser'
 
 export function detectDiagramType(code: string): DiagramType | null {
   const trimmedCode = code.trim().toLowerCase()
@@ -44,6 +45,19 @@ export function detectDiagramType(code: string): DiagramType | null {
   }
   if (trimmedCode.startsWith('gitgraph')) {
     return 'gitgraph'
+  }
+  if (trimmedCode.startsWith('pie')) {
+    return 'pie'
+  }
+  if (trimmedCode.startsWith('journey')) {
+    return 'journey'
+  }
+  if (trimmedCode.startsWith('requirementdiagram')) {
+    return 'requirement'
+  }
+  if (trimmedCode.startsWith('c4context') || trimmedCode.startsWith('c4container') || 
+      trimmedCode.startsWith('c4component') || trimmedCode.startsWith('c4dynamic')) {
+    return 'c4'
   }
 
   return null
@@ -82,6 +96,14 @@ export function parseMermaidCode(code: string): MermaidParseResult {
         return parseTimelineDiagram(code)
       case 'gitgraph':
         return parseGitgraphDiagram(code)
+      case 'pie':
+        return parsePieDiagram(code)
+      case 'journey':
+        return parseJourneyDiagram(code)
+      case 'requirement':
+        return parseRequirementDiagram(code)
+      case 'c4':
+        return parseC4Diagram(code)
       default:
         return {
           success: false,
@@ -100,16 +122,51 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
   const nodes: TemplateNode[] = []
   const edges: TemplateEdge[] = []
   const nodeMap = new Map<string, TemplateNode>()
+  const subgraphMap = new Map<string, { id: string; title: string; nodes: string[] }>()
+  const nodeToSubgraph = new Map<string, string>()
 
   const lines = code.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('%%'))
 
   const directionMatch = lines[0]?.match(/(?:flowchart|graph)\s+(TD|TB|LR|RL|BT)/i)
   const direction = directionMatch?.[1] || 'TD'
 
+  let currentSubgraph: string | null = null
+  let subgraphDepth = 0
+  const subgraphStack: string[] = []
+
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]
 
-    const edgeMatch = line.match(/^(\w+)\s*(-->|---|-\.->|==>|\.->)\s*(?:\|([^|]+)\|)?\s*(\w+)$/)
+    const subgraphMatch = line.match(/^subgraph\s+(?:(\w+)\s+)?(?:\[?"?([^"\]]+)"?\]?)?$/i)
+    if (subgraphMatch) {
+      const subgraphId = subgraphMatch[1] || `subgraph-${subgraphMap.size}`
+      const subgraphTitle = subgraphMatch[2]?.trim() || ''
+      
+      subgraphMap.set(subgraphId, {
+        id: subgraphId,
+        title: subgraphTitle,
+        nodes: [],
+      })
+      
+      if (currentSubgraph) {
+        subgraphStack.push(currentSubgraph)
+      }
+      currentSubgraph = subgraphId
+      subgraphDepth++
+      continue
+    }
+
+    if (line === 'end' && currentSubgraph) {
+      if (subgraphStack.length > 0) {
+        currentSubgraph = subgraphStack.pop()!
+      } else {
+        currentSubgraph = null
+      }
+      subgraphDepth--
+      continue
+    }
+
+    const edgeMatch = line.match(/^(\w+)\s*(-->|---|-\.->|==>|\.->|<-->|~~~-|---o|o---|---x|x---)\s*(?:\|([^|]+)\|)?\s*(\w+)$/)
     if (edgeMatch) {
       const [, sourceId, arrowType, label, targetId] = edgeMatch
 
@@ -117,23 +174,91 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
         const node = createActivityNode(sourceId, sourceId, direction, nodes.length)
         nodes.push(node)
         nodeMap.set(sourceId, node)
+        if (currentSubgraph) {
+          subgraphMap.get(currentSubgraph)?.nodes.push(sourceId)
+          nodeToSubgraph.set(sourceId, currentSubgraph)
+        }
       }
 
       if (!nodeMap.has(targetId)) {
         const node = createActivityNode(targetId, targetId, direction, nodes.length)
         nodes.push(node)
         nodeMap.set(targetId, node)
+        if (currentSubgraph) {
+          subgraphMap.get(currentSubgraph)?.nodes.push(targetId)
+          nodeToSubgraph.set(targetId, currentSubgraph)
+        }
       }
 
+      const edgeStyle = getEdgeStyle(arrowType)
       edges.push({
         id: `edge-${edges.length}`,
         source: sourceId,
         target: targetId,
         label: label?.trim(),
-        style: arrowType.includes('.') ? 'curved' : 'orthogonal',
-        lineStyle: arrowType === '---' ? 'dashed' : 'solid',
+        style: edgeStyle.style,
+        lineStyle: edgeStyle.lineStyle,
+        startMarker: edgeStyle.startMarker,
+        endMarker: edgeStyle.endMarker,
       })
 
+      continue
+    }
+
+    const chainedEdgeMatch = line.match(/^(\w+)\s*(-->|---|-\.->|==>|\.->)\s*(?:\|([^|]+)\|)?\s*(\w+)\s*(-->|---|-\.->|==>|\.->)\s*(?:\|([^|]+)\|)?\s*(\w+)/)
+    if (chainedEdgeMatch) {
+      const [, sourceId, arrowType1, label1, midId, arrowType2, label2, targetId] = chainedEdgeMatch
+      
+      if (!nodeMap.has(sourceId)) {
+        const node = createActivityNode(sourceId, sourceId, direction, nodes.length)
+        nodes.push(node)
+        nodeMap.set(sourceId, node)
+        if (currentSubgraph) {
+          subgraphMap.get(currentSubgraph)?.nodes.push(sourceId)
+          nodeToSubgraph.set(sourceId, currentSubgraph)
+        }
+      }
+      
+      if (!nodeMap.has(midId)) {
+        const node = createActivityNode(midId, midId, direction, nodes.length)
+        nodes.push(node)
+        nodeMap.set(midId, node)
+        if (currentSubgraph) {
+          subgraphMap.get(currentSubgraph)?.nodes.push(midId)
+          nodeToSubgraph.set(midId, currentSubgraph)
+        }
+      }
+      
+      if (!nodeMap.has(targetId)) {
+        const node = createActivityNode(targetId, targetId, direction, nodes.length)
+        nodes.push(node)
+        nodeMap.set(targetId, node)
+        if (currentSubgraph) {
+          subgraphMap.get(currentSubgraph)?.nodes.push(targetId)
+          nodeToSubgraph.set(targetId, currentSubgraph)
+        }
+      }
+      
+      const edgeStyle1 = getEdgeStyle(arrowType1)
+      edges.push({
+        id: `edge-${edges.length}`,
+        source: sourceId,
+        target: midId,
+        label: label1?.trim(),
+        style: edgeStyle1.style,
+        lineStyle: edgeStyle1.lineStyle,
+      })
+      
+      const edgeStyle2 = getEdgeStyle(arrowType2)
+      edges.push({
+        id: `edge-${edges.length}`,
+        source: midId,
+        target: targetId,
+        label: label2?.trim(),
+        style: edgeStyle2.style,
+        lineStyle: edgeStyle2.lineStyle,
+      })
+      
       continue
     }
 
@@ -165,6 +290,10 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
         const node = createActivityNode(nodeId, text?.trim() || nodeId, direction, nodes.length, nodeType)
         nodes.push(node)
         nodeMap.set(nodeId, node)
+        if (currentSubgraph) {
+          subgraphMap.get(currentSubgraph)?.nodes.push(nodeId)
+          nodeToSubgraph.set(nodeId, currentSubgraph)
+        }
       } else {
         const existingNode = nodeMap.get(nodeId)!
         existingNode.text = text?.trim() || nodeId
@@ -176,6 +305,31 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
     }
   }
 
+  subgraphMap.forEach((subgraph) => {
+    if (subgraph.nodes.length > 0) {
+      const subgraphNodeIds = subgraph.nodes
+      const subgraphNodes = subgraphNodeIds.map(id => nodeMap.get(id)).filter(Boolean) as TemplateNode[]
+      
+      if (subgraphNodes.length > 0) {
+        const padding = 30
+        const headerHeight = 30
+        
+        nodes.push({
+          id: subgraph.id,
+          type: 'uml-swimlane',
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 150,
+          text: subgraph.title,
+          fill: '#f0f5ff',
+          stroke: '#2f54eb',
+          strokeWidth: 1,
+        })
+      }
+    }
+  })
+
   const layoutDirection = parseDirectionFromCode(code)
   const layoutedNodes = nodes.length > 0 
     ? calculateLayout(nodes, edges, { direction: layoutDirection })
@@ -186,6 +340,37 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
     diagramType: 'activity',
     nodes: layoutedNodes,
     edges,
+  }
+}
+
+function getEdgeStyle(arrowType: string): { 
+  style: 'straight' | 'orthogonal' | 'curved' | 'bezier'; 
+  lineStyle: 'solid' | 'dashed';
+  startMarker?: string;
+  endMarker?: string;
+} {
+  switch (arrowType) {
+    case '-->':
+      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'arrow' }
+    case '---':
+      return { style: 'orthogonal', lineStyle: 'solid' }
+    case '-.->':
+    case '.->':
+      return { style: 'curved', lineStyle: 'dashed', endMarker: 'arrow' }
+    case '==>':
+      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'arrow', startMarker: 'arrow' }
+    case '<-->':
+      return { style: 'orthogonal', lineStyle: 'solid', startMarker: 'arrow', endMarker: 'arrow' }
+    case '~~~':
+      return { style: 'orthogonal', lineStyle: 'dashed' }
+    case '---o':
+    case 'o---':
+      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'circle' }
+    case '---x':
+    case 'x---':
+      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'cross' }
+    default:
+      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'arrow' }
   }
 }
 
@@ -282,88 +467,178 @@ function getActivityNodeType(bracket: string, fullText: string = ''): string {
 }
 
 export function parseSequenceDiagram(code: string): MermaidParseResult {
-  const participants: TemplateNode[] = []
+  const parser = new MermaidSequenceParser()
+  const parsed = parser.parse(code)
+  
+  const nodes: TemplateNode[] = []
   const edges: TemplateEdge[] = []
-  const participantMap = new Map<string, { id: string; alias?: string; type?: string }>()
-
-  const lines = code.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('%%'))
-
-  for (const line of lines) {
-    const participantMatch = line.match(/participant\s+(\w+)(?:\s+as\s+(.+))?/i)
-    if (participantMatch) {
-      const [, id, alias] = participantMatch
-      participantMap.set(id, { id, alias: alias?.trim() })
-    }
-
-    const actorMatch = line.match(/actor\s+(\w+)(?:\s+as\s+(.+))?/i)
-    if (actorMatch) {
-      const [, id, alias] = actorMatch
-      participantMap.set(id, { id, alias: alias?.trim(), type: 'uml-actor' })
-    }
-  }
-
-  for (const line of lines) {
-    const messageMatch = line.match(/^(\w+)\s*(->>|-->>|->|-x|--x|->>\+|->>-|--)\s*(\w+)\s*:\s*(.+)$/)
-    if (messageMatch) {
-      const [, sourceId, , targetId] = messageMatch
-      if (!participantMap.has(sourceId)) {
-        participantMap.set(sourceId, { id: sourceId })
-      }
-      if (!participantMap.has(targetId)) {
-        participantMap.set(targetId, { id: targetId })
-      }
-    }
-  }
-
-  const participantArray = Array.from(participantMap.values())
-  const colors = getNodeColors('uml-lifeline')
-
-  participantArray.forEach((p) => {
-    participants.push({
+  
+  const padding = 50
+  const participantWidth = 120
+  const participantHeight = 50
+  const spacing = 160
+  const messageSpacing = 55
+  const lifelineStartY = padding + participantHeight + 20
+  
+  const participantXMap = new Map<string, number>()
+  
+  parsed.participants.forEach((p, index) => {
+    const x = padding + index * spacing
+    participantXMap.set(p.id, x)
+    
+    const colors = getNodeColors(p.type === 'actor' ? 'uml-actor' : 'uml-action')
+    
+    nodes.push({
       id: p.id,
-      type: p.type || 'uml-action',
-      x: 0,
-      y: 0,
-      width: 100,
-      height: 50,
-      text: p.alias || p.id,
+      type: p.type === 'actor' ? 'uml-actor' : 'uml-action',
+      x,
+      y: padding,
+      width: participantWidth,
+      height: participantHeight,
+      text: p.name,
       fill: colors.fill,
       stroke: colors.stroke,
       strokeWidth: 2,
     })
+    
+    nodes.push({
+      id: `lifeline-${p.id}`,
+      type: 'uml-lifeline',
+      x: x + participantWidth / 2 - 5,
+      y: lifelineStartY,
+      width: 10,
+      height: parsed.messages.length * messageSpacing + 100,
+      text: '',
+      fill: 'transparent',
+      stroke: '#666',
+      strokeWidth: 1,
+    })
   })
-
-  let currentY = 100
-  for (const line of lines) {
-    const messageMatch = line.match(/^(\w+)\s*(->>|-->>|->|-x|--x|->>\+|->>-|--)\s*(\w+)\s*:\s*(.+)$/)
-    if (messageMatch) {
-      const [, sourceId, arrowType, targetId, message] = messageMatch
-
-      const sourceIndex = participantArray.findIndex(p => p.id === sourceId)
-      const targetIndex = participantArray.findIndex(p => p.id === targetId)
-
-      if (sourceIndex !== -1 && targetIndex !== -1) {
-        edges.push({
-          id: `edge-${edges.length}`,
-          source: sourceId,
-          target: targetId,
-          label: message.trim(),
-          style: 'straight',
-          lineStyle: arrowType.includes('--') ? 'dashed' : 'solid',
+  
+  parsed.messages.forEach((msg, index) => {
+    const sourceX = participantXMap.get(msg.from) ?? 0
+    const targetX = participantXMap.get(msg.to) ?? 0
+    const y = lifelineStartY + index * messageSpacing
+    
+    const isSelfMessage = msg.from === msg.to
+    
+    edges.push({
+      id: msg.id,
+      source: msg.from,
+      target: msg.to,
+      label: parsed.autoNumber ? `${index + 1}. ${msg.text}` : msg.text,
+      style: isSelfMessage ? 'curved' : 'straight',
+      lineStyle: msg.type === 'return' ? 'dashed' : 'solid',
+    })
+    
+    if (msg.activate || parsed.activations.some(a => a.participant === msg.to && a.startMessageOrder === msg.order)) {
+      const actX = (participantXMap.get(msg.to) ?? 0) + participantWidth / 2 - 10
+      const activation = parsed.activations.find(a => 
+        a.participant === msg.to && a.startMessageOrder <= msg.order && a.endMessageOrder >= msg.order
+      )
+      
+      if (activation) {
+        nodes.push({
+          id: activation.id,
+          type: 'uml-activation',
+          x: actX,
+          y: y - 10,
+          width: 20,
+          height: messageSpacing * (activation.endMessageOrder - activation.startMessageOrder + 1),
+          text: '',
+          fill: '#e1e1e1',
+          stroke: '#999',
+          strokeWidth: 1,
         })
-
-        currentY += 60
       }
     }
-  }
-
-  const { nodes: layoutedNodes, edges: layoutedEdges } = calculateSequenceLayout(participants, edges)
-
+  })
+  
+  parsed.fragments.forEach((fragment, index) => {
+    const startY = lifelineStartY + (fragment.startMessageOrder - 1) * messageSpacing - 15
+    const endY = lifelineStartY + fragment.endMessageOrder * messageSpacing + 15
+    
+    const involvedParticipants = new Set<string>()
+    for (let i = fragment.startMessageOrder - 1; i < fragment.endMessageOrder; i++) {
+      const msg = parsed.messages[i]
+      if (msg) {
+        involvedParticipants.add(msg.from)
+        involvedParticipants.add(msg.to)
+      }
+    }
+    
+    const participantIndices = Array.from(involvedParticipants)
+      .map(id => parsed.participants.findIndex(p => p.id === id))
+      .filter(i => i >= 0)
+    
+    if (participantIndices.length === 0) return
+    
+    const minX = Math.min(...participantIndices)
+    const maxX = Math.max(...participantIndices)
+    
+    const startX = padding + minX * spacing - 20
+    const endX = padding + maxX * spacing + participantWidth + 20
+    
+    const fragmentLabels: Record<string, string> = {
+      'alt': 'alt',
+      'opt': 'opt',
+      'loop': 'loop',
+      'par': 'par',
+      'break': 'break',
+      'critical': 'critical',
+      'group': fragment.condition || 'group',
+    }
+    
+    nodes.push({
+      id: fragment.id,
+      type: 'uml-fragment',
+      x: startX,
+      y: startY,
+      width: endX - startX,
+      height: endY - startY,
+      text: fragmentLabels[fragment.type] + (fragment.condition ? ` [${fragment.condition}]` : ''),
+      fill: '#f4f4f4',
+      stroke: '#666',
+      strokeWidth: 1,
+    })
+  })
+  
+  parsed.notes.forEach((note, index) => {
+    const y = lifelineStartY + note.messageOrder * messageSpacing
+    const participantIndex = parsed.participants.findIndex(p => p.id === note.participants[0])
+    const participantX = padding + participantIndex * spacing
+    
+    let noteX: number
+    let noteWidth = 100
+    
+    if (note.position === 'left') {
+      noteX = participantX - noteWidth - 20
+    } else if (note.position === 'right') {
+      noteX = participantX + participantWidth + 20
+    } else {
+      noteX = participantX
+      noteWidth = participantWidth
+    }
+    
+    nodes.push({
+      id: note.id,
+      type: 'uml-note',
+      x: noteX,
+      y: y - 15,
+      width: noteWidth,
+      height: 30,
+      text: note.text,
+      fill: '#fff5ad',
+      stroke: '#e8d665',
+      strokeWidth: 1,
+    })
+  })
+  
   return {
     success: true,
     diagramType: 'sequence',
-    nodes: layoutedNodes,
-    edges: layoutedEdges,
+    nodes,
+    edges,
   }
 }
 
@@ -1014,6 +1289,425 @@ export function parseGitgraphDiagram(code: string): MermaidParseResult {
     success: true,
     diagramType: 'gitgraph',
     nodes,
+    edges,
+  }
+}
+
+export function parsePieDiagram(code: string): MermaidParseResult {
+  const nodes: TemplateNode[] = []
+  const edges: TemplateEdge[] = []
+
+  const lines = code.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('%%'))
+
+  let showTitle = false
+  let title = ''
+  const slices: { label: string; value: number }[] = []
+
+  for (const line of lines) {
+    if (line.match(/^pie\s+showtitle/i)) {
+      showTitle = true
+      continue
+    }
+    if (line.match(/^pie$/i)) {
+      continue
+    }
+
+    const titleMatch = line.match(/^title\s+(.+)$/i)
+    if (titleMatch) {
+      title = titleMatch[1]
+      continue
+    }
+
+    const sliceMatch = line.match(/^"([^"]+)"\s*:\s*(\d+(?:\.\d+)?)/)
+    if (sliceMatch) {
+      slices.push({
+        label: sliceMatch[1],
+        value: parseFloat(sliceMatch[2]),
+      })
+    }
+  }
+
+  const centerX = 250
+  const centerY = 200
+  const radius = 150
+  const total = slices.reduce((sum, s) => sum + s.value, 0)
+
+  if (title) {
+    nodes.push({
+      id: 'pie-title',
+      type: 'uml-action',
+      x: centerX - 75,
+      y: 20,
+      width: 150,
+      height: 30,
+      text: title,
+      fill: '#f0f5ff',
+      stroke: '#2f54eb',
+      strokeWidth: 2,
+    })
+  }
+
+  let startAngle = -Math.PI / 2
+  const colors = [
+    '#1890ff', '#52c41a', '#fa8c16', '#eb2f96', 
+    '#722ed1', '#13c2c2', '#faad14', '#f5222d'
+  ]
+
+  slices.forEach((slice, index) => {
+    const sliceAngle = (slice.value / total) * 2 * Math.PI
+    const endAngle = startAngle + sliceAngle
+    const midAngle = startAngle + sliceAngle / 2
+
+    const labelX = centerX + Math.cos(midAngle) * (radius + 40)
+    const labelY = centerY + Math.sin(midAngle) * (radius + 40)
+
+    nodes.push({
+      id: `slice-${index}`,
+      type: 'uml-action',
+      x: labelX - 50,
+      y: labelY - 15,
+      width: 100,
+      height: 30,
+      text: `${slice.label}: ${slice.value}`,
+      fill: colors[index % colors.length],
+      stroke: colors[index % colors.length],
+      strokeWidth: 1,
+    })
+
+    startAngle = endAngle
+  })
+
+  nodes.push({
+    id: 'pie-center',
+    type: 'mermaid-circle',
+    x: centerX - radius,
+    y: centerY - radius,
+    width: radius * 2,
+    height: radius * 2,
+    text: '',
+    fill: '#f0f0f0',
+    stroke: '#999',
+    strokeWidth: 2,
+  })
+
+  return {
+    success: true,
+    diagramType: 'pie',
+    nodes,
+    edges,
+  }
+}
+
+export function parseJourneyDiagram(code: string): MermaidParseResult {
+  const nodes: TemplateNode[] = []
+  const edges: TemplateEdge[] = []
+
+  const lines = code.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('%%'))
+
+  let title = ''
+  let currentSection = ''
+  let yOffset = 80
+  let taskIndex = 0
+
+  for (const line of lines) {
+    if (line.match(/^journey$/i)) {
+      continue
+    }
+
+    const titleMatch = line.match(/^title\s+(.+)$/i)
+    if (titleMatch) {
+      title = titleMatch[1]
+      nodes.push({
+        id: 'journey-title',
+        type: 'uml-action',
+        x: 300,
+        y: 20,
+        width: 200,
+        height: 40,
+        text: title,
+        fill: '#f0f5ff',
+        stroke: '#2f54eb',
+        strokeWidth: 2,
+      })
+      continue
+    }
+
+    const sectionMatch = line.match(/^section\s+(.+)$/i)
+    if (sectionMatch) {
+      currentSection = sectionMatch[1]
+      nodes.push({
+        id: `section-${nodes.length}`,
+        type: 'uml-swimlane',
+        x: 50,
+        y: yOffset,
+        width: 600,
+        height: 40,
+        text: currentSection,
+        fill: '#e6f7ff',
+        stroke: '#1890ff',
+        strokeWidth: 1,
+      })
+      yOffset += 60
+      continue
+    }
+
+    const taskMatch = line.match(/^([^:]+):\s*(\d+)(?::\s*(.+))?$/)
+    if (taskMatch) {
+      const [, taskName, score, actors] = taskMatch
+      const taskId = `task-${taskIndex}`
+
+      nodes.push({
+        id: taskId,
+        type: 'uml-action',
+        x: 100 + taskIndex * 80,
+        y: yOffset,
+        width: 120,
+        height: 40,
+        text: taskName.trim(),
+        fill: '#f6ffed',
+        stroke: '#52c41a',
+        strokeWidth: 2,
+      })
+
+      if (taskIndex > 0) {
+        edges.push({
+          id: `edge-${edges.length}`,
+          source: `task-${taskIndex - 1}`,
+          target: taskId,
+          style: 'orthogonal',
+          lineStyle: 'solid',
+        })
+      }
+
+      taskIndex++
+    }
+  }
+
+  return {
+    success: true,
+    diagramType: 'journey',
+    nodes,
+    edges,
+  }
+}
+
+export function parseRequirementDiagram(code: string): MermaidParseResult {
+  const nodes: TemplateNode[] = []
+  const edges: TemplateEdge[] = []
+
+  const lines = code.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('%%'))
+
+  const requirementMap = new Map<string, TemplateNode>()
+  let yOffset = 100
+
+  for (const line of lines) {
+    if (line.match(/^requirementdiagram$/i)) {
+      continue
+    }
+
+    const requirementMatch = line.match(/^requirement\s+(\w+)\s*\{/)
+    if (requirementMatch) {
+      const reqId = requirementMatch[1]
+      requirementMap.set(reqId, {
+        id: reqId,
+        type: 'uml-action',
+        x: 100,
+        y: yOffset,
+        width: 180,
+        height: 80,
+        text: reqId,
+        fill: '#fff4dd',
+        stroke: '#d4b46a',
+        strokeWidth: 2,
+      })
+      yOffset += 100
+      continue
+    }
+
+    const functionalMatch = line.match(/^functionalrequirement\s+(\w+)\s*\{/)
+    if (functionalMatch) {
+      const reqId = functionalMatch[1]
+      requirementMap.set(reqId, {
+        id: reqId,
+        type: 'uml-action',
+        x: 100,
+        y: yOffset,
+        width: 180,
+        height: 80,
+        text: reqId,
+        fill: '#e6fffb',
+        stroke: '#13c2c2',
+        strokeWidth: 2,
+      })
+      yOffset += 100
+      continue
+    }
+
+    const interfaceMatch = line.match(/^interfacerequirement\s+(\w+)\s*\{/)
+    if (interfaceMatch) {
+      const reqId = interfaceMatch[1]
+      requirementMap.set(reqId, {
+        id: reqId,
+        type: 'uml-interface',
+        x: 100,
+        y: yOffset,
+        width: 180,
+        height: 80,
+        text: reqId,
+        fill: '#f6ffed',
+        stroke: '#52c41a',
+        strokeWidth: 2,
+      })
+      yOffset += 100
+      continue
+    }
+
+    const elementMatch = line.match(/^element\s+(\w+)\s*\{/)
+    if (elementMatch) {
+      const elemId = elementMatch[1]
+      requirementMap.set(elemId, {
+        id: elemId,
+        type: 'uml-component',
+        x: 350,
+        y: yOffset,
+        width: 150,
+        height: 60,
+        text: elemId,
+        fill: '#f0f5ff',
+        stroke: '#2f54eb',
+        strokeWidth: 2,
+      })
+      continue
+    }
+
+    const relationshipMatch = line.match(/^(\w+)\s*(->|-.->)\s*(\w+)/)
+    if (relationshipMatch) {
+      const [, source, , target] = relationshipMatch
+      edges.push({
+        id: `edge-${edges.length}`,
+        source,
+        target,
+        style: 'orthogonal',
+        lineStyle: relationshipMatch[2] === '-.-> ' ? 'dashed' : 'solid',
+      })
+    }
+  }
+
+  return {
+    success: true,
+    diagramType: 'requirement',
+    nodes: Array.from(requirementMap.values()),
+    edges,
+  }
+}
+
+export function parseC4Diagram(code: string): MermaidParseResult {
+  const nodes: TemplateNode[] = []
+  const edges: TemplateEdge[] = []
+
+  const lines = code.split('\n').map(line => line.trim()).filter(line => line && !line.startsWith('%%'))
+
+  const elementMap = new Map<string, TemplateNode>()
+  let yOffset = 100
+  let xOffset = 100
+
+  for (const line of lines) {
+    if (line.match(/^c4context|c4container|c4component|c4dynamic$/i)) {
+      continue
+    }
+
+    const titleMatch = line.match(/^title\s+(.+)$/i)
+    if (titleMatch) {
+      nodes.push({
+        id: 'c4-title',
+        type: 'uml-action',
+        x: 250,
+        y: 20,
+        width: 200,
+        height: 40,
+        text: titleMatch[1],
+        fill: '#f0f5ff',
+        stroke: '#2f54eb',
+        strokeWidth: 2,
+      })
+      continue
+    }
+
+    const personMatch = line.match(/^person\(([^,]+),\s*([^,]+),\s*([^)]+)\)/i)
+    if (personMatch) {
+      const [, id, name, desc] = personMatch
+      elementMap.set(id.trim(), {
+        id: id.trim(),
+        type: 'uml-actor',
+        x: xOffset,
+        y: yOffset,
+        width: 100,
+        height: 80,
+        text: name.trim(),
+        fill: '#e6f7ff',
+        stroke: '#1890ff',
+        strokeWidth: 2,
+      })
+      yOffset += 100
+      continue
+    }
+
+    const systemMatch = line.match(/^(system|systemdb|systemqueue|systemext)\(([^,]+),\s*([^,]+),\s*([^)]+)\)/i)
+    if (systemMatch) {
+      const [, type, id, name, desc] = systemMatch
+      elementMap.set(id.trim(), {
+        id: id.trim(),
+        type: 'uml-component',
+        x: xOffset + 200,
+        y: yOffset,
+        width: 150,
+        height: 80,
+        text: name.trim(),
+        fill: type.toLowerCase().includes('ext') ? '#fff0f6' : '#f6ffed',
+        stroke: type.toLowerCase().includes('ext') ? '#eb2f96' : '#52c41a',
+        strokeWidth: 2,
+      })
+      yOffset += 100
+      continue
+    }
+
+    const containerMatch = line.match(/^container\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)/i)
+    if (containerMatch) {
+      const [, id, name, tech, desc] = containerMatch
+      elementMap.set(id.trim(), {
+        id: id.trim(),
+        type: 'uml-component',
+        x: xOffset + 200,
+        y: yOffset,
+        width: 150,
+        height: 80,
+        text: `${name.trim()}\n[${tech.trim()}]`,
+        fill: '#fff4dd',
+        stroke: '#d4b46a',
+        strokeWidth: 2,
+      })
+      yOffset += 100
+      continue
+    }
+
+    const relMatch = line.match(/^rel\(([^,]+),\s*([^,]+),\s*([^)]+)\)/i)
+    if (relMatch) {
+      const [, from, to, label] = relMatch
+      edges.push({
+        id: `edge-${edges.length}`,
+        source: from.trim(),
+        target: to.trim(),
+        label: label.trim(),
+        style: 'orthogonal',
+        lineStyle: 'solid',
+      })
+    }
+  }
+
+  return {
+    success: true,
+    diagramType: 'c4',
+    nodes: Array.from(elementMap.values()),
     edges,
   }
 }

@@ -4,7 +4,7 @@
  */
 
 /** 支持的图表类型 */
-export type DiagramType = 'activity' | 'sequence' | 'state' | 'er' | 'class' | 'gantt' | 'mindmap' | 'timeline' | 'gitgraph'
+export type DiagramType = 'activity' | 'sequence' | 'state' | 'er' | 'class' | 'gantt' | 'mindmap' | 'timeline' | 'gitgraph' | 'pie' | 'journey' | 'requirement' | 'c4'
 
 /** 图表布局方向 */
 export type LayoutDirection = 'vertical' | 'horizontal' | 'auto'

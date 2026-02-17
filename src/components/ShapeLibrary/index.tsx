@@ -36,7 +36,7 @@ interface ShapeItemProps {
   onDragStart: (shape: ShapeLibraryItem) => void
 }
 
-const ShapeItem: React.FC<ShapeItemProps> = ({
+const ShapeItem = React.memo<ShapeItemProps>(({
   shape,
   isFavorite,
   onToggleFavorite,
@@ -112,7 +112,9 @@ const ShapeItem: React.FC<ShapeItemProps> = ({
       </div>
     </Tooltip>
   )
-}
+})
+
+ShapeItem.displayName = 'ShapeItem'
 
 interface ShapeGridProps {
   shapes: ShapeLibraryItem[]
@@ -121,7 +123,7 @@ interface ShapeGridProps {
   onUseShape: (shape: ShapeLibraryItem) => void
 }
 
-const ShapeGrid: React.FC<ShapeGridProps> = ({
+const ShapeGrid = React.memo<ShapeGridProps>(({
   shapes,
   favoriteIds,
   onToggleFavorite,
@@ -144,7 +146,9 @@ const ShapeGrid: React.FC<ShapeGridProps> = ({
       ))}
     </div>
   )
-}
+})
+
+ShapeGrid.displayName = 'ShapeGrid'
 
 const ShapeLibrary: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('')

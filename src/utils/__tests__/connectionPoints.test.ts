@@ -15,6 +15,9 @@ import {
   updateConnectionPointConnectionStatus,
   getConnectionPointsForX6Ports,
   getX6PortGroups,
+  isNearNodeEdge,
+  getEdgePointFromMouse,
+  createCustomConnectionPoint,
 } from '../connectionPoints'
 import type { ConnectionPoint } from '../../types/connection'
 
@@ -385,6 +388,91 @@ describe('connectionPoints', () => {
       expect(groups.top.attrs.circle).toHaveProperty('r')
       expect(groups.top.attrs.circle).toHaveProperty('magnet')
       expect(groups.top.attrs.circle.magnet).toBe(true)
+    })
+
+    it('should have custom port group', () => {
+      const groups = getX6PortGroups()
+      expect(groups).toHaveProperty('custom')
+      expect(groups.custom.attrs.circle.stroke).toBe('#52c41a')
+    })
+  })
+
+  describe('isNearNodeEdge', () => {
+    const mockNode = {
+      getPosition: () => ({ x: 100, y: 100 }),
+      getSize: () => ({ width: 200, height: 100 }),
+    }
+
+    it('should return true when near edge', () => {
+      expect(isNearNodeEdge(mockNode, 105, 150, 15)).toBe(true)
+    })
+
+    it('should return false when far from edge', () => {
+      expect(isNearNodeEdge(mockNode, 200, 150, 15)).toBe(false)
+    })
+
+    it('should return false when outside bounds', () => {
+      expect(isNearNodeEdge(mockNode, 50, 50, 15)).toBe(false)
+    })
+  })
+
+  describe('getEdgePointFromMouse', () => {
+    const mockNode = {
+      getPosition: () => ({ x: 100, y: 100 }),
+      getSize: () => ({ width: 200, height: 100 }),
+    }
+
+    it('should return edge point for top edge', () => {
+      const result = getEdgePointFromMouse(mockNode, 150, 100)
+      expect(result).not.toBeNull()
+      expect(result?.edge).toBe('top')
+      expect(result?.y).toBe(0)
+    })
+
+    it('should return edge point for bottom edge', () => {
+      const result = getEdgePointFromMouse(mockNode, 150, 200)
+      expect(result).not.toBeNull()
+      expect(result?.edge).toBe('bottom')
+      expect(result?.y).toBe(1)
+    })
+
+    it('should return edge point for left edge', () => {
+      const result = getEdgePointFromMouse(mockNode, 100, 150)
+      expect(result).not.toBeNull()
+      expect(result?.edge).toBe('left')
+      expect(result?.x).toBe(0)
+    })
+
+    it('should return edge point for right edge', () => {
+      const result = getEdgePointFromMouse(mockNode, 300, 150)
+      expect(result).not.toBeNull()
+      expect(result?.edge).toBe('right')
+      expect(result?.x).toBe(1)
+    })
+
+    it('should return relative coordinates', () => {
+      const result = getEdgePointFromMouse(mockNode, 150, 100)
+      expect(result?.x).toBeGreaterThanOrEqual(0)
+      expect(result?.x).toBeLessThanOrEqual(1)
+      expect(result?.y).toBeGreaterThanOrEqual(0)
+      expect(result?.y).toBeLessThanOrEqual(1)
+    })
+  })
+
+  describe('createCustomConnectionPoint', () => {
+    it('should create custom connection point', () => {
+      const point = createCustomConnectionPoint(0.3, 0.7)
+      expect(point.x).toBe(0.3)
+      expect(point.y).toBe(0.7)
+      expect(point.position).toBe('custom')
+      expect(point.isCustom).toBe(true)
+    })
+
+    it('should have correct default properties', () => {
+      const point = createCustomConnectionPoint(0.5, 0.5)
+      expect(point.isVisible).toBe(true)
+      expect(point.isConnected).toBe(false)
+      expect(point.connectedLineIds).toEqual([])
     })
   })
 })

@@ -27,7 +27,6 @@ export const createGraph = (options: GraphInitOptions): Graph => {
   const graph: Graph = new Graph({
     container,
     autoResize: true,
-    resizing: true,
     background: {
       color: bgColor,
     },
