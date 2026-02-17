@@ -40,6 +40,7 @@ export class CanvasHelper {
         x: x - bounds.x,
         y: y - bounds.y,
       },
+      force: true,
     })
   }
 

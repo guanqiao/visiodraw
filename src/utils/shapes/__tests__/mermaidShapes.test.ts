@@ -144,7 +144,7 @@ describe('Mermaid Shapes', () => {
 
     it('should have two circles in path', () => {
       const node = renderDoubleCircle(baseConfig)
-      const d = node.attr('body/refD')
+      const d = node.attr('body/refD') as string
       expect(d).toBeDefined()
       const arcCount = (d.match(/A/g) || []).length
       expect(arcCount).toBeGreaterThanOrEqual(4) // 2 circles, each with 2 arcs
