@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { 
+import {
   renderUmlClass,
   renderUmlInterface,
   renderUmlActor,
@@ -11,6 +11,10 @@ import {
   renderUmlLifeline,
   renderUmlActivation,
   renderUmlFragment,
+  renderUmlSwimlanePool,
+  renderUmlSwimlaneHorizontal,
+  renderUmlSwimlaneVertical,
+  renderUmlSwimlaneSeparator,
 } from '../uml'
 import type { ShapeRenderConfig } from '../types'
 
@@ -127,9 +131,86 @@ describe('UML shape renderers', () => {
   describe('renderUmlFragment', () => {
     it('should create a UML fragment shape', () => {
       const node = renderUmlFragment(defaultConfig)
-      
+
       expect(node.id).toBe('test-uml')
       expect(node.shape).toBe('rect')
+    })
+  })
+
+  describe('renderUmlSwimlanePool', () => {
+    it('should create a UML swimlane pool shape', () => {
+      const node = renderUmlSwimlanePool(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should create pool with correct dimensions', () => {
+      const config = { ...defaultConfig, width: 600, height: 400 }
+      const node = renderUmlSwimlanePool(config)
+
+      expect(node.size().width).toBe(600)
+      expect(node.size().height).toBe(400)
+    })
+
+    it('should have valid path data', () => {
+      const node = renderUmlSwimlanePool(defaultConfig)
+      const pathData = node.attr('body/d')
+
+      expect(pathData).toBeDefined()
+      expect(pathData).toContain('M')
+      expect(pathData).toContain('L')
+      expect(pathData).toContain('Z')
+    })
+  })
+
+  describe('renderUmlSwimlaneHorizontal', () => {
+    it('should create a horizontal swimlane shape', () => {
+      const node = renderUmlSwimlaneHorizontal(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should create horizontal swimlane with header', () => {
+      const config = { ...defaultConfig, width: 400, height: 100 }
+      const node = renderUmlSwimlaneHorizontal(config)
+
+      expect(node.size().width).toBe(400)
+      expect(node.size().height).toBe(100)
+    })
+  })
+
+  describe('renderUmlSwimlaneVertical', () => {
+    it('should create a vertical swimlane shape', () => {
+      const node = renderUmlSwimlaneVertical(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should create vertical swimlane with header', () => {
+      const config = { ...defaultConfig, width: 120, height: 300 }
+      const node = renderUmlSwimlaneVertical(config)
+
+      expect(node.size().width).toBe(120)
+      expect(node.size().height).toBe(300)
+    })
+  })
+
+  describe('renderUmlSwimlaneSeparator', () => {
+    it('should create a swimlane separator shape', () => {
+      const node = renderUmlSwimlaneSeparator(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should have dashed stroke style', () => {
+      const node = renderUmlSwimlaneSeparator(defaultConfig)
+      const strokeDasharray = node.attr('body/strokeDasharray')
+
+      expect(strokeDasharray).toBe('4,2')
     })
   })
 })

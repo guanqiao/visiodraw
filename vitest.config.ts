@@ -5,26 +5,17 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   test: {
-    globals: true,
     environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      exclude: [
-        'node_modules/',
-        'src/test/',
-        '**/*.d.ts',
-      ],
-    },
+    globals: true,
+    setupFiles: [],
   },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@components': path.resolve(__dirname, './src/components'),
-      '@stores': path.resolve(__dirname, './src/stores'),
       '@utils': path.resolve(__dirname, './src/utils'),
+      '@stores': path.resolve(__dirname, './src/stores'),
+      '@hooks': path.resolve(__dirname, './src/hooks'),
       '@types': path.resolve(__dirname, './src/types'),
     },
   },

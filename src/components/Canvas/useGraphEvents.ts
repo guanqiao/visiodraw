@@ -6,6 +6,7 @@ import { generateDefaultConnectionPoints } from '../../utils/connectionPoints'
 import { ConnectorRenderer } from '../../utils/connectorRenderer'
 import { isErTableNode, getErNodeName } from '../ERRelationQuickSelector'
 import { showPorts } from '../../utils/connectionPoints'
+import { updateNodePathOnResize, needsPathUpdate } from '../../utils/shapePathUpdater'
 
 export const useGraphEvents = (options: UseGraphEventsOptions) => {
   const {
@@ -95,6 +96,9 @@ export const useGraphEvents = (options: UseGraphEventsOptions) => {
 
     const handleNodeResized = ({ node }: { node: Node }) => {
       onNodeResized(node.id, node.size().width, node.size().height)
+      if (needsPathUpdate(node)) {
+        updateNodePathOnResize(node)
+      }
     }
 
     const handleNodeSelected = ({ node }: { node: Node }) => {

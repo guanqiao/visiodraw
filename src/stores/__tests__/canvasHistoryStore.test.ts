@@ -2,10 +2,22 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import useCanvasHistoryStore from '../canvasHistoryStore'
 
+// Mock localStorage
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+})
+
 describe('CanvasHistoryStore', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    localStorage.clear()
+    localStorageMock.clear()
   })
 
   afterEach(() => {
@@ -199,7 +211,7 @@ describe('CanvasHistoryStore', () => {
         result.current.clearHistory()
       })
 
-      expect(localStorage.removeItem).toHaveBeenCalledWith('visiodraw-canvas-history')
+      expect(localStorageMock.removeItem).toHaveBeenCalledWith('visiodraw-canvas-history')
     })
   })
 

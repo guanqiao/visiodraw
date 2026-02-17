@@ -19,7 +19,13 @@ const builtinTemplates: Template[] = [
       { id: 'output', type: 'input-output', x: 350, y: 500, width: 100, height: 60, fill: '#f9f0ff', stroke: '#722ed1', text: '输出' },
       { id: 'end', type: 'start-end', x: 350, y: 610, width: 100, height: 50, fill: '#fff1f0', stroke: '#f5222d', text: '结束' },
     ],
-    connectors: [],
+    connectors: [
+      { id: 'conn-1', source: 'start', target: 'input' },
+      { id: 'conn-2', source: 'input', target: 'process' },
+      { id: 'conn-3', source: 'process', target: 'decision' },
+      { id: 'conn-4', source: 'decision', target: 'output' },
+      { id: 'conn-5', source: 'output', target: 'end' },
+    ],
   },
   // Org chart template
   {
@@ -38,7 +44,16 @@ const builtinTemplates: Template[] = [
       { id: 'ops1', type: 'rectangle', x: 500, y: 310, width: 80, height: 50, fill: '#fff7e6', stroke: '#fa8c16', text: '运营部' },
       { id: 'ops2', type: 'rectangle', x: 620, y: 310, width: 80, height: 50, fill: '#fff7e6', stroke: '#fa8c16', text: '市场部' },
     ],
-    connectors: [],
+    connectors: [
+      { id: 'conn-1', source: 'ceo', target: 'cto' },
+      { id: 'conn-2', source: 'ceo', target: 'cfo' },
+      { id: 'conn-3', source: 'ceo', target: 'coo' },
+      { id: 'conn-4', source: 'cto', target: 'dev1' },
+      { id: 'conn-5', source: 'cto', target: 'dev2' },
+      { id: 'conn-6', source: 'cfo', target: 'finance' },
+      { id: 'conn-7', source: 'coo', target: 'ops1' },
+      { id: 'conn-8', source: 'coo', target: 'ops2' },
+    ],
   },
   // Network template
   {
@@ -54,7 +69,13 @@ const builtinTemplates: Template[] = [
       { id: 'lan', type: 'rectangle', x: 350, y: 400, width: 100, height: 60, fill: '#f6ffed', stroke: '#52c41a', text: '内网' },
       { id: 'wifi', type: 'rectangle', x: 550, y: 400, width: 100, height: 60, fill: '#f9f0ff', stroke: '#722ed1', text: '无线网' },
     ],
-    connectors: [],
+    connectors: [
+      { id: 'conn-1', source: 'internet', target: 'firewall' },
+      { id: 'conn-2', source: 'firewall', target: 'switch' },
+      { id: 'conn-3', source: 'switch', target: 'dmz' },
+      { id: 'conn-4', source: 'switch', target: 'lan' },
+      { id: 'conn-5', source: 'switch', target: 'wifi' },
+    ],
   },
   // UML class template
   {
@@ -67,7 +88,11 @@ const builtinTemplates: Template[] = [
       { id: 'order', type: 'rectangle', x: 400, y: 100, width: 150, height: 120, fill: '#e6f7ff', stroke: '#1890ff', text: 'Order\n- id: int\n- total: decimal\n+ pay(): bool' },
       { id: 'product', type: 'rectangle', x: 250, y: 350, width: 150, height: 120, fill: '#e6f7ff', stroke: '#1890ff', text: 'Product\n- id: int\n- price: decimal\n+ getPrice(): decimal' },
     ],
-    connectors: [],
+    connectors: [
+      { id: 'conn-1', source: 'user', target: 'order', label: '1:n' },
+      { id: 'conn-2', source: 'order', target: 'product', label: 'n:m' },
+      { id: 'conn-3', source: 'user', target: 'product', label: '浏览' },
+    ],
   },
 ]
 

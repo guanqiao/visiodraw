@@ -95,7 +95,10 @@ export const createGraph = (options: GraphInitOptions): Graph => {
 
   graph.use(
     new Transform({
-      resizing: true,
+      resizing: {
+        enabled: true,
+        preserveAspectRatio: true,
+      },
       rotating: true,
     })
   )

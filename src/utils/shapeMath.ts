@@ -371,10 +371,16 @@ export function createUmlActorPath(width: number, height: number): string {
     M${cx},${bodyBottom} L${cx + legSpread},${legBottom}`
 }
 
-export function createUmlClassPath(width: number, height: number): string {
-  const headerHeight = height * 0.25
-  const divider1Y = headerHeight
-  const divider2Y = height * 0.55
+export function createUmlClassPath(
+  width: number,
+  height: number,
+  headerHeight?: number,
+  attrHeight?: number
+): string {
+  const actualHeaderHeight = headerHeight || height * 0.25
+  const actualAttrHeight = attrHeight || height * 0.3
+  const divider1Y = actualHeaderHeight
+  const divider2Y = actualHeaderHeight + actualAttrHeight
 
   return `M0,0 L${width},0 L${width},${height} L0,${height} Z
     M0,${divider1Y} L${width},${divider1Y}
@@ -885,4 +891,45 @@ export function createUmlTimingStateLinePath(width: number, height: number): str
   path += ` M${lastX},0 L${width},0 L${width},${stateHeight} L${lastX},${stateHeight} Z`
 
   return path
+}
+
+export function createUmlSwimlanePoolPath(
+  width: number,
+  height: number,
+  laneCount: number = 3,
+  headerWidth: number = 80
+): string {
+  let path = `M 0 0 L ${width} 0 L ${width} ${height} L 0 ${height} Z`
+  path += ` M ${headerWidth} 0 L ${headerWidth} ${height}`
+
+  if (laneCount > 1) {
+    const laneHeight = height / laneCount
+    for (let i = 1; i < laneCount; i++) {
+      const y = i * laneHeight
+      path += ` M ${headerWidth} ${y} L ${width} ${y}`
+    }
+  }
+
+  return path
+}
+
+export function createUmlSwimlaneHorizontalPath(
+  width: number,
+  height: number,
+  headerWidth: number = 80
+): string {
+  return `M 0 0 L ${width} 0 L ${width} ${height} L 0 ${height} Z M ${headerWidth} 0 L ${headerWidth} ${height}`
+}
+
+export function createUmlSwimlaneVerticalPath(
+  width: number,
+  height: number,
+  headerHeight: number = 40
+): string {
+  return `M 0 0 L ${width} 0 L ${width} ${height} L 0 ${height} Z M 0 ${headerHeight} L ${width} ${headerHeight}`
+}
+
+export function createUmlSwimlaneSeparatorPath(width: number, height: number): string {
+  const y = height / 2
+  return `M 0 ${y} L ${width} ${y}`
 }

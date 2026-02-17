@@ -11,6 +11,7 @@ import {
   Tooltip,
   message,
   Popconfirm,
+  Space,
 } from 'antd'
 import {
   PlusOutlined,
@@ -19,10 +20,15 @@ import {
   ExportOutlined,
   SearchOutlined,
   FileOutlined,
+  CodeOutlined,
 } from '@ant-design/icons'
 import useX6GraphStore from '@stores/x6GraphStore'
 import type { Template, TemplateCategory } from '../types/template'
+import type { DiagramTemplate, DiagramType } from '../types/diagramTemplate'
 import { getBuiltinTemplates, saveCustomTemplate, getCustomTemplates, deleteCustomTemplate } from '../templates/templateRegistry'
+import { getAllTemplates, getTemplatesByType } from '../templates'
+import { buildDiagramTemplate } from '../utils/diagramTemplateBuilder'
+import { parseMermaidCode } from '../utils/mermaidParser'
 
 const { TabPane } = Tabs
 const { Search } = Input
@@ -31,13 +37,16 @@ const { Meta } = Card
 interface TemplateGalleryProps {
   visible: boolean
   onClose: () => void
+  onOpenMermaidImport?: () => void
 }
 
-const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) => {
+const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onOpenMermaidImport }) => {
   const [templates, setTemplates] = useState<Template[]>([])
   const [customTemplates, setCustomTemplates] = useState<Template[]>([])
+  const [diagramTemplates, setDiagramTemplates] = useState<DiagramTemplate[]>([])
   const [searchText, setSearchText] = useState('')
-  const [activeTab, setActiveTab] = useState<TemplateCategory | 'custom'>('flowchart')
+  const [activeTab, setActiveTab] = useState<TemplateCategory | 'custom' | 'diagram'>('flowchart')
+  const [activeDiagramTab, setActiveDiagramTab] = useState<DiagramType>('activity')
 
   const { nodes, edges, addNodes, addEdge, newGraph } = useX6GraphStore()
 
@@ -45,6 +54,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) =
     if (visible) {
       setTemplates(getBuiltinTemplates())
       setCustomTemplates(getCustomTemplates())
+      setDiagramTemplates(getAllTemplates())
     }
   }, [visible])
 
@@ -60,6 +70,27 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) =
     // Add template connectors
     if (template.connectors && template.connectors.length > 0) {
       template.connectors.forEach((connector) => addEdge(connector))
+    }
+
+    message.success(`已应用模板: ${template.name}`)
+    onClose()
+  }
+
+  const handleApplyDiagramTemplate = (template: DiagramTemplate) => {
+    // Clear current canvas
+    newGraph()
+
+    // Build template to X6 format
+    const { nodes: templateNodes, edges: templateEdges } = buildDiagramTemplate(template)
+
+    // Add template nodes
+    if (templateNodes.length > 0) {
+      addNodes(templateNodes)
+    }
+
+    // Add template edges
+    if (templateEdges.length > 0) {
+      templateEdges.forEach((edge) => addEdge(edge))
     }
 
     message.success(`已应用模板: ${template.name}`)
@@ -83,7 +114,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) =
       category: 'custom',
       shapes: nodes,
       connectors: edges,
-      thumbnail: '', // Could generate thumbnail from canvas
+      thumbnail: '',
     }
 
     try {
@@ -156,11 +187,24 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) =
     )
   }
 
+  const filterDiagramTemplates = (templates: DiagramTemplate[]) => {
+    if (!searchText) return templates
+    return templates.filter(
+      (t) =>
+        t.name.toLowerCase().includes(searchText.toLowerCase()) ||
+        t.description?.toLowerCase().includes(searchText.toLowerCase())
+    )
+  }
+
   const getTemplatesByCategory = (category: TemplateCategory | 'custom') => {
     if (category === 'custom') {
       return filterTemplates(customTemplates)
     }
     return filterTemplates(templates.filter((t) => t.category === category))
+  }
+
+  const getDiagramTemplatesByType = (type: DiagramType) => {
+    return filterDiagramTemplates(getTemplatesByType(type))
   }
 
   const renderTemplateCard = (template: Template, isCustom = false) => (
@@ -209,16 +253,134 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) =
     </Col>
   )
 
+  const renderDiagramTemplateCard = (template: DiagramTemplate) => (
+    <Col span={8} key={template.id}>
+      <Card
+        hoverable
+        cover={
+          <div
+            style={{
+              height: 120,
+              background: '#f0f5ff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 48,
+              color: '#2f54eb',
+            }}
+          >
+            <CodeOutlined />
+          </div>
+        }
+        actions={[
+          <Tooltip title="应用模板" key="apply">
+            <Button type="link" onClick={() => handleApplyDiagramTemplate(template)}>
+              应用
+            </Button>
+          </Tooltip>,
+        ]}
+      >
+        <Meta 
+          title={template.name} 
+          description={
+            <Space direction="vertical" size={0}>
+              <span>{template.description}</span>
+              {template.mermaidCode && (
+                <span style={{ fontSize: 12, color: '#8c8c8c' }}>支持 Mermaid</span>
+              )}
+            </Space>
+          } 
+        />
+      </Card>
+    </Col>
+  )
+
+  const renderDiagramTabs = () => (
+    <Tabs activeKey={activeDiagramTab} onChange={(key) => setActiveDiagramTab(key as DiagramType)}>
+      <TabPane tab="活动图" key="activity">
+        <Row gutter={[16, 16]}>
+          {getDiagramTemplatesByType('activity').length > 0 ? (
+            getDiagramTemplatesByType('activity').map((t) => renderDiagramTemplateCard(t))
+          ) : (
+            <Col span={24}>
+              <Empty description="暂无活动图模板" />
+            </Col>
+          )}
+        </Row>
+      </TabPane>
+      <TabPane tab="序列图" key="sequence">
+        <Row gutter={[16, 16]}>
+          {getDiagramTemplatesByType('sequence').length > 0 ? (
+            getDiagramTemplatesByType('sequence').map((t) => renderDiagramTemplateCard(t))
+          ) : (
+            <Col span={24}>
+              <Empty description="暂无序列图模板" />
+            </Col>
+          )}
+        </Row>
+      </TabPane>
+      <TabPane tab="状态图" key="state">
+        <Row gutter={[16, 16]}>
+          {getDiagramTemplatesByType('state').length > 0 ? (
+            getDiagramTemplatesByType('state').map((t) => renderDiagramTemplateCard(t))
+          ) : (
+            <Col span={24}>
+              <Empty description="暂无状态图模板" />
+            </Col>
+          )}
+        </Row>
+      </TabPane>
+      <TabPane tab="ER图" key="er">
+        <Row gutter={[16, 16]}>
+          {getDiagramTemplatesByType('er').length > 0 ? (
+            getDiagramTemplatesByType('er').map((t) => renderDiagramTemplateCard(t))
+          ) : (
+            <Col span={24}>
+              <Empty description="暂无ER图模板" />
+            </Col>
+          )}
+        </Row>
+      </TabPane>
+      <TabPane tab="类图" key="class">
+        <Row gutter={[16, 16]}>
+          {getDiagramTemplatesByType('class').length > 0 ? (
+            getDiagramTemplatesByType('class').map((t) => renderDiagramTemplateCard(t))
+          ) : (
+            <Col span={24}>
+              <Empty description="暂无类图模板" />
+            </Col>
+          )}
+        </Row>
+      </TabPane>
+      <TabPane tab="甘特图" key="gantt">
+        <Row gutter={[16, 16]}>
+          {getDiagramTemplatesByType('gantt').length > 0 ? (
+            getDiagramTemplatesByType('gantt').map((t) => renderDiagramTemplateCard(t))
+          ) : (
+            <Col span={24}>
+              <Empty description="暂无甘特图模板" />
+            </Col>
+          )}
+        </Row>
+      </TabPane>
+    </Tabs>
+  )
+
   return (
     <Modal
       title="模板库"
       open={visible}
       onCancel={onClose}
-      width={800}
+      width={900}
       footer={[
         <Button key="import" icon={<ImportOutlined />} onClick={handleImportTemplate}>
           导入模板
         </Button>,
+        onOpenMermaidImport && (
+          <Button key="mermaid" icon={<CodeOutlined />} onClick={onOpenMermaidImport}>
+            从 Mermaid 导入
+          </Button>
+        ),
         <Button
           key="save"
           type="primary"
@@ -239,7 +401,10 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose }) =
         />
       </div>
 
-      <Tabs activeKey={activeTab} onChange={(key) => setActiveTab(key as TemplateCategory | 'custom')}>
+      <Tabs activeKey={activeTab} onChange={(key) => setActiveTab(key as TemplateCategory | 'custom' | 'diagram')}>
+        <TabPane tab="图表模板" key="diagram">
+          {renderDiagramTabs()}
+        </TabPane>
         <TabPane tab="流程图" key="flowchart">
           <Row gutter={[16, 16]}>
             {getTemplatesByCategory('flowchart').length > 0 ? (

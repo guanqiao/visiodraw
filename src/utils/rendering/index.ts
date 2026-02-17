@@ -1,0 +1,6 @@
+export { ShapeCache, globalShapeCache } from './ShapeCache'
+export { SmartRouter } from './SmartRouter'
+export { VirtualRenderer } from './VirtualRenderer'
+export { GradientManager } from './GradientManager'
+export { AnimationManager } from './AnimationManager'
+export type { GradientConfig, LinearGradientConfig, RadialGradientConfig, GradientStop } from './GradientManager'

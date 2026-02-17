@@ -27,14 +27,53 @@ export const renderErWeakEntity = (config: ShapeRenderConfig): Node => {
 
 export const renderErTableEntity = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
-  const path = createErTableEntityPath(config.width, config.height, 0.25, 0.5)
+  
+  // 解析文本内容，计算列数和自适应尺寸
+  const lines = config.text?.split('\n') || []
+  const tableName = lines[0] || ''
+  const columns = lines.slice(1).filter(line => line.trim())
+  
+  // 计算列宽
+  const charWidth = 8
+  const padding = 16
+  const maxColumnWidth = columns.reduce((max, col) => {
+    const parts = col.split(/\s+/)
+    const colWidth = parts.reduce((sum, part) => sum + part.length * charWidth, 0) + padding * 2
+    return Math.max(max, colWidth)
+  }, 100) // 最小宽度 100
+  
+  // 计算自适应宽度
+  const nameWidth = tableName.length * charWidth + padding * 2
+  const adaptiveWidth = Math.max(config.width, Math.max(nameWidth, maxColumnWidth))
+  
+  // 计算自适应高度
+  const lineHeight = 24
+  const headerHeight = 32
+  const minHeight = headerHeight + columns.length * lineHeight + padding
+  const adaptiveHeight = Math.max(config.height, minHeight)
+  
+  // 计算 PK 区域高度（如果有主键列）
+  const pkColumns = columns.filter(col => col.includes('[pk]') || col.includes('[PK]'))
+  const pkRatio = pkColumns.length > 0 ? headerHeight / adaptiveHeight : 0.5
+  
+  const path = createErTableEntityPath(adaptiveWidth, adaptiveHeight, headerHeight / adaptiveHeight, pkRatio)
+  
   return new Shape.Path({
     ...base,
+    width: adaptiveWidth,
+    height: adaptiveHeight,
     attrs: {
       ...base.attrs,
       body: {
         ...base.attrs.body,
         d: path,
+      },
+      label: {
+        ...base.attrs.label,
+        text: tableName,
+        textVerticalAnchor: 'top',
+        textAnchor: 'middle',
+        refY: headerHeight / 2,
       },
     },
   })

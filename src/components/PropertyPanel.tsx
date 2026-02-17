@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react'
-import { Card, Form, InputNumber, Input, ColorPicker, Space, Button, Divider, Select, Slider, Tabs, Typography } from 'antd'
+import { Card, Form, InputNumber, Input, ColorPicker, Space, Button, Divider, Select, Slider, Tabs, Tooltip } from 'antd'
 import {
   AlignLeftOutlined,
   AlignCenterOutlined,
@@ -25,6 +25,8 @@ import {
   FontSizeOutlined,
   DatabaseOutlined,
   SettingOutlined,
+  LockOutlined,
+  UnlockOutlined,
 } from '@ant-design/icons'
 import useX6GraphStore from '@stores/x6GraphStore'
 import type { ConnectorStyle, ConnectorEndStyle, LineStyle, ConnectorLabel, UMLRelationType, ERRelationType } from '../types/connection'
@@ -61,6 +63,7 @@ const PropertyPanel: React.FC = () => {
 
   const [editingLabelIndex, setEditingLabelIndex] = useState<number | null>(null)
   const [labelText, setLabelText] = useState('')
+  const [lockAspectRatio, setLockAspectRatio] = useState(true)
 
   const isErTableEntity = singleNode && ER_TABLE_TYPES.includes(singleNode.type)
 
@@ -272,7 +275,19 @@ const PropertyPanel: React.FC = () => {
   // Handle size change
   const handleSizeChange = (dimension: 'width' | 'height', value: number | null) => {
     if (value === null || !singleNode) return
-    updateNode(singleNode.id, { [dimension]: value })
+    
+    if (lockAspectRatio) {
+      const aspectRatio = singleNode.width / singleNode.height
+      if (dimension === 'width') {
+        const newHeight = Math.round(value / aspectRatio)
+        updateNode(singleNode.id, { width: value, height: newHeight })
+      } else {
+        const newWidth = Math.round(value * aspectRatio)
+        updateNode(singleNode.id, { width: newWidth, height: value })
+      }
+    } else {
+      updateNode(singleNode.id, { [dimension]: value })
+    }
   }
 
   // Handle fill color change
@@ -910,6 +925,14 @@ const PropertyPanel: React.FC = () => {
                       onChange={(v) => handleSizeChange('width', v)}
                       style={{ width: 100 }}
                     />
+                    <Tooltip title={lockAspectRatio ? '解锁比例' : '锁定比例'}>
+                      <Button
+                        type={lockAspectRatio ? 'primary' : 'default'}
+                        icon={lockAspectRatio ? <LockOutlined /> : <UnlockOutlined />}
+                        onClick={() => setLockAspectRatio(!lockAspectRatio)}
+                        size="small"
+                      />
+                    </Tooltip>
                     <InputNumber
                       addonBefore="H"
                       value={singleNode?.height}
@@ -973,14 +996,22 @@ const PropertyPanel: React.FC = () => {
                 value={singleNode?.width}
                 onChange={(v) => handleSizeChange('width', v)}
                 disabled={!singleNode}
-                style={{ width: 120 }}
+                style={{ width: 100 }}
               />
+              <Tooltip title={lockAspectRatio ? '解锁比例' : '锁定比例'}>
+                <Button
+                  type={lockAspectRatio ? 'primary' : 'default'}
+                  icon={lockAspectRatio ? <LockOutlined /> : <UnlockOutlined />}
+                  onClick={() => setLockAspectRatio(!lockAspectRatio)}
+                  size="small"
+                />
+              </Tooltip>
               <InputNumber
                 addonBefore="H"
                 value={singleNode?.height}
                 onChange={(v) => handleSizeChange('height', v)}
                 disabled={!singleNode}
-                style={{ width: 120 }}
+                style={{ width: 100 }}
               />
             </Space>
           </Form.Item>

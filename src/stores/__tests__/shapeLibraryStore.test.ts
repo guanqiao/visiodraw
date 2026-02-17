@@ -24,6 +24,18 @@ const mockCategories: ShapeCategory[] = [
   },
 ]
 
+// Mock localStorage
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+}
+Object.defineProperty(window, 'localStorage', {
+  value: localStorageMock,
+  writable: true,
+})
+
 describe('ShapeLibraryStore', () => {
   beforeEach(() => {
     // Reset favorites before each test
@@ -83,7 +95,7 @@ describe('ShapeLibraryStore', () => {
         result.current.setCategories(mockCategories)
         result.current.toggleFavorite('rect1')
       })
-      expect(localStorage.setItem).toHaveBeenCalledWith(
+      expect(localStorageMock.setItem).toHaveBeenCalledWith(
         'visiodraw-shape-favorites',
         JSON.stringify(['rect1'])
       )

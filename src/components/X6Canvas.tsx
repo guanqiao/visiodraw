@@ -174,7 +174,10 @@ const X6Canvas: React.FC = () => {
 
     graph.use(
       new Transform({
-        resizing: true,
+        resizing: {
+          enabled: true,
+          preserveAspectRatio: true,
+        },
         rotating: true,
       })
     )

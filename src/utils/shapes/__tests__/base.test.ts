@@ -62,15 +62,15 @@ describe('base shape renderers', () => {
     it('should create a rounded rectangle with corner radius', () => {
       const node = renderRoundedRectangle(defaultConfig)
       
-      expect(node.attr('body/rx')).toBe(10)
-      expect(node.attr('body/ry')).toBe(10)
+      expect(node.attr('body/rx')).toBe(15) // Mermaid 默认圆角
+      expect(node.attr('body/ry')).toBe(15)
     })
 
     it('should use custom corner radius', () => {
-      const node = renderRoundedRectangle({ ...defaultConfig, rx: 20, ry: 15 })
+      const node = renderRoundedRectangle({ ...defaultConfig, rx: 20, ry: 10 })
       
       expect(node.attr('body/rx')).toBe(20)
-      expect(node.attr('body/ry')).toBe(15)
+      expect(node.attr('body/ry')).toBe(10)
     })
   })
 

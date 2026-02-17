@@ -13,6 +13,7 @@ import SqlExportDialog from '@components/SqlExportDialog'
 import SqlImportDialog from '@components/SqlImportDialog'
 import ErToolbar from '@components/ErToolbar'
 import ErExportDialog from '@components/ErExportDialog'
+import MermaidImportDialog from '@components/MermaidImportDialog'
 import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import { useTheme } from '@hooks/useTheme'
@@ -117,6 +118,7 @@ const App: React.FC = () => {
   const [showSqlExport, setShowSqlExport] = useState(false)
   const [showSqlImport, setShowSqlImport] = useState(false)
   const [showErExport, setShowErExport] = useState(false)
+  const [showMermaidImport, setShowMermaidImport] = useState(false)
 
   const [leftWidth, setLeftWidth] = useState(() => {
     const saved = localStorage.getItem('left-panel-width')
@@ -510,7 +512,14 @@ const App: React.FC = () => {
       
       <StatusBar />
       
-      <TemplateGallery visible={showTemplates} onClose={() => setShowTemplates(false)} />
+      <TemplateGallery 
+        visible={showTemplates} 
+        onClose={() => setShowTemplates(false)} 
+        onOpenMermaidImport={() => {
+          setShowTemplates(false)
+          setShowMermaidImport(true)
+        }}
+      />
       <CanvasHistoryPanel visible={showHistory} onClose={() => setShowHistory(false)} />
       <SequenceScriptEditor visible={showScriptEditor} onClose={() => setShowScriptEditor(false)} />
       <SqlImportDialog
@@ -539,6 +548,10 @@ const App: React.FC = () => {
             columns: parseColumnsFromText(n.text || ''),
           }))}
         onClose={() => setShowErExport(false)}
+      />
+      <MermaidImportDialog
+        visible={showMermaidImport}
+        onClose={() => setShowMermaidImport(false)}
       />
     </Layout>
   )

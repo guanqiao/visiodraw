@@ -7,6 +7,7 @@ import { erRenderers } from './er'
 import { bpmnRenderers } from './bpmn'
 import { cloudRenderers } from './cloud'
 import { renderDatabase } from './flowchart'
+import { globalShapeCache } from '../rendering/ShapeCache'
 
 export * from './types'
 export * from './base'
@@ -131,10 +132,42 @@ export const shapeRenderers: ShapeRendererMap = {
 
 export const renderShape = (type: string, config: ShapeRenderConfig): Node => {
   const renderer = shapeRenderers[type]
-  if (renderer) {
-    return renderer(config)
+  const configWithType = { ...config, shapeType: type }
+
+  if (!renderer) {
+    console.warn(`[renderShape] 未找到渲染器: ${type}，使用默认矩形`)
+    return baseRenderers.rectangle(configWithType)
   }
-  return baseRenderers.rectangle(config)
+
+  try {
+    const cachedNode = globalShapeCache.get(type, config)
+    if (cachedNode) {
+      cachedNode.setPosition(config.x, config.y)
+      ;(cachedNode as any).id = config.id
+      if (config.text) {
+        cachedNode.attr('label/text', config.text)
+      }
+      cachedNode.setData({ fromStore: true, shapeType: type })
+      console.log(`[renderShape] 从缓存克隆: ${type}, id: ${config.id}`)
+      return cachedNode
+    }
+
+    const node = renderer(configWithType)
+    node.setData({ fromStore: true, shapeType: type })
+    
+    const cacheConfig = { ...config }
+    delete (cacheConfig as any).id
+    delete (cacheConfig as any).x
+    delete (cacheConfig as any).y
+    delete (cacheConfig as any).text
+    globalShapeCache.set(type, cacheConfig, node)
+    
+    console.log(`[renderShape] 成功渲染: ${type}, id: ${config.id}`)
+    return node
+  } catch (error) {
+    console.error(`[renderShape] 渲染失败: ${type}, id: ${config.id}`, error)
+    return baseRenderers.rectangle(configWithType)
+  }
 }
 
 export default renderShape

@@ -12,6 +12,7 @@ export interface ShapeRenderConfig {
   text?: string
   rx?: number
   ry?: number
+  shapeType?: string
 }
 
 export interface PortGroup {
@@ -90,30 +91,76 @@ export const getPortItems = (): PortItem[] => [
   { id: 'right', group: 'right' },
 ]
 
-export const createBaseConfig = (config: ShapeRenderConfig) => ({
-  id: config.id,
-  x: config.x,
-  y: config.y,
-  width: config.width,
-  height: config.height,
-  attrs: {
-    body: {
-      fill: config.fill || '#ffffff',
-      stroke: config.stroke || '#333333',
-      strokeWidth: config.strokeWidth || 2,
+export interface TextWrapConfig {
+  width: number
+  height: number
+  ellipsis?: boolean
+  [key: string]: any
+}
+
+export interface ShapeStyleConfig {
+  rx?: number
+  ry?: number
+  strokeDasharray?: string
+  opacity?: number
+  shadowBlur?: number
+  shadowColor?: string
+  shadowOffsetX?: number
+  shadowOffsetY?: number
+}
+
+export const createBaseConfig = (config: ShapeRenderConfig, styleConfig: ShapeStyleConfig = {}) => {
+  const { rx, ry, strokeDasharray, opacity, shadowBlur, shadowColor, shadowOffsetX, shadowOffsetY } = styleConfig
+  
+  const bodyAttrs: Record<string, any> = {
+    fill: config.fill || '#ffffff',
+    stroke: config.stroke || '#333333',
+    strokeWidth: config.strokeWidth || 2,
+  }
+  
+  // 添加圆角
+  if (rx !== undefined) bodyAttrs.rx = rx
+  if (ry !== undefined) bodyAttrs.ry = ry
+  
+  // 添加虚线
+  if (strokeDasharray) bodyAttrs.strokeDasharray = strokeDasharray
+  
+  // 添加透明度
+  if (opacity !== undefined) bodyAttrs.opacity = opacity
+  
+  // 添加阴影
+  if (shadowBlur !== undefined) bodyAttrs.filter = {
+    name: 'dropShadow',
+    args: {
+      dx: shadowOffsetX || 2,
+      dy: shadowOffsetY || 2,
+      blur: shadowBlur,
+      color: shadowColor || 'rgba(0,0,0,0.1)',
     },
-    label: {
-      text: config.text || '',
-      fontSize: 14,
-      fill: '#333333',
+  }
+  
+  return {
+    id: config.id,
+    x: config.x,
+    y: config.y,
+    width: config.width,
+    height: config.height,
+    attrs: {
+      body: bodyAttrs,
+      label: {
+        text: config.text || '',
+        fontSize: 14,
+        fill: '#333333',
+        fontFamily: 'trebuchet ms, verdana, arial, sans-serif',
+      },
     },
-  },
-  ports: {
-    groups: getPortGroups(),
-    items: getPortItems(),
-  },
-  data: { fromStore: true },
-})
+    ports: {
+      groups: getPortGroups(),
+      items: getPortItems(),
+    },
+    data: { fromStore: true, shapeType: config.shapeType },
+  }
+}
 
 export type ShapeRenderer = (config: ShapeRenderConfig) => Node
 
