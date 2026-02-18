@@ -21,6 +21,7 @@ export interface SequenceParticipant {
   name: string
   type: ParticipantType
   order: number
+  color?: string
 }
 
 export interface SequenceMessage {
@@ -32,6 +33,7 @@ export interface SequenceMessage {
   order: number
   activate?: boolean
   deactivate?: boolean
+  color?: string
 }
 
 export interface SequenceFragment {
@@ -41,6 +43,7 @@ export interface SequenceFragment {
   startMessageOrder: number
   endMessageOrder: number
   parentId?: string
+  color?: string
 }
 
 export interface SequenceNote {
@@ -217,32 +220,34 @@ export class MermaidSequenceParser {
   }
 
   private parseParticipant(line: string, ctx: ParseContext): void {
-    // participant A as 用户
-    const match = line.match(/participant\s+(\w+)(?:\s+as\s+(.+))?/)
+    // participant A as 用户 #color
+    const match = line.match(/participant\s+(\w+)(?:\s+as\s+([^#]+))?(?:\s*#(.+))?/)
     if (match && !ctx.participants.find(p => p.id === match[1])) {
       ctx.participants.push({
         id: match[1],
         name: match[2] ? match[2].trim() : match[1],
         type: 'participant',
         order: ctx.participants.length,
+        color: match[3] ? match[3].trim() : undefined,
       })
     }
   }
 
   private parseActor(line: string, ctx: ParseContext): void {
-    const match = line.match(/actor\s+(\w+)(?:\s+as\s+(.+))?/)
+    const match = line.match(/actor\s+(\w+)(?:\s+as\s+([^#]+))?(?:\s*#(.+))?/)
     if (match && !ctx.participants.find(p => p.id === match[1])) {
       ctx.participants.push({
         id: match[1],
         name: match[2] ? match[2].trim() : match[1],
         type: 'actor',
         order: ctx.participants.length,
+        color: match[3] ? match[3].trim() : undefined,
       })
     }
   }
 
   private parseDatabase(line: string, ctx: ParseContext): void {
-    const match = line.match(/database\s+(\w+)(?:\s+as\s+(.+))?/)
+    const match = line.match(/database\s+(\w+)(?:\s+as\s+([^#]+))?(?:\s*#(.+))?/)
     if (match && !ctx.participants.find(p => p.id === match[1])) {
       ctx.participants.push({
         id: match[1],
