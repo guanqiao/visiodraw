@@ -1,4 +1,10 @@
 import type { Template } from '../types/template'
+import {
+  calculateBoundingBox,
+  drawShape,
+  drawConnector,
+} from './shared/canvasRenderer'
+import { escapeXml } from './shared/xmlUtils'
 
 export interface ShareOptions {
   baseUrl?: string
@@ -210,7 +216,7 @@ async function drawTemplateOnCanvas(
   // 绘制连线
   if (template.connectors) {
     template.connectors.forEach((connector) => {
-      drawConnector(ctx, connector, template.shapes, scale, offsetX, offsetY)
+      drawConnector(ctx, connector as any, template.shapes, scale, offsetX, offsetY)
     })
   }
 
@@ -218,141 +224,6 @@ async function drawTemplateOnCanvas(
   template.shapes.forEach((shape) => {
     drawShape(ctx, shape, scale, offsetX, offsetY)
   })
-}
-
-/**
- * 计算边界框
- */
-function calculateBoundingBox(shapes: any[]): { minX: number; minY: number; maxX: number; maxY: number } {
-  if (shapes.length === 0) {
-    return { minX: 0, minY: 0, maxX: 100, maxY: 100 }
-  }
-
-  let minX = Infinity
-  let minY = Infinity
-  let maxX = -Infinity
-  let maxY = -Infinity
-
-  shapes.forEach((shape) => {
-    const width = shape.width || 60
-    const height = shape.height || 40
-    minX = Math.min(minX, shape.x)
-    minY = Math.min(minY, shape.y)
-    maxX = Math.max(maxX, shape.x + width)
-    maxY = Math.max(maxY, shape.y + height)
-  })
-
-  return { minX, minY, maxX, maxY }
-}
-
-/**
- * 绘制形状
- */
-function drawShape(
-  ctx: CanvasRenderingContext2D,
-  shape: any,
-  scale: number,
-  offsetX: number,
-  offsetY: number
-): void {
-  const x = shape.x * scale + offsetX
-  const y = shape.y * scale + offsetY
-  const width = (shape.width || 100) * scale
-  const height = (shape.height || 60) * scale
-
-  ctx.fillStyle = shape.fill || '#E6F7FF'
-  ctx.strokeStyle = shape.stroke || '#1890FF'
-  ctx.lineWidth = Math.max(1, 2 * scale)
-
-  // 绘制圆角矩形
-  const radius = Math.min(4 * scale, 8)
-  ctx.beginPath()
-  ctx.moveTo(x + radius, y)
-  ctx.lineTo(x + width - radius, y)
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
-  ctx.lineTo(x + width, y + height - radius)
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
-  ctx.lineTo(x + radius, y + height)
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
-  ctx.lineTo(x, y + radius)
-  ctx.quadraticCurveTo(x, y, x + radius, y)
-  ctx.closePath()
-
-  ctx.fill()
-  ctx.stroke()
-
-  // 绘制文本
-  if (shape.text) {
-    ctx.fillStyle = '#333333'
-    ctx.font = `${Math.max(8, 12 * scale)}px Arial`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-
-    const lines = shape.text.split('\n').slice(0, 3)
-    const lineHeight = Math.max(10, 14 * scale)
-    const startY = y + height / 2 - ((lines.length - 1) * lineHeight) / 2
-
-    lines.forEach((line: string, index: number) => {
-      const truncated = line.length > 15 ? line.substring(0, 15) + '...' : line
-      ctx.fillText(truncated, x + width / 2, startY + index * lineHeight)
-    })
-  }
-}
-
-/**
- * 绘制连线
- */
-function drawConnector(
-  ctx: CanvasRenderingContext2D,
-  connector: any,
-  shapes: any[],
-  scale: number,
-  offsetX: number,
-  offsetY: number
-): void {
-  const sourceShape = shapes.find((s) => s.id === connector.source || s.id === connector.sourceShapeId)
-  const targetShape = shapes.find((s) => s.id === connector.target || s.id === connector.targetShapeId)
-
-  if (!sourceShape || !targetShape) return
-
-  const sourceX = (sourceShape.x + (sourceShape.width || 100) / 2) * scale + offsetX
-  const sourceY = (sourceShape.y + (sourceShape.height || 60) / 2) * scale + offsetY
-  const targetX = (targetShape.x + (targetShape.width || 100) / 2) * scale + offsetX
-  const targetY = (targetShape.y + (targetShape.height || 60) / 2) * scale + offsetY
-
-  ctx.strokeStyle = connector.stroke || '#666666'
-  ctx.lineWidth = Math.max(1, 1.5 * scale)
-  ctx.lineCap = 'round'
-  ctx.lineJoin = 'round'
-
-  ctx.beginPath()
-  ctx.moveTo(sourceX, sourceY)
-
-  // 正交连线
-  const midX = (sourceX + targetX) / 2
-  ctx.lineTo(midX, sourceY)
-  ctx.lineTo(midX, targetY)
-  ctx.lineTo(targetX, targetY)
-
-  ctx.stroke()
-
-  // 绘制箭头
-  const angle = Math.atan2(targetY - sourceY, targetX - sourceX)
-  const arrowLength = Math.max(6, 10 * scale)
-  const arrowAngle = Math.PI / 6
-
-  ctx.beginPath()
-  ctx.moveTo(targetX, targetY)
-  ctx.lineTo(
-    targetX - arrowLength * Math.cos(angle - arrowAngle),
-    targetY - arrowLength * Math.sin(angle - arrowAngle)
-  )
-  ctx.moveTo(targetX, targetY)
-  ctx.lineTo(
-    targetX - arrowLength * Math.cos(angle + arrowAngle),
-    targetY - arrowLength * Math.sin(angle + arrowAngle)
-  )
-  ctx.stroke()
 }
 
 /**
@@ -408,27 +279,27 @@ export async function exportTemplateAsSvg(
       .map((shape) => {
         const x = shape.x + padding - bbox.minX
         const y = shape.y + padding - bbox.minY
-        const width = shape.width || 100
-        const height = shape.height || 60
+        const shapeWidth = shape.width || 100
+        const shapeHeight = shape.height || 60
         const radius = 4
 
-        const rect = `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="${radius}" ry="${radius}" fill="${shape.fill || '#E6F7FF'}" stroke="${shape.stroke || '#1890FF'}" stroke-width="2" />`
+        const rect = `<rect x="${x}" y="${y}" width="${shapeWidth}" height="${shapeHeight}" rx="${radius}" ry="${radius}" fill="${shape.fill || '#E6F7FF'}" stroke="${shape.stroke || '#1890FF'}" stroke-width="2" />`
 
-        let text = ''
+        let textSvg = ''
         if (shape.text) {
           const lines = shape.text.split('\n').slice(0, 3)
           const lineHeight = 14
-          const startY = y + height / 2 - ((lines.length - 1) * lineHeight) / 2
+          const startY = y + shapeHeight / 2 - ((lines.length - 1) * lineHeight) / 2
 
-          text = lines
+          textSvg = lines
             .map((line, index) => {
               const truncated = line.length > 15 ? line.substring(0, 15) + '...' : line
-              return `<text x="${x + width / 2}" y="${startY + index * lineHeight}" text-anchor="middle" dominant-baseline="middle" fill="#333333" font-size="12">${escapeXml(truncated)}</text>`
+              return `<text x="${x + shapeWidth / 2}" y="${startY + index * lineHeight}" text-anchor="middle" dominant-baseline="middle" fill="#333333" font-size="12">${escapeXml(truncated)}</text>`
             })
             .join('\n')
         }
 
-        return rect + '\n' + text
+        return rect + '\n' + textSvg
       })
       .join('\n')
   }
@@ -549,20 +420,6 @@ export function validateShareLink(link: string): {
   } catch (error) {
     return { valid: false, error: '无效的 URL' }
   }
-}
-
-/**
- * XML 转义
- * @param text 文本
- * @returns 转义后的文本
- */
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
 }
 
 export default {
