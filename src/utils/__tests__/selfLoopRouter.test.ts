@@ -134,7 +134,11 @@ describe('SelfLoopRouter', () => {
       const config1 = router.calculateMultiLoopConfig('node1', 5, 4)
       const config2 = router.calculateMultiLoopConfig('node1', 5, 5)
 
-      expect(config1.offset).toBe(0)
+      // 索引4对应第5个自连线，方向为top（4 % 4 = 0），偏移为1层（4 / 4 = 1）
+      expect(config1.direction).toBe('top')
+      expect(config1.offset).toBe(25)
+      // 索引5对应第6个自连线，方向为right（5 % 4 = 1），偏移为1层（5 / 4 = 1）
+      expect(config2.direction).toBe('right')
       expect(config2.offset).toBe(25)
     })
   })

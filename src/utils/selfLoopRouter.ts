@@ -82,10 +82,10 @@ export class SelfLoopRouter {
     const offsetRadius = radius + existingLoops * (offset || 20)
 
     // 根据方向计算起点和终点
-    let startPoint: SelfLoopPoint
-    let endPoint: SelfLoopPoint
-    let controlPoint1: SelfLoopPoint
-    let controlPoint2: SelfLoopPoint
+    let startPoint: SelfLoopPoint = { x: nodeX, y: nodeY }
+    let endPoint: SelfLoopPoint = { x: nodeX, y: nodeY }
+    let controlPoint1: SelfLoopPoint | undefined
+    let controlPoint2: SelfLoopPoint | undefined
 
     switch (direction) {
       case 'top':

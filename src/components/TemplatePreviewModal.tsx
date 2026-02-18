@@ -19,13 +19,17 @@ import {
   NodeIndexOutlined,
   AppstoreOutlined,
   FileTextOutlined,
+  FullscreenOutlined,
+  DownloadOutlined,
 } from '@ant-design/icons'
 import type { Template } from '../types/template'
 import type { DiagramTemplate } from '../types/diagramTemplate'
 import {
   generateTemplateThumbnail,
   generateDiagramTemplateThumbnail,
+  previewTemplate,
 } from '../utils/templateThumbnailGenerator'
+import { devError } from '../utils/logger'
 
 const { Title, Text } = Typography
 
@@ -60,7 +64,7 @@ const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
         })
       }
     } catch (error) {
-      console.error('生成预览图失败:', error)
+      devError('生成预览图失败:', error)
       return ''
     }
   }, [template])

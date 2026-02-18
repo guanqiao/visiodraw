@@ -1,5 +1,17 @@
 export type MermaidThemeName = 'default' | 'dark' | 'forest' | 'neutral' | 'base'
 
+export interface SelfLoopThemeVariables {
+  defaultRadius: number
+  defaultDirection: 'top' | 'right' | 'bottom' | 'left'
+  multiLoopOffset: number
+  bezierControlOffset: number
+  labelPosition: 'inside' | 'outside' | 'auto'
+  labelOffset: number
+  stroke: string
+  strokeWidth: number
+  arrowSize: number
+}
+
 export interface MermaidThemeVariables {
   background: string
   primaryColor: string
@@ -55,6 +67,20 @@ export interface MermaidThemeVariables {
   taskTextColor: string
   taskTextOutsideColor: string
   activeTaskTextColor: string
+
+  selfLoop: SelfLoopThemeVariables
+}
+
+const defaultSelfLoopTheme: SelfLoopThemeVariables = {
+  defaultRadius: 35,
+  defaultDirection: 'top',
+  multiLoopOffset: 25,
+  bezierControlOffset: 50,
+  labelPosition: 'outside',
+  labelOffset: 15,
+  stroke: '#333333',
+  strokeWidth: 2,
+  arrowSize: 10,
 }
 
 export const defaultTheme: MermaidThemeVariables = {
@@ -112,6 +138,13 @@ export const defaultTheme: MermaidThemeVariables = {
   taskTextColor: '#333',
   taskTextOutsideColor: '#333',
   activeTaskTextColor: '#333',
+
+  selfLoop: defaultSelfLoopTheme,
+}
+
+const darkSelfLoopTheme: SelfLoopThemeVariables = {
+  ...defaultSelfLoopTheme,
+  stroke: '#e0e0e0',
 }
 
 export const darkTheme: MermaidThemeVariables = {
@@ -168,6 +201,13 @@ export const darkTheme: MermaidThemeVariables = {
   taskTextColor: '#e0e0e0',
   taskTextOutsideColor: '#e0e0e0',
   activeTaskTextColor: '#e0e0e0',
+
+  selfLoop: darkSelfLoopTheme,
+}
+
+const forestSelfLoopTheme: SelfLoopThemeVariables = {
+  ...defaultSelfLoopTheme,
+  stroke: '#4a7c4e',
 }
 
 export const forestTheme: MermaidThemeVariables = {
@@ -222,6 +262,13 @@ export const forestTheme: MermaidThemeVariables = {
   taskTextColor: '#155724',
   taskTextOutsideColor: '#155724',
   activeTaskTextColor: '#155724',
+
+  selfLoop: forestSelfLoopTheme,
+}
+
+const neutralSelfLoopTheme: SelfLoopThemeVariables = {
+  ...defaultSelfLoopTheme,
+  stroke: '#666666',
 }
 
 export const neutralTheme: MermaidThemeVariables = {
@@ -276,6 +323,8 @@ export const neutralTheme: MermaidThemeVariables = {
   taskTextColor: '#333',
   taskTextOutsideColor: '#333',
   activeTaskTextColor: '#333',
+
+  selfLoop: neutralSelfLoopTheme,
 }
 
 export function getTheme(themeName: MermaidThemeName): MermaidThemeVariables {
@@ -397,6 +446,14 @@ export function getEdgeColors(style?: string): { stroke: string; text: string } 
     stroke: theme.defaultLinkColor,
     text: theme.textColor,
   }
+}
+
+/**
+ * 获取自连线主题配置
+ */
+export function getSelfLoopTheme(): SelfLoopThemeVariables {
+  const theme = getCurrentTheme()
+  return theme.selfLoop
 }
 
 export function parseThemeFromCode(code: string): MermaidThemeName {

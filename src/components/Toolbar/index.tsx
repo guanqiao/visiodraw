@@ -47,6 +47,7 @@ import { Button, Space, Divider, Tooltip, Dropdown } from 'antd'
 import type { MenuProps } from 'antd'
 import useX6GraphStore from '@stores/x6GraphStore'
 import { useTheme } from '@hooks/useTheme'
+import { devError } from '../../utils/logger'
 import styles from './toolbar.module.css'
 
 interface ToolbarProps {
@@ -192,7 +193,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
       link.click()
       onExportPng?.()
     } catch (error) {
-      console.error('Export PNG failed:', error)
+      devError('Export PNG failed:', error)
     }
   }
 
@@ -207,7 +208,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
       link.click()
       URL.revokeObjectURL(url)
     } catch (error) {
-      console.error('Export SVG failed:', error)
+      devError('Export SVG failed:', error)
     }
   }
 

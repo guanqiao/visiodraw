@@ -42,6 +42,7 @@ import {
 } from '../utils/templateThumbnailGenerator'
 import TemplatePreviewModal from './TemplatePreviewModal'
 import TemplateImportDialog from './TemplateImportDialog'
+import { devError } from '../utils/logger'
 
 const { TabPane } = Tabs
 const { Search } = Input
@@ -179,7 +180,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
       setCustomTemplates(getCustomTemplates())
       message.success('模板已保存')
     } catch (error) {
-      console.error('保存模板失败:', error)
+      devError('保存模板失败:', error)
       message.error('保存模板失败')
     }
   }
@@ -253,7 +254,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
       thumbnailCache.set(cacheKey, thumbnail)
       return thumbnail
     } catch (error) {
-      console.error('生成缩略图失败:', error)
+      devError('生成缩略图失败:', error)
       return generateEmptyThumbnail()
     }
   }, [])

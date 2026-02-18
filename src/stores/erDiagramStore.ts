@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import type { ErColumn, ErConstraint } from '../types/shapeLibrary'
+import { devError } from '../utils/logger'
 
 export interface ErTable {
   id: string
@@ -361,7 +362,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
             selectedRelationId: null,
           })
         } catch (error) {
-          console.error('Failed to import ER diagram:', error)
+          devError('Failed to import ER diagram:', error)
         }
       },
 

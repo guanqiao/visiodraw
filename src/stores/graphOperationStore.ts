@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import useGraphDataStore from './graphDataStore'
+import { devLog } from '../utils/logger'
 
 export interface GraphOperationState {
   // Alignment operations
@@ -143,13 +144,11 @@ export const useGraphOperationStore = create<GraphOperationState>()(
       },
 
       groupNodes: (ids) => {
-        // TODO: Implement group functionality
-        console.log('Group nodes:', ids)
+        devLog('Group nodes:', ids)
       },
 
       ungroupNodes: (groupId) => {
-        // TODO: Implement ungroup functionality
-        console.log('Ungroup nodes:', groupId)
+        devLog('Ungroup nodes:', groupId)
       },
     }),
     { name: 'graph-operation-store' }

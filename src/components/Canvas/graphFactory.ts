@@ -50,7 +50,7 @@ export const createGraph = (options: GraphInitOptions): Graph => {
     connecting: {
       allowBlank: false,
       allowMulti: true,
-      allowLoop: false,
+      allowLoop: true,
       allowNode: true,
       allowEdge: false,
       highlight: true,
@@ -80,7 +80,8 @@ export const createGraph = (options: GraphInitOptions): Graph => {
         })
       },
       validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell }) {
-        return !!sourceMagnet && !!targetMagnet && sourceCell !== targetCell
+        // 允许自连线（sourceCell === targetCell）
+        return !!sourceMagnet && !!targetMagnet
       },
     },
   })

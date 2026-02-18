@@ -36,6 +36,7 @@ import type { Template } from '../types/template'
 import { saveCustomTemplate } from '../templates/templateRegistry'
 import { generateTemplateThumbnail } from '../utils/templateThumbnailGenerator'
 import TemplatePreviewModal from './TemplatePreviewModal'
+import { devError, devWarn } from '../utils/logger'
 
 const { Dragger } = Upload
 const { Text, Title } = Typography
@@ -109,7 +110,7 @@ const TemplateImportDialog: React.FC<TemplateImportDialogProps> = ({
       try {
         thumbnail = generateTemplateThumbnail(data)
       } catch (e) {
-        console.warn('生成缩略图失败:', e)
+        devWarn('生成缩略图失败:', e)
       }
 
       return {
@@ -219,7 +220,7 @@ const TemplateImportDialog: React.FC<TemplateImportDialogProps> = ({
           successCount++
         }
       } catch (error) {
-        console.error('导入模板失败:', error)
+        devError('导入模板失败:', error)
         errorCount++
       }
     }

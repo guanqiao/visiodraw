@@ -4,6 +4,7 @@ import { DeleteOutlined, EditOutlined, ImportOutlined, SaveOutlined, HistoryOutl
 import useCanvasHistoryStore, { CanvasHistoryItem } from '@stores/canvasHistoryStore'
 import useX6GraphStore from '@stores/x6GraphStore'
 import dayjs from 'dayjs'
+import { devError } from '../utils/logger'
 
 interface CanvasHistoryPanelProps {
   visible: boolean
@@ -28,7 +29,7 @@ const CanvasHistoryPanel: React.FC<CanvasHistoryPanelProps> = ({ visible, onClos
     try {
       thumbnail = await useX6GraphStore.getState().exportToPng()
     } catch (error) {
-      console.error('Failed to generate thumbnail:', error)
+      devError('Failed to generate thumbnail:', error)
     }
     
     addToHistory(saveName || `画布 ${dayjs().format('YYYY-MM-DD HH:mm:ss')}`, data, thumbnail)

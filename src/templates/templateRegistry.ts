@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
 import type { Template } from '../types/template'
+import { devError } from '../utils/logger'
 
 const CUSTOM_TEMPLATES_KEY = 'visiodraw_custom_templates'
 
@@ -249,7 +250,7 @@ export function getCustomTemplates(): Template[] {
       return JSON.parse(data)
     }
   } catch (error) {
-    console.error('Failed to load custom templates:', error)
+    devError('Failed to load custom templates:', error)
   }
   return []
 }
@@ -312,7 +313,7 @@ export function importTemplate(json: string): Template | null {
       thumbnail: template.thumbnail,
     })
   } catch (error) {
-    console.error('Failed to import template:', error)
+    devError('Failed to import template:', error)
     return null
   }
 }

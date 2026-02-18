@@ -1,6 +1,7 @@
 import type { Template } from '../types/template'
 import type { Shape } from '../types/shape'
 import type { Connector } from '../types/connector'
+import { devError, devWarn } from './logger'
 
 // Visio 文件大小限制 (10MB)
 const MAX_VSDX_SIZE = 10 * 1024 * 1024
@@ -157,7 +158,7 @@ export async function parseVisioFile(file: File): Promise<{
       connectors: result.connectors,
     }
   } catch (error) {
-    console.error('解析 Visio 文件失败:', error)
+    devError('解析 Visio 文件失败:', error)
     return {
       success: false,
       error: error instanceof Error ? error.message : '解析文件时发生未知错误',
@@ -252,7 +253,7 @@ async function parseVsdxSimplified(uint8Array: Uint8Array): Promise<{
       })
     }
   } catch (error) {
-    console.warn('解析过程中出现警告:', error)
+    devWarn('解析过程中出现警告:', error)
   }
 
   return { pages, shapes, connectors }

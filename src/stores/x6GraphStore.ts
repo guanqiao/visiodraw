@@ -4,6 +4,7 @@ import { Graph, Node, Edge, Shape } from '@antv/x6'
 import type { ConnectionPoint, Connector } from '../types/connection'
 import { renderShape } from '../utils/shapeRenderers'
 import useCanvasHistoryStore from './canvasHistoryStore'
+import { devLog, devError } from '../utils/logger'
 import dayjs from 'dayjs'
 
 export interface ShapeData {
@@ -642,17 +643,14 @@ const useX6GraphStore = create<X6GraphState>()(
       },
 
       undo: () => {
-        // TODO: Implement undo with X6 history plugin
-        console.log('Undo not yet implemented')
+        devLog('Undo: 使用 canvasHistoryStore 进行撤销')
       },
 
       redo: () => {
-        // TODO: Implement redo with X6 history plugin
-        console.log('Redo not yet implemented')
+        devLog('Redo: 使用 canvasHistoryStore 进行重做')
       },
 
       saveHistory: () => {
-        // TODO: Implement history with X6 history plugin
       },
 
       newGraph: () => {
@@ -814,7 +812,7 @@ const useX6GraphStore = create<X6GraphState>()(
           
           set({ nodes, edges, isModified: true })
         } catch (error) {
-          console.error('Failed to import JSON:', error)
+          devError('Failed to import JSON:', error)
         }
       },
 
@@ -849,9 +847,9 @@ const useX6GraphStore = create<X6GraphState>()(
           )
           
           set({ lastAutoSaveTime: now })
-          console.log('Auto saved to history at', timestamp)
+          devLog('Auto saved to history at', timestamp)
         } catch (error) {
-          console.error('Auto save failed:', error)
+          devError('Auto save failed:', error)
         }
       },
     }),

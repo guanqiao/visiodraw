@@ -20,6 +20,7 @@ import { renderShape } from '@utils/shapeRenderers'
 import ERRelationQuickSelector, { isErTableNode, getErNodeName } from '@components/ERRelationQuickSelector'
 import type { ERRelationType } from '../types/connection'
 import { erRelations } from '../types/connection'
+import { devLog } from '../utils/logger'
 
 const X6Canvas: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -231,11 +232,11 @@ const X6Canvas: React.FC = () => {
     // Debug connecting events - 只在开发环境输出
     if (import.meta.env.DEV) {
       graph.on('edge:connected', ({ edge, type }: { edge: Edge; type: string }) => {
-        console.log('Edge connected:', type, edge.id)
+        devLog('Edge connected:', type, edge.id)
       })
 
       graph.on('edge:created', ({ edge }: { edge: Edge }) => {
-        console.log('Edge created:', edge.id)
+        devLog('Edge created:', edge.id)
       })
     }
 
@@ -776,7 +777,7 @@ const X6Canvas: React.FC = () => {
         }
         copyNodeStyle(style)
         if (import.meta.env.DEV) {
-          console.log('Node style copied:', style)
+          devLog('Node style copied:', style)
         }
       } else if (firstCell.isEdge()) {
         const edge = firstCell as Edge
@@ -791,7 +792,7 @@ const X6Canvas: React.FC = () => {
         }
         copyEdgeStyle(style)
         if (import.meta.env.DEV) {
-          console.log('Edge style copied:', style)
+          devLog('Edge style copied:', style)
         }
       }
     })

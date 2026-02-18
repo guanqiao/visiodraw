@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Card, Form, InputNumber, Input, ColorPicker, Space, Button, Divider, Select, Slider, Tooltip } from 'antd'
+import { Card, Form, InputNumber, Input, ColorPicker, Space, Button, Divider, Select, Slider, Tooltip, Switch } from 'antd'
 import {
   LineOutlined,
   NodeIndexOutlined,
@@ -10,10 +10,16 @@ import {
   SmallDashOutlined,
   EditOutlined,
   PlusOutlined,
+  SyncOutlined,
+  ArrowUpOutlined,
+  ArrowRightOutlined,
+  ArrowDownOutlined,
+  ArrowLeftOutlined,
 } from '@ant-design/icons'
 import type { Connector, ConnectorStyle, ConnectorEndStyle, LineStyle, ConnectorLabel, UMLRelationType, ERRelationType } from '../../types/connection'
 import { ConnectorRenderer } from '@utils/connectorRenderer'
 import { umlRelations, erRelations } from '../../types/connection'
+import type { SelfLoopDirection } from '../../utils/selfLoopRouter'
 import { v4 as uuidv4 } from 'uuid'
 
 const { Option } = Select
@@ -23,6 +29,12 @@ export interface EdgePropertyPanelProps {
   onUpdateEdge: (id: string, updates: Partial<Connector>) => void
   onDeleteEdge: (id: string) => void
   graph: any
+  isSelfLoop?: boolean
+  selfLoopConfig?: {
+    direction?: SelfLoopDirection
+    radius?: number
+  }
+  onUpdateSelfLoop?: (id: string, config: { direction?: SelfLoopDirection; radius?: number }) => void
 }
 
 export const EdgePropertyPanel: React.FC<EdgePropertyPanelProps> = ({
@@ -30,9 +42,24 @@ export const EdgePropertyPanel: React.FC<EdgePropertyPanelProps> = ({
   onUpdateEdge,
   onDeleteEdge,
   graph,
+  isSelfLoop = false,
+  selfLoopConfig,
+  onUpdateSelfLoop,
 }) => {
   const [editingLabelIndex, setEditingLabelIndex] = useState<number | null>(null)
   const [labelText, setLabelText] = useState('')
+
+  const handleSelfLoopDirectionChange = (direction: SelfLoopDirection) => {
+    if (onUpdateSelfLoop) {
+      onUpdateSelfLoop(edge.id, { direction })
+    }
+  }
+
+  const handleSelfLoopRadiusChange = (radius: number) => {
+    if (onUpdateSelfLoop) {
+      onUpdateSelfLoop(edge.id, { radius })
+    }
+  }
 
   const handleEdgeStyleChange = (style: ConnectorStyle) => {
     onUpdateEdge(edge.id, { style } as any)
@@ -214,7 +241,7 @@ export const EdgePropertyPanel: React.FC<EdgePropertyPanelProps> = ({
 
   return (
     <Card
-      title="连接线属性"
+      title={isSelfLoop ? "自连线属性" : "连接线属性"}
       size="small"
       extra={
         <Button
@@ -227,6 +254,53 @@ export const EdgePropertyPanel: React.FC<EdgePropertyPanelProps> = ({
       }
     >
       <Form layout="vertical" size="small">
+        {isSelfLoop && (
+          <>
+            <Form.Item label="自连线配置">
+              <Space direction="vertical" style={{ width: '100%' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <SyncOutlined style={{ color: '#1890ff' }} />
+                  <span style={{ fontSize: 12, color: '#666' }}>当前为自连线</span>
+                </div>
+              </Space>
+            </Form.Item>
+
+            <Form.Item label="方向">
+              <Select
+                value={selfLoopConfig?.direction || 'top'}
+                onChange={handleSelfLoopDirectionChange}
+                style={{ width: '100%' }}
+              >
+                <Option value="top">
+                  <Space><ArrowUpOutlined />向上</Space>
+                </Option>
+                <Option value="right">
+                  <Space><ArrowRightOutlined />向右</Space>
+                </Option>
+                <Option value="bottom">
+                  <Space><ArrowDownOutlined />向下</Space>
+                </Option>
+                <Option value="left">
+                  <Space><ArrowLeftOutlined />向左</Space>
+                </Option>
+              </Select>
+            </Form.Item>
+
+            <Form.Item label="弧度半径">
+              <InputNumber
+                min={20}
+                max={100}
+                value={selfLoopConfig?.radius || 35}
+                onChange={(v) => v && handleSelfLoopRadiusChange(v)}
+                style={{ width: '100%' }}
+                addonAfter="px"
+              />
+            </Form.Item>
+
+            <Divider style={{ margin: '12px 0' }} />
+          </>
+        )}
+
         <Form.Item label="UML 关系">
           <Select
             placeholder="选择 UML 关系类型"

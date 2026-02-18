@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { v4 as uuidv4 } from 'uuid'
+import { devError } from '../utils/logger'
 
 export interface CanvasHistoryItem {
   id: string
@@ -34,7 +35,7 @@ const loadHistoryFromStorage = (): CanvasHistoryItem[] => {
       return JSON.parse(stored)
     }
   } catch (error) {
-    console.error('Failed to load history from storage:', error)
+    devError('Failed to load history from storage:', error)
   }
   return []
 }
@@ -44,7 +45,7 @@ const saveHistoryToStorage = (history: CanvasHistoryItem[]) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(history))
   } catch (error) {
-    console.error('Failed to save history to storage:', error)
+    devError('Failed to save history to storage:', error)
   }
 }
 
