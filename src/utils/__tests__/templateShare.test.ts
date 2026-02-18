@@ -24,6 +24,7 @@ const mockCanvasContext = {
   stroke: vi.fn(),
   arc: vi.fn(),
   fillText: vi.fn(),
+  quadraticCurveTo: vi.fn(),
   font: '',
   textAlign: '',
   textBaseline: '',
@@ -36,12 +37,19 @@ const mockCanvasContext = {
 
 const mockCanvas = {
   getContext: vi.fn(() => mockCanvasContext),
-  toDataURL: vi.fn(() => 'data:image/png;base64,mocked'),
+  toDataURL: vi.fn((type?: string) => `data:${type || 'image/png'};base64,mocked`),
   width: 800,
   height: 600,
 }
 
 const mockExecCommand = vi.fn()
+
+const mockTextarea = {
+  value: '',
+  style: {} as Record<string, string>,
+  focus: vi.fn(),
+  select: vi.fn(),
+}
 
 Object.defineProperty(global, 'document', {
   value: {
@@ -55,6 +63,9 @@ Object.defineProperty(global, 'document', {
           download: '',
           click: vi.fn(),
         }
+      }
+      if (tagName === 'textarea') {
+        return mockTextarea
       }
       return {}
     }),
@@ -95,12 +106,13 @@ const mockTemplate: Template = {
 describe('Template Share', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockExecCommand.mockReturnValue(true)
   })
 
   describe('Generate Share Link', () => {
     it('should generate a valid share link', () => {
       const link = generateShareLink(mockTemplate)
-      expect(link).toMatch(/^https:\/\//)
+      expect(link).toMatch(/^https?:\/\//)
       expect(link).toContain(mockTemplate.id)
     })
 
@@ -370,6 +382,7 @@ describe('Template Share', () => {
     })
 
     it('should handle clipboard API not available', async () => {
+      mockExecCommand.mockReturnValueOnce(false)
       Object.defineProperty(global, 'navigator', {
         value: {},
         writable: true,

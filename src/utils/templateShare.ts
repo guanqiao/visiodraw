@@ -47,7 +47,7 @@ export function generateShareLink(template: Template, options: ShareOptions = {}
   const params = new URLSearchParams()
 
   params.set('id', template.id)
-  params.set('name', encodeURIComponent(template.name))
+  params.set('name', template.name)
 
   if (options.expiresIn) {
     const expiresAt = Date.now() + options.expiresIn * 24 * 60 * 60 * 1000
@@ -122,7 +122,7 @@ function generateScriptEmbed(templateId: string, shareUrl: string, options: Embe
  * 生成 markdown 嵌入代码
  */
 function generateMarkdownEmbed(name: string, shareUrl: string): string {
-  return `[${name}](${shareUrl})`
+  return `![${name}](${shareUrl})`
 }
 
 /**
@@ -151,6 +151,11 @@ export async function exportTemplateAsImage(
 ): Promise<string> {
   if (!template) {
     throw new Error('Template is required')
+  }
+
+  // 验证图片格式
+  if (format !== 'png' && format !== 'jpeg') {
+    throw new Error(`Unsupported image format: ${format}`)
   }
 
   const canvas = document.createElement('canvas')
@@ -400,7 +405,7 @@ export function validateShareLink(link: string): {
     const url = new URL(link)
 
     // 提取模板 ID
-    const pathMatch = url.pathname.match(/\/share\/(\w+)/)
+    const pathMatch = url.pathname.match(/\/share\/([\w-]+)/)
     if (!pathMatch) {
       return { valid: false, error: '无效的分享链接格式' }
     }

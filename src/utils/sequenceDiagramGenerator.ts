@@ -55,14 +55,67 @@ export class SequenceDiagramGenerator {
   private config: LayoutConfig = {
     startX: 80,
     startY: 30,
-    participantWidth: 100,
-    participantHeight: 50,
-    participantSpacing: 160,
-    lifelineExtension: 50,
-    messageSpacing: 45,
-    activationWidth: 10,
-    noteWidth: 100,
-    noteHeight: 40,
+    participantWidth: 120,
+    participantHeight: 55,
+    participantSpacing: 180,
+    lifelineExtension: 60,
+    messageSpacing: 50,
+    activationWidth: 12,
+    noteWidth: 110,
+    noteHeight: 45,
+  }
+
+  // 样式配置
+  private styles = {
+    participant: {
+      fill: '#ffffff',
+      stroke: '#1890ff',
+      strokeWidth: 2,
+      fontSize: 13,
+      fontWeight: 500,
+    },
+    actor: {
+      fill: '#ffffff',
+      stroke: '#722ed1',
+      strokeWidth: 2,
+      fontSize: 13,
+      fontWeight: 500,
+    },
+    database: {
+      fill: '#ffffff',
+      stroke: '#52c41a',
+      strokeWidth: 2,
+      fontSize: 13,
+      fontWeight: 500,
+    },
+    lifeline: {
+      stroke: '#d9d9d9',
+      strokeWidth: 1,
+      dashArray: '5,5',
+    },
+    activation: {
+      fill: '#e6f7ff',
+      fillGradient: ['#e6f7ff', '#bae7ff'],
+      stroke: '#1890ff',
+      strokeWidth: 1,
+      cornerRadius: 2,
+    },
+    fragment: {
+      fillOpacity: 0.15,
+      strokeWidth: 1.5,
+      cornerRadius: 4,
+      headerHeight: 24,
+    },
+    note: {
+      fill: '#fffbe6',
+      stroke: '#ffd666',
+      strokeWidth: 1,
+      cornerRadius: 3,
+    },
+    message: {
+      fontSize: 12,
+      color: '#262626',
+    },
   }
 
   private participantLayouts: Map<string, ParticipantLayout> = new Map()
@@ -149,33 +202,38 @@ export class SequenceDiagramGenerator {
       let nodeType: string
       let width = layout.width
       let height = layout.height
+      let style = this.styles.participant
 
       switch (participant.type) {
         case 'actor':
-          nodeType = 'uml-actor'
-          width = 50
-          height = 70
+          nodeType = 'uml-actor-sequence'
+          width = 60
+          height = 80
+          style = this.styles.actor
           break
         case 'database':
-          nodeType = 'uml-database'
-          width = 70
-          height = 50
+          nodeType = 'uml-database-participant'
+          width = 80
+          height = 60
+          style = this.styles.database
           break
         default:
-          nodeType = 'uml-rect'
+          nodeType = 'uml-participant'
       }
 
       const node: ShapeData = {
         id: `part-${participant.id}`,
         type: nodeType,
-        x: layout.x,
+        x: layout.x + (layout.width - width) / 2,
         y: layout.y,
         width,
         height,
         text: participant.name,
-        fill: this.getParticipantFill(participant.type),
-        stroke: this.getParticipantStroke(participant.type),
-        strokeWidth: 1,
+        fill: style.fill,
+        stroke: style.stroke,
+        strokeWidth: style.strokeWidth,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
         zIndex: 20,
       }
 
@@ -188,14 +246,15 @@ export class SequenceDiagramGenerator {
       const lifeline: ShapeData = {
         id: `lifeline-${layout.id}`,
         type: 'uml-lifeline',
-        x: layout.centerX - 1,
+        x: layout.centerX,
         y: layout.bottomY,
-        width: 2,
+        width: 1,
         height: this.totalHeight - layout.bottomY,
         text: '',
         fill: 'transparent',
-        stroke: '#999999',
-        strokeWidth: 1,
+        stroke: this.styles.lifeline.stroke,
+        strokeWidth: this.styles.lifeline.strokeWidth,
+        dashArray: this.styles.lifeline.dashArray,
         zIndex: 1,
       }
       nodes.push(lifeline)
@@ -218,13 +277,15 @@ export class SequenceDiagramGenerator {
         id: `activation-${activation.id}`,
         type: 'uml-activation',
         x: layout.centerX - this.config.activationWidth / 2,
-        y: startY - 6,
+        y: startY - 8,
         width: this.config.activationWidth,
-        height: Math.max(endY - startY + 12, 20),
+        height: Math.max(endY - startY + 16, 24),
         text: '',
-        fill: '#e3e3e3',
-        stroke: '#666666',
-        strokeWidth: 1,
+        fill: this.styles.activation.fill,
+        fillGradient: this.styles.activation.fillGradient,
+        stroke: this.styles.activation.stroke,
+        strokeWidth: this.styles.activation.strokeWidth,
+        cornerRadius: this.styles.activation.cornerRadius,
         zIndex: 5,
       }
 
@@ -385,10 +446,10 @@ export class SequenceDiagramGenerator {
     const centers = Array.from(this.participantLayouts.values()).map(l => l.centerX)
     const minCenter = Math.min(...centers)
     const maxCenter = Math.max(...centers)
-    const leftX = minCenter - 25
-    const rightX = maxCenter + 25
+    const leftX = minCenter - 30
+    const rightX = maxCenter + 30
 
-    fragments.forEach(fragment => {
+    fragments.forEach((fragment, index) => {
       const startY = this.messageYMap.get(fragment.startMessageOrder)
       const endY = fragment.endMessageOrder > 0
         ? this.messageYMap.get(fragment.endMessageOrder)
@@ -396,22 +457,43 @@ export class SequenceDiagramGenerator {
 
       if (!startY) return
 
+      const strokeColor = this.getFragmentStroke(fragment.type)
+      const fillColor = this.getFragmentFill(fragment.type)
+      const fragmentLabel = this.getFragmentLabel(fragment)
+
       const fragmentNode: ShapeData = {
         id: `fragment-${fragment.id}`,
         type: 'uml-fragment',
         x: leftX - 10,
-        y: startY - 20,
+        y: startY - 25,
         width: rightX - leftX + 20,
-        height: Math.max((endY || startY) - startY + 40, 60),
-        text: `${fragment.type}${fragment.condition ? `: ${fragment.condition}` : ''}`,
-        fill: this.getFragmentFill(fragment.type),
-        stroke: this.getFragmentStroke(fragment.type),
-        strokeWidth: 1,
+        height: Math.max((endY || startY) - startY + 50, 70),
+        text: fragmentLabel,
+        fill: fillColor,
+        fillOpacity: this.styles.fragment.fillOpacity,
+        stroke: strokeColor,
+        strokeWidth: this.styles.fragment.strokeWidth,
+        cornerRadius: this.styles.fragment.cornerRadius,
+        headerHeight: this.styles.fragment.headerHeight,
         zIndex: 0,
       }
 
       nodes.push(fragmentNode)
     })
+  }
+
+  private getFragmentLabel(fragment: SequenceFragment): string {
+    const labels: Record<string, string> = {
+      'alt': 'alt',
+      'opt': 'opt',
+      'loop': 'loop',
+      'par': 'par',
+      'break': 'break',
+      'critical': 'critical',
+      'group': 'group',
+    }
+    const baseLabel = labels[fragment.type] || fragment.type
+    return fragment.condition ? `${baseLabel} [${fragment.condition}]` : baseLabel
   }
 
   private generateNotes(notes: SequenceNote[], nodes: ShapeData[]): void {
@@ -427,14 +509,14 @@ export class SequenceDiagramGenerator {
       if (!messageY) return
 
       let x: number
-      let y: number = messageY - 20
+      let y: number = messageY - 22
 
       switch (note.position) {
         case 'left':
-          x = layout.x - this.config.noteWidth - 15
+          x = layout.x - this.config.noteWidth - 20
           break
         case 'right':
-          x = layout.x + layout.width + 15
+          x = layout.x + layout.width + 20
           break
         case 'over':
         case 'across':
@@ -446,7 +528,7 @@ export class SequenceDiagramGenerator {
           } else {
             x = layout.centerX - this.config.noteWidth / 2
           }
-          y = messageY - 30
+          y = messageY - 35
           break
       }
 
@@ -458,9 +540,11 @@ export class SequenceDiagramGenerator {
         width: this.config.noteWidth,
         height: this.config.noteHeight,
         text: note.text,
-        fill: '#fffbe6',
-        stroke: '#d9d9d9',
-        strokeWidth: 1,
+        fill: this.styles.note.fill,
+        stroke: this.styles.note.stroke,
+        strokeWidth: this.styles.note.strokeWidth,
+        cornerRadius: this.styles.note.cornerRadius,
+        fontSize: 11,
         zIndex: 15,
       }
 
@@ -545,9 +629,9 @@ export class SequenceDiagramGenerator {
       'par': '#722ed1',
       'break': '#f5222d',
       'critical': '#cf1322',
-      'group': '#999999',
+      'group': '#8c8c8c',
     }
-    return strokes[type] || '#999999'
+    return strokes[type] || '#8c8c8c'
   }
 }
 

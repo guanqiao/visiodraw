@@ -1,6 +1,12 @@
 import type { Template } from '../types/template'
 import type { Shape } from '../types/shape'
 import type { Connector } from '../types/connector'
+import { visioColorToHex } from './shared/colorUtils'
+import {
+  escapeXml,
+  extractXmlAttribute,
+  extractXmlContent,
+} from './shared/xmlUtils'
 import { devError, devWarn } from './logger'
 
 // Visio 文件大小限制 (10MB)
@@ -45,29 +51,6 @@ const shapeTypeMapping: Record<string, string> = {
   DirectAccessStorage: 'direct-access',
   Display: 'display',
   Delay: 'delay',
-}
-
-// Visio 颜色映射（Visio 使用 RGB 整数，我们需要转换为十六进制）
-function visioColorToHex(visioColor: number | string): string {
-  if (typeof visioColor === 'string') {
-    if (visioColor.startsWith('#')) return visioColor
-    // 尝试解析 RGB 字符串
-    const rgbMatch = visioColor.match(/RGB\((\d+),\s*(\d+),\s*(\d+)\)/)
-    if (rgbMatch) {
-      const r = parseInt(rgbMatch[1], 10)
-      const g = parseInt(rgbMatch[2], 10)
-      const b = parseInt(rgbMatch[3], 10)
-      return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
-    }
-    return visioColor
-  }
-
-  // Visio 颜色是整数格式
-  const r = (visioColor >> 16) & 0xff
-  const g = (visioColor >> 8) & 0xff
-  const b = visioColor & 0xff
-
-  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`
 }
 
 // 验证 Visio 文件
@@ -259,18 +242,6 @@ async function parseVsdxSimplified(uint8Array: Uint8Array): Promise<{
   return { pages, shapes, connectors }
 }
 
-// 提取 XML 属性
-function extractXmlAttribute(xml: string, attribute: string): string | undefined {
-  const match = xml.match(new RegExp(`${attribute}="([^"]*)"`))
-  return match ? match[1] : undefined
-}
-
-// 提取 XML 内容
-function extractXmlContent(xml: string, tag: string): string | undefined {
-  const match = xml.match(new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`))
-  return match ? match[1].trim() : undefined
-}
-
 // 将 Visio 数据转换为模板
 export async function convertVisioToTemplate(visioData: {
   pages?: any[]
@@ -344,7 +315,7 @@ export async function convertTemplateToVisio(template: Template): Promise<Blob> 
 function generateVisioXml(template: Template): string {
   const shapesXml = template.shapes
     .map(
-      (shape, index) => `
+      (shape) => `
     <Shape ID="${shape.id}" Type="${mapToVisioType(shape.type)}" Master="0">
       <XForm>
         <PinX>${(shape.x / 50).toFixed(2)}</PinX>
@@ -416,16 +387,6 @@ function mapToVisioType(ourType: string): string {
   }
 
   return reverseMapping[ourType] || 'Rectangle'
-}
-
-// XML 转义
-function escapeXml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
 }
 
 export default {
