@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   Modal,
   Card,
@@ -12,6 +12,9 @@ import {
   message,
   Popconfirm,
   Space,
+  Badge,
+  Spin,
+  Image,
 } from 'antd'
 import {
   PlusOutlined,
@@ -21,6 +24,10 @@ import {
   SearchOutlined,
   FileOutlined,
   CodeOutlined,
+  EyeOutlined,
+  StarOutlined,
+  StarFilled,
+  MoreOutlined,
 } from '@ant-design/icons'
 import useX6GraphStore from '@stores/x6GraphStore'
 import type { Template, TemplateCategory } from '../types/template'
@@ -28,7 +35,13 @@ import type { DiagramTemplate, DiagramType } from '../types/diagramTemplate'
 import { getBuiltinTemplates, saveCustomTemplate, getCustomTemplates, deleteCustomTemplate } from '../templates/templateRegistry'
 import { getAllTemplates, getTemplatesByType } from '../templates'
 import { buildDiagramTemplate } from '../utils/diagramTemplateBuilder'
-import { parseMermaidCode } from '../utils/mermaidParser'
+import {
+  generateTemplateThumbnail,
+  generateDiagramTemplateThumbnail,
+  generateEmptyThumbnail,
+} from '../utils/templateThumbnailGenerator'
+import TemplatePreviewModal from './TemplatePreviewModal'
+import TemplateImportDialog from './TemplateImportDialog'
 
 const { TabPane } = Tabs
 const { Search } = Input
@@ -40,6 +53,9 @@ interface TemplateGalleryProps {
   onOpenMermaidImport?: () => void
 }
 
+// 缩略图缓存
+const thumbnailCache = new Map<string, string>()
+
 const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onOpenMermaidImport }) => {
   const [templates, setTemplates] = useState<Template[]>([])
   const [customTemplates, setCustomTemplates] = useState<Template[]>([])
@@ -47,6 +63,18 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
   const [searchText, setSearchText] = useState('')
   const [activeTab, setActiveTab] = useState<TemplateCategory | 'custom' | 'diagram'>('flowchart')
   const [activeDiagramTab, setActiveDiagramTab] = useState<DiagramType>('activity')
+  const [loadingThumbnails, setLoadingThumbnails] = useState<Set<string>>(new Set())
+  const [previewTemplate, setPreviewTemplate] = useState<Template | DiagramTemplate | null>(null)
+  const [previewVisible, setPreviewVisible] = useState(false)
+  const [importDialogVisible, setImportDialogVisible] = useState(false)
+  const [favorites, setFavorites] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('visiodraw_template_favorites')
+      return new Set(saved ? JSON.parse(saved) : [])
+    } catch {
+      return new Set()
+    }
+  })
 
   const { nodes, edges, addNodes, addEdge, newGraph } = useX6GraphStore()
 
@@ -58,16 +86,18 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
     }
   }, [visible])
 
+  // 保存收藏到 localStorage
+  useEffect(() => {
+    localStorage.setItem('visiodraw_template_favorites', JSON.stringify([...favorites]))
+  }, [favorites])
+
   const handleApplyTemplate = (template: Template) => {
-    // Clear current canvas
     newGraph()
 
-    // Add template shapes
     if (template.shapes && template.shapes.length > 0) {
       addNodes(template.shapes)
     }
 
-    // Add template connectors - convert to Connector format
     if (template.connectors && template.connectors.length > 0) {
       template.connectors.forEach((connector) => {
         const convertedConnector = {
@@ -95,18 +125,14 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
   }
 
   const handleApplyDiagramTemplate = (template: DiagramTemplate) => {
-    // Clear current canvas
     newGraph()
 
-    // Build template to X6 format
     const { nodes: templateNodes, edges: templateEdges } = buildDiagramTemplate(template)
 
-    // Add template nodes
     if (templateNodes.length > 0) {
       addNodes(templateNodes)
     }
 
-    // Add template edges
     if (templateEdges.length > 0) {
       templateEdges.forEach((edge) => addEdge(edge))
     }
@@ -115,7 +141,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
     onClose()
   }
 
-  const handleSaveAsTemplate = () => {
+  const handleSaveAsTemplate = async () => {
     if (nodes.length === 0) {
       message.warning('画布为空，无法保存模板')
       return
@@ -126,7 +152,9 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
 
     const description = window.prompt('请输入模板描述（可选）:') || ''
 
-    const template: Omit<Template, 'id'> = {
+    // 生成缩略图
+    const tempTemplate: Template = {
+      id: 'temp',
       name,
       description,
       category: 'custom',
@@ -136,10 +164,22 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
     }
 
     try {
+      const thumbnail = generateTemplateThumbnail(tempTemplate)
+
+      const template: Omit<Template, 'id'> = {
+        name,
+        description,
+        category: 'custom',
+        shapes: nodes,
+        connectors: edges,
+        thumbnail,
+      }
+
       saveCustomTemplate(template)
       setCustomTemplates(getCustomTemplates())
       message.success('模板已保存')
     } catch (error) {
+      console.error('保存模板失败:', error)
       message.error('保存模板失败')
     }
   }
@@ -148,6 +188,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
     try {
       deleteCustomTemplate(templateId)
       setCustomTemplates(getCustomTemplates())
+      thumbnailCache.delete(templateId)
       message.success('模板已删除')
     } catch (error) {
       message.error('删除模板失败')
@@ -166,35 +207,56 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
     message.success('模板已导出')
   }
 
-  const handleImportTemplate = () => {
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json'
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0]
-      if (file) {
-        const reader = new FileReader()
-        reader.onload = (event) => {
-          try {
-            const template = JSON.parse(event.target?.result as string) as Template
-            saveCustomTemplate({
-              name: template.name,
-              description: template.description,
-              category: 'custom',
-              shapes: template.shapes,
-              connectors: template.connectors,
-            })
-            setCustomTemplates(getCustomTemplates())
-            message.success('模板已导入')
-          } catch (error) {
-            message.error('导入模板失败')
-          }
-        }
-        reader.readAsText(file)
-      }
-    }
-    input.click()
+  const handleImportSuccess = () => {
+    setCustomTemplates(getCustomTemplates())
+    setImportDialogVisible(false)
   }
+
+  const toggleFavorite = (templateId: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev)
+      if (next.has(templateId)) {
+        next.delete(templateId)
+        message.success('已取消收藏')
+      } else {
+        next.add(templateId)
+        message.success('已添加到收藏')
+      }
+      return next
+    })
+  }
+
+  const openPreview = (template: Template | DiagramTemplate) => {
+    setPreviewTemplate(template)
+    setPreviewVisible(true)
+  }
+
+  const getThumbnail = useCallback((template: Template | DiagramTemplate): string => {
+    const cacheKey = 'id' in template && template.id ? template.id : `diagram-${(template as DiagramTemplate).name || (template as Template).name}`
+
+    if (thumbnailCache.has(cacheKey)) {
+      return thumbnailCache.get(cacheKey)!
+    }
+
+    if ('thumbnail' in template && template.thumbnail) {
+      thumbnailCache.set(cacheKey, template.thumbnail)
+      return template.thumbnail
+    }
+
+    try {
+      let thumbnail: string
+      if ('nodes' in template) {
+        thumbnail = generateDiagramTemplateThumbnail(template)
+      } else {
+        thumbnail = generateTemplateThumbnail(template)
+      }
+      thumbnailCache.set(cacheKey, thumbnail)
+      return thumbnail
+    } catch (error) {
+      console.error('生成缩略图失败:', error)
+      return generateEmptyThumbnail()
+    }
+  }, [])
 
   const filterTemplates = (templates: Template[]) => {
     if (!searchText) return templates
@@ -225,93 +287,284 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
     return filterDiagramTemplates(getTemplatesByType(type))
   }
 
-  const renderTemplateCard = (template: Template, isCustom = false) => (
-    <Col span={8} key={template.id}>
-      <Card
-        hoverable
-        cover={
-          <div
-            style={{
-              height: 120,
-              background: '#f5f5f5',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 48,
-              color: '#d9d9d9',
-            }}
-          >
-            <FileOutlined />
-          </div>
-        }
-        actions={[
-          <Tooltip title="应用模板" key="apply">
-            <Button type="link" onClick={() => handleApplyTemplate(template)}>
-              应用
-            </Button>
-          </Tooltip>,
-          ...(isCustom
-            ? [
-                <Tooltip title="导出模板" key="export">
-                  <ExportOutlined onClick={() => handleExportTemplate(template)} />
-                </Tooltip>,
-                <Popconfirm
-                  key="delete"
-                  title="确定删除此模板？"
-                  onConfirm={() => handleDeleteTemplate(template.id)}
-                >
-                  <DeleteOutlined style={{ color: '#ff4d4f' }} />
-                </Popconfirm>,
-              ]
-            : []),
-        ]}
-      >
-        <Meta title={template.name} description={template.description} />
-      </Card>
-    </Col>
-  )
+  const getCategoryColor = (category: string): string => {
+    const colors: Record<string, string> = {
+      flowchart: '#1890ff',
+      org: '#52c41a',
+      network: '#722ed1',
+      uml: '#fa8c16',
+      custom: '#13c2c2',
+      activity: '#1890ff',
+      sequence: '#52c41a',
+      state: '#fa8c16',
+      er: '#722ed1',
+      class: '#eb2f96',
+      gantt: '#13c2c2',
+    }
+    return colors[category] || '#8c8c8c'
+  }
 
-  const renderDiagramTemplateCard = (template: DiagramTemplate) => (
-    <Col span={8} key={template.id}>
-      <Card
-        hoverable
-        cover={
-          <div
-            style={{
-              height: 120,
-              background: '#f0f5ff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: 48,
-              color: '#2f54eb',
-            }}
+  const renderTemplateCard = (template: Template, isCustom = false) => {
+    const thumbnail = getThumbnail(template)
+    const isFavorite = favorites.has(template.id)
+    const categoryColor = getCategoryColor(template.category)
+
+    return (
+      <Col span={8} key={template.id}>
+        <Badge.Ribbon
+          text={template.category}
+          color={categoryColor}
+          style={{ display: template.category ? 'block' : 'none' }}
+        >
+          <Card
+            hoverable
+            cover={
+              <div
+                style={{
+                  height: 140,
+                  background: '#f5f5f5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
+              >
+                <Image
+                  src={thumbnail}
+                  alt={template.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                  }}
+                  preview={false}
+                  placeholder={
+                    <div style={{ fontSize: 48, color: '#d9d9d9' }}>
+                      <FileOutlined />
+                    </div>
+                  }
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    display: 'flex',
+                    gap: 4,
+                  }}
+                >
+                  <Tooltip title="预览">
+                    <Button
+                      type="primary"
+                      shape="circle"
+                      size="small"
+                      icon={<EyeOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openPreview(template)
+                      }}
+                    />
+                  </Tooltip>
+                </div>
+              </div>
+            }
+            actions={[
+              <Tooltip title="应用模板" key="apply">
+                <Button type="link" onClick={() => handleApplyTemplate(template)}>
+                  应用
+                </Button>
+              </Tooltip>,
+              <Tooltip title={isFavorite ? '取消收藏' : '收藏'} key="favorite">
+                {isFavorite ? (
+                  <StarFilled
+                    style={{ color: '#faad14', fontSize: 16 }}
+                    onClick={() => toggleFavorite(template.id)}
+                  />
+                ) : (
+                  <StarOutlined
+                    style={{ fontSize: 16 }}
+                    onClick={() => toggleFavorite(template.id)}
+                  />
+                )}
+              </Tooltip>,
+              ...(isCustom
+                ? [
+                    <Tooltip title="导出模板" key="export">
+                      <ExportOutlined onClick={() => handleExportTemplate(template)} />
+                    </Tooltip>,
+                    <Popconfirm
+                      key="delete"
+                      title="确定删除此模板？"
+                      onConfirm={() => handleDeleteTemplate(template.id)}
+                    >
+                      <DeleteOutlined style={{ color: '#ff4d4f' }} />
+                    </Popconfirm>,
+                  ]
+                : []),
+            ]}
           >
-            <CodeOutlined />
-          </div>
-        }
-        actions={[
-          <Tooltip title="应用模板" key="apply">
-            <Button type="link" onClick={() => handleApplyDiagramTemplate(template)}>
-              应用
-            </Button>
-          </Tooltip>,
-        ]}
-      >
-        <Meta 
-          title={template.name} 
-          description={
-            <Space direction="vertical" size={0}>
-              <span>{template.description}</span>
-              {template.mermaidCode && (
-                <span style={{ fontSize: 12, color: '#8c8c8c' }}>支持 Mermaid</span>
-              )}
-            </Space>
-          } 
-        />
-      </Card>
-    </Col>
-  )
+            <Meta
+              title={
+                <Tooltip title={template.name}>
+                  <span
+                    style={{
+                      display: 'block',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {template.name}
+                  </span>
+                </Tooltip>
+              }
+              description={
+                <Tooltip title={template.description}>
+                  <span
+                    style={{
+                      display: 'block',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      color: '#8c8c8c',
+                    }}
+                  >
+                    {template.description || '暂无描述'}
+                  </span>
+                </Tooltip>
+              }
+            />
+          </Card>
+        </Badge.Ribbon>
+      </Col>
+    )
+  }
+
+  const renderDiagramTemplateCard = (template: DiagramTemplate) => {
+    const thumbnail = getThumbnail(template)
+    const cacheKey = `diagram-${template.name}`
+    const isFavorite = favorites.has(cacheKey)
+    const categoryColor = getCategoryColor(template.type)
+
+    return (
+      <Col span={8} key={template.id}>
+        <Badge.Ribbon text={template.type} color={categoryColor}>
+          <Card
+            hoverable
+            cover={
+              <div
+                style={{
+                  height: 140,
+                  background: '#f0f5ff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  overflow: 'hidden',
+                  position: 'relative',
+                }}
+              >
+                <Image
+                  src={thumbnail}
+                  alt={template.name}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
+                  }}
+                  preview={false}
+                  placeholder={
+                    <div style={{ fontSize: 48, color: '#2f54eb' }}>
+                      <CodeOutlined />
+                    </div>
+                  }
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    display: 'flex',
+                    gap: 4,
+                  }}
+                >
+                  <Tooltip title="预览">
+                    <Button
+                      type="primary"
+                      shape="circle"
+                      size="small"
+                      icon={<EyeOutlined />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openPreview(template)
+                      }}
+                    />
+                  </Tooltip>
+                </div>
+              </div>
+            }
+            actions={[
+              <Tooltip title="应用模板" key="apply">
+                <Button type="link" onClick={() => handleApplyDiagramTemplate(template)}>
+                  应用
+                </Button>
+              </Tooltip>,
+              <Tooltip title={isFavorite ? '取消收藏' : '收藏'} key="favorite">
+                {isFavorite ? (
+                  <StarFilled
+                    style={{ color: '#faad14', fontSize: 16 }}
+                    onClick={() => toggleFavorite(cacheKey)}
+                  />
+                ) : (
+                  <StarOutlined
+                    style={{ fontSize: 16 }}
+                    onClick={() => toggleFavorite(cacheKey)}
+                  />
+                )}
+              </Tooltip>,
+            ]}
+          >
+            <Meta
+              title={
+                <Tooltip title={template.name}>
+                  <span
+                    style={{
+                      display: 'block',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {template.name}
+                  </span>
+                </Tooltip>
+              }
+              description={
+                <Space direction="vertical" size={0} style={{ width: '100%' }}>
+                  <Tooltip title={template.description}>
+                    <span
+                      style={{
+                        display: 'block',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        color: '#8c8c8c',
+                      }}
+                    >
+                      {template.description || '暂无描述'}
+                    </span>
+                  </Tooltip>
+                  {template.mermaidCode && (
+                    <span style={{ fontSize: 12, color: '#2f54eb' }}>支持 Mermaid</span>
+                  )}
+                </Space>
+              }
+            />
+          </Card>
+        </Badge.Ribbon>
+      </Col>
+    )
+  }
 
   const renderDiagramTabs = () => (
     <Tabs activeKey={activeDiagramTab} onChange={(key) => setActiveDiagramTab(key as DiagramType)}>
@@ -385,101 +638,137 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({ visible, onClose, onO
   )
 
   return (
-    <Modal
-      title="模板库"
-      open={visible}
-      onCancel={onClose}
-      width={900}
-      footer={[
-        <Button key="import" icon={<ImportOutlined />} onClick={handleImportTemplate}>
-          导入模板
-        </Button>,
-        onOpenMermaidImport && (
-          <Button key="mermaid" icon={<CodeOutlined />} onClick={onOpenMermaidImport}>
-            从 Mermaid 导入
-          </Button>
-        ),
-        <Button
-          key="save"
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={handleSaveAsTemplate}
-        >
-          保存当前为模板
-        </Button>,
-      ]}
-    >
-      <div style={{ marginBottom: 16 }}>
-        <Search
-          placeholder="搜索模板"
-          allowClear
-          prefix={<SearchOutlined />}
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-        />
-      </div>
+    <>
+      <Modal
+        title="模板库"
+        open={visible}
+        onCancel={onClose}
+        width={1000}
+        footer={[
+          <Button key="import" icon={<ImportOutlined />} onClick={() => setImportDialogVisible(true)}>
+            导入模板
+          </Button>,
+          onOpenMermaidImport && (
+            <Button key="mermaid" icon={<CodeOutlined />} onClick={onOpenMermaidImport}>
+              从 Mermaid 导入
+            </Button>
+          ),
+          <Button
+            key="save"
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleSaveAsTemplate}
+          >
+            保存当前为模板
+          </Button>,
+        ]}
+      >
+        <div style={{ marginBottom: 16 }}>
+          <Search
+            placeholder="搜索模板"
+            allowClear
+            prefix={<SearchOutlined />}
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+          />
+        </div>
 
-      <Tabs activeKey={activeTab} onChange={(key) => setActiveTab(key as TemplateCategory | 'custom' | 'diagram')}>
-        <TabPane tab="图表模板" key="diagram">
-          {renderDiagramTabs()}
-        </TabPane>
-        <TabPane tab="流程图" key="flowchart">
-          <Row gutter={[16, 16]}>
-            {getTemplatesByCategory('flowchart').length > 0 ? (
-              getTemplatesByCategory('flowchart').map((t) => renderTemplateCard(t))
-            ) : (
-              <Col span={24}>
-                <Empty description="暂无模板" />
-              </Col>
-            )}
-          </Row>
-        </TabPane>
-        <TabPane tab="组织结构" key="org">
-          <Row gutter={[16, 16]}>
-            {getTemplatesByCategory('org').length > 0 ? (
-              getTemplatesByCategory('org').map((t) => renderTemplateCard(t))
-            ) : (
-              <Col span={24}>
-                <Empty description="暂无模板" />
-              </Col>
-            )}
-          </Row>
-        </TabPane>
-        <TabPane tab="网络拓扑" key="network">
-          <Row gutter={[16, 16]}>
-            {getTemplatesByCategory('network').length > 0 ? (
-              getTemplatesByCategory('network').map((t) => renderTemplateCard(t))
-            ) : (
-              <Col span={24}>
-                <Empty description="暂无模板" />
-              </Col>
-            )}
-          </Row>
-        </TabPane>
-        <TabPane tab="UML" key="uml">
-          <Row gutter={[16, 16]}>
-            {getTemplatesByCategory('uml').length > 0 ? (
-              getTemplatesByCategory('uml').map((t) => renderTemplateCard(t))
-            ) : (
-              <Col span={24}>
-                <Empty description="暂无模板" />
-              </Col>
-            )}
-          </Row>
-        </TabPane>
-        <TabPane tab="自定义" key="custom">
-          <Row gutter={[16, 16]}>
-            {getTemplatesByCategory('custom').length > 0 ? (
-              getTemplatesByCategory('custom').map((t) => renderTemplateCard(t, true))
-            ) : (
-              <Col span={24}>
-                <Empty description="暂无自定义模板，可以将当前画布保存为模板" />
-              </Col>
-            )}
-          </Row>
-        </TabPane>
-      </Tabs>
-    </Modal>
+        <Tabs activeKey={activeTab} onChange={(key) => setActiveTab(key as TemplateCategory | 'custom' | 'diagram')}>
+          <TabPane tab="图表模板" key="diagram">
+            {renderDiagramTabs()}
+          </TabPane>
+          <TabPane tab="流程图" key="flowchart">
+            <Row gutter={[16, 16]}>
+              {getTemplatesByCategory('flowchart').length > 0 ? (
+                getTemplatesByCategory('flowchart').map((t) => renderTemplateCard(t))
+              ) : (
+                <Col span={24}>
+                  <Empty description="暂无模板" />
+                </Col>
+              )}
+            </Row>
+          </TabPane>
+          <TabPane tab="组织结构" key="org">
+            <Row gutter={[16, 16]}>
+              {getTemplatesByCategory('org').length > 0 ? (
+                getTemplatesByCategory('org').map((t) => renderTemplateCard(t))
+              ) : (
+                <Col span={24}>
+                  <Empty description="暂无模板" />
+                </Col>
+              )}
+            </Row>
+          </TabPane>
+          <TabPane tab="网络拓扑" key="network">
+            <Row gutter={[16, 16]}>
+              {getTemplatesByCategory('network').length > 0 ? (
+                getTemplatesByCategory('network').map((t) => renderTemplateCard(t))
+              ) : (
+                <Col span={24}>
+                  <Empty description="暂无模板" />
+                </Col>
+              )}
+            </Row>
+          </TabPane>
+          <TabPane tab="UML" key="uml">
+            <Row gutter={[16, 16]}>
+              {getTemplatesByCategory('uml').length > 0 ? (
+                getTemplatesByCategory('uml').map((t) => renderTemplateCard(t))
+              ) : (
+                <Col span={24}>
+                  <Empty description="暂无模板" />
+                </Col>
+              )}
+            </Row>
+          </TabPane>
+          <TabPane
+            tab={
+              <span>
+                自定义
+                {favorites.size > 0 && (
+                  <Badge count={favorites.size} style={{ marginLeft: 4 }} />
+                )}
+              </span>
+            }
+            key="custom"
+          >
+            <Row gutter={[16, 16]}>
+              {getTemplatesByCategory('custom').length > 0 ? (
+                getTemplatesByCategory('custom').map((t) => renderTemplateCard(t, true))
+              ) : (
+                <Col span={24}>
+                  <Empty description="暂无自定义模板，可以将当前画布保存为模板" />
+                </Col>
+              )}
+            </Row>
+          </TabPane>
+        </Tabs>
+      </Modal>
+
+      <TemplatePreviewModal
+        visible={previewVisible}
+        template={previewTemplate}
+        onClose={() => {
+          setPreviewVisible(false)
+          setPreviewTemplate(null)
+        }}
+        onApply={() => {
+          if (previewTemplate) {
+            if ('nodes' in previewTemplate) {
+              handleApplyDiagramTemplate(previewTemplate)
+            } else {
+              handleApplyTemplate(previewTemplate)
+            }
+          }
+        }}
+      />
+
+      <TemplateImportDialog
+        visible={importDialogVisible}
+        onClose={() => setImportDialogVisible(false)}
+        onImportSuccess={handleImportSuccess}
+      />
+    </>
   )
 }
 
