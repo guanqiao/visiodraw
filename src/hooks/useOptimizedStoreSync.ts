@@ -30,6 +30,21 @@ export function useOptimizedStoreSync(
   const previousEdgesRef = useRef<EdgeData[]>([])
   const isProcessingRef = useRef(false)
 
+  // 检测是否是清空操作
+  const isClearingNodes = previousNodesRef.current.length > 0 && nodes.length === 0
+  const isClearingEdges = previousEdgesRef.current.length > 0 && edges.length === 0
+
+  // 处理清空操作
+  useEffect(() => {
+    if (!graph) return
+
+    if (isClearingNodes || isClearingEdges) {
+      graph.clearCells()
+      previousNodesRef.current = []
+      previousEdgesRef.current = []
+    }
+  }, [graph, isClearingNodes, isClearingEdges])
+
   /**
    * 创建 X6 节点
    */
@@ -314,15 +329,23 @@ export function useOptimizedStoreSync(
 
   // 节点同步
   useEffect(() => {
+    // 如果是清空操作，已经在上面的 useEffect 中处理了
+    if (isClearingNodes || isClearingEdges) {
+      return
+    }
     debouncedNodeSync(nodes)
-  }, [nodes, debouncedNodeSync])
+  }, [nodes, debouncedNodeSync, isClearingNodes, isClearingEdges])
 
   // 边同步（边变更频率较低，不需要防抖）
   useEffect(() => {
+    // 如果是清空操作，已经在上面的 useEffect 中处理了
+    if (isClearingNodes || isClearingEdges) {
+      return
+    }
     if (!graph) return
     processEdgeChanges(edges, previousEdgesRef.current)
     previousEdgesRef.current = edges
-  }, [edges, graph, processEdgeChanges])
+  }, [edges, graph, processEdgeChanges, isClearingNodes, isClearingEdges])
 
   // 清理函数
   useEffect(() => {

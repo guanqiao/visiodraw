@@ -656,10 +656,6 @@ const useX6GraphStore = create<X6GraphState>()(
       },
 
       newGraph: () => {
-        const { graph } = get()
-        if (graph) {
-          graph.clearCells()
-        }
         set({
           nodes: [],
           edges: [],

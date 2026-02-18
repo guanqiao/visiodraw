@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react'
-import { Layout, message, Tabs } from 'antd'
+import { Layout, Tabs, App as AntdApp } from 'antd'
 import X6Canvas from '@components/X6Canvas'
 import Toolbar from '@components/Toolbar'
 import StatusBar from '@components/StatusBar'
@@ -24,9 +24,10 @@ import { optimizeErLayout } from '@utils/smartRouter'
 import { parseColumnsFromText } from '@utils/erTableUtils'
 import './styles/theme.css'
 
-const { TabPane } = Tabs
+
 
 const App: React.FC = () => {
+  const { message } = AntdApp.useApp()
   const [showTemplates, setShowTemplates] = useState(false)
   const [showStencils, setShowStencils] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
@@ -398,31 +399,34 @@ const App: React.FC = () => {
             borderLeft: '1px solid var(--border-color)',
           }}
         >
-          <Tabs defaultActiveKey="properties" size="small" style={{ height: '100%' }}>
-            <TabPane
-              tab="属性"
-              key="properties"
-              style={{
-                height: 'calc(100% - 40px)',
-                overflow: 'auto',
-                padding: '16px',
-                background: 'var(--bg-primary)',
-              }}
-            >
-              <PropertyPanel />
-            </TabPane>
-            <TabPane
-              tab="图层"
-              key="layers"
-              style={{
-                height: 'calc(100% - 40px)',
-                overflow: 'auto',
-                background: 'var(--bg-primary)',
-              }}
-            >
-              <LayerPanel />
-            </TabPane>
-          </Tabs>
+          <Tabs 
+            defaultActiveKey="properties" 
+            size="small" 
+            style={{ height: '100%' }}
+            items={[
+              {
+                key: 'properties',
+                label: '属性',
+                style: {
+                  height: 'calc(100% - 40px)',
+                  overflow: 'auto',
+                  padding: '16px',
+                  background: 'var(--bg-primary)',
+                },
+                children: <PropertyPanel />,
+              },
+              {
+                key: 'layers',
+                label: '图层',
+                style: {
+                  height: 'calc(100% - 40px)',
+                  overflow: 'auto',
+                  background: 'var(--bg-primary)',
+                },
+                children: <LayerPanel />,
+              },
+            ]}
+          />
         </ResizableSider>
       </div>
       

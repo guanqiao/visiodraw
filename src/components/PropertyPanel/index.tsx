@@ -333,28 +333,28 @@ const PropertyPanel: React.FC = () => {
               children: (
                 <Form layout="vertical" size="small">
                   <Form.Item label="位置">
-                    <Space>
+                    <Space.Compact>
+                      <Button>X</Button>
                       <InputNumber
-                        addonBefore="X"
                         value={singleNode?.x}
                         onChange={(v) => v && updateNode(singleNode.id, { x: v })}
-                        style={{ width: 100 }}
+                        style={{ width: 80 }}
                       />
+                      <Button>Y</Button>
                       <InputNumber
-                        addonBefore="Y"
                         value={singleNode?.y}
                         onChange={(v) => v && updateNode(singleNode.id, { y: v })}
-                        style={{ width: 100 }}
+                        style={{ width: 80 }}
                       />
-                    </Space>
+                    </Space.Compact>
                   </Form.Item>
                   <Form.Item label="尺寸">
-                    <Space>
+                    <Space.Compact>
+                      <Button>W</Button>
                       <InputNumber
-                        addonBefore="W"
                         value={singleNode?.width}
                         onChange={(v) => v && updateNode(singleNode.id, { width: v })}
-                        style={{ width: 100 }}
+                        style={{ width: 80 }}
                       />
                       <Button
                         type={lockAspectRatio ? 'primary' : 'default'}
@@ -362,13 +362,13 @@ const PropertyPanel: React.FC = () => {
                         onClick={() => setLockAspectRatio(!lockAspectRatio)}
                         size="small"
                       />
+                      <Button>H</Button>
                       <InputNumber
-                        addonBefore="H"
                         value={singleNode?.height}
                         onChange={(v) => v && updateNode(singleNode.id, { height: v })}
-                        style={{ width: 100 }}
+                        style={{ width: 80 }}
                       />
-                    </Space>
+                    </Space.Compact>
                   </Form.Item>
                   <Form.Item label="填充颜色">
                     <ColorPicker

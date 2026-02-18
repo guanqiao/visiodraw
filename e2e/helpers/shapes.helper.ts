@@ -287,13 +287,13 @@ export class ShapesHelper {
   /**
    * Drag shape from library to canvas
    */
-  async dragShapeFromLibrary(shapeType: string, canvasX: number, canvasY: number) {
+  async dragShapeFromLibrary(shapeName: string, canvasX: number, canvasY: number) {
     const shapeItem = this.page.locator(`[data-testid="shape-item"]`).filter({
-      has: this.page.locator(`text=${shapeType}`)
+      has: this.page.locator(`.shape-item-name`, { hasText: shapeName })
     }).first()
     
     if (await shapeItem.count() === 0) {
-      throw new Error(`Shape "${shapeType}" not found in library`)
+      throw new Error(`Shape "${shapeName}" not found in library`)
     }
     
     const canvasBounds = await this.canvas.getCanvasBounds()
@@ -308,12 +308,18 @@ export class ShapesHelper {
     const endY = canvasBounds.y + canvasY
     
     await this.page.mouse.move(startX, startY)
+    await this.page.waitForTimeout(100)
     await this.page.mouse.down()
-    await this.page.waitForTimeout(100)
-    await this.page.mouse.move(endX, endY, { steps: 10 })
-    await this.page.waitForTimeout(100)
+    await this.page.waitForTimeout(200)
+    await this.page.mouse.move(endX, endY, { steps: 15 })
+    await this.page.waitForTimeout(200)
     await this.page.mouse.up()
-    await this.page.waitForTimeout(500)
+    await this.page.waitForTimeout(800)
+    
+    const shapeCount = await this.page.locator('.x6-node').count()
+    if (shapeCount === 0) {
+      throw new Error(`Failed to create shape "${shapeName}" on canvas`)
+    }
   }
 
   /**

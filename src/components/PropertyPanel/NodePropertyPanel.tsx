@@ -95,30 +95,30 @@ export const NodePropertyPanel: React.FC<NodePropertyPanelProps> = ({
       {children}
       <Form layout="vertical" size="small">
         <Form.Item label="位置">
-          <Space>
+          <Space.Compact>
+            <Button>X</Button>
             <InputNumber
-              addonBefore="X"
               value={singleNode?.x ?? selectedNodes[0]?.x}
               onChange={(v) => handlePositionChange('x', v)}
-              style={{ width: 120 }}
+              style={{ width: 100 }}
             />
+            <Button>Y</Button>
             <InputNumber
-              addonBefore="Y"
               value={singleNode?.y ?? selectedNodes[0]?.y}
               onChange={(v) => handlePositionChange('y', v)}
-              style={{ width: 120 }}
+              style={{ width: 100 }}
             />
-          </Space>
+          </Space.Compact>
         </Form.Item>
 
         <Form.Item label="尺寸">
-          <Space>
+          <Space.Compact>
+            <Button>W</Button>
             <InputNumber
-              addonBefore="W"
               value={singleNode?.width}
               onChange={(v) => handleSizeChange('width', v)}
               disabled={!singleNode}
-              style={{ width: 100 }}
+              style={{ width: 80 }}
             />
             <Tooltip title={lockAspectRatio ? '解锁比例' : '锁定比例'}>
               <Button
@@ -128,14 +128,14 @@ export const NodePropertyPanel: React.FC<NodePropertyPanelProps> = ({
                 size="small"
               />
             </Tooltip>
+            <Button>H</Button>
             <InputNumber
-              addonBefore="H"
               value={singleNode?.height}
               onChange={(v) => handleSizeChange('height', v)}
               disabled={!singleNode}
-              style={{ width: 100 }}
+              style={{ width: 80 }}
             />
-          </Space>
+          </Space.Compact>
         </Form.Item>
 
         <Divider style={{ margin: '12px 0' }} />
