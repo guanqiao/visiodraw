@@ -18,6 +18,13 @@ import {
   renderUmlParticipant,
   renderUmlActorSequence,
   renderUmlDatabaseParticipant,
+  renderUmlReference,
+  renderUmlDestroyMarker,
+  renderUmlCreateLabel,
+  renderUmlLifelineMarker,
+  renderUmlLifelineEnd,
+  renderUmlMessageMarker,
+  renderUmlNoteConnection,
 } from '../uml'
 import type { ShapeRenderConfig } from '../types'
 
@@ -267,6 +274,161 @@ describe('UML shape renderers', () => {
       expect(pathData).toBeDefined()
       expect(pathData).toContain('Q')
       expect(pathData).toContain('M')
+    })
+  })
+
+  describe('renderUmlReference', () => {
+    it('should create a reference box shape', () => {
+      const node = renderUmlReference(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('rect')
+    })
+
+    it('should have dashed border', () => {
+      const node = renderUmlReference(defaultConfig)
+
+      expect(node.attr('body/strokeDasharray')).toBe('5,3')
+    })
+
+    it('should have ref: header label', () => {
+      const node = renderUmlReference(defaultConfig)
+
+      expect(node.attr('headerLabel/text')).toBe('ref:')
+    })
+  })
+
+  describe('renderUmlDestroyMarker', () => {
+    it('should create an X-shaped destroy marker', () => {
+      const node = renderUmlDestroyMarker(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should have X-shaped path', () => {
+      const node = renderUmlDestroyMarker(defaultConfig)
+      const pathData = node.attr('body/refD')
+
+      expect(pathData).toBeDefined()
+      expect(pathData).toContain('M')
+      expect(pathData).toContain('L')
+    })
+
+    it('should use red color', () => {
+      const node = renderUmlDestroyMarker({ ...defaultConfig, stroke: '#f5222d' })
+
+      expect(node.attr('body/stroke')).toBe('#f5222d')
+    })
+  })
+
+  describe('renderUmlCreateLabel', () => {
+    it('should create a create label shape', () => {
+      const node = renderUmlCreateLabel({ ...defaultConfig, text: '«create»' })
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('rect')
+    })
+
+    it('should display create label text', () => {
+      const node = renderUmlCreateLabel({ ...defaultConfig, text: '«create»' })
+
+      expect(node.attr('label/text')).toBe('«create»')
+    })
+
+    it('should use green color', () => {
+      const node = renderUmlCreateLabel(defaultConfig)
+
+      expect(node.attr('label/fill')).toBe('#52c41a')
+    })
+  })
+
+  describe('renderUmlLifelineMarker', () => {
+    it('should create a lifeline top marker', () => {
+      const node = renderUmlLifelineMarker(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('rect')
+    })
+
+    it('should be a circle shape', () => {
+      const node = renderUmlLifelineMarker(defaultConfig)
+
+      expect(node.attr('body/rx')).toBe(defaultConfig.width / 2)
+      expect(node.attr('body/ry')).toBe(defaultConfig.height / 2)
+    })
+
+    it('should use gray fill', () => {
+      const node = renderUmlLifelineMarker({ ...defaultConfig, fill: '#8c8c8c' })
+
+      expect(node.attr('body/fill')).toBe('#8c8c8c')
+    })
+  })
+
+  describe('renderUmlLifelineEnd', () => {
+    it('should create a lifeline end marker', () => {
+      const node = renderUmlLifelineEnd(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should have X-shaped path', () => {
+      const node = renderUmlLifelineEnd(defaultConfig)
+      const pathData = node.attr('body/refD')
+
+      expect(pathData).toBeDefined()
+      expect(pathData).toContain('M')
+      expect(pathData).toContain('L')
+    })
+
+    it('should use gray color', () => {
+      const node = renderUmlLifelineEnd({ ...defaultConfig, stroke: '#8c8c8c' })
+
+      expect(node.attr('body/stroke')).toBe('#8c8c8c')
+    })
+  })
+
+  describe('renderUmlMessageMarker', () => {
+    it('should create a message connection marker', () => {
+      const node = renderUmlMessageMarker(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('rect')
+    })
+
+    it('should be a circle shape', () => {
+      const node = renderUmlMessageMarker(defaultConfig)
+
+      expect(node.attr('body/rx')).toBe(defaultConfig.width / 2)
+      expect(node.attr('body/ry')).toBe(defaultConfig.height / 2)
+    })
+
+    it('should use dark fill', () => {
+      const node = renderUmlMessageMarker({ ...defaultConfig, fill: '#333333' })
+
+      expect(node.attr('body/fill')).toBe('#333333')
+    })
+  })
+
+  describe('renderUmlNoteConnection', () => {
+    it('should create a note connection line', () => {
+      const node = renderUmlNoteConnection(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should have dashed stroke', () => {
+      const node = renderUmlNoteConnection(defaultConfig)
+
+      expect(node.attr('body/strokeDasharray')).toBe('3,3')
+    })
+
+    it('should use yellow color', () => {
+      const node = renderUmlNoteConnection({ ...defaultConfig, stroke: '#ffd666' })
+
+      expect(node.attr('body/stroke')).toBe('#ffd666')
     })
   })
 })

@@ -85,6 +85,7 @@ export interface Connector {
   isSelected?: boolean
   routingConstraint?: RoutingConstraint
   routingPadding?: number
+  zIndex?: number
   gradient?: {
     type: 'linear' | 'radial'
     id?: string
@@ -242,6 +243,9 @@ export const defaultConnectionPointsConfig: Record<string, ConnectionPointPositi
   'uml-entity': ['top', 'bottom', 'left', 'right'],
   'uml-attribute': ['top', 'bottom', 'left', 'right'],
   'uml-relationship': [],
+  // 新增序列图元素
+  'uml-participant': ['top', 'bottom', 'left', 'right'],
+  'uml-lifeline-line': ['top', 'bottom'],
   // Legacy UML types (for backward compatibility)
   'uml-lifeline': ['top', 'bottom', 'left', 'right'],
   'uml-object': ['top', 'bottom', 'left', 'right'],

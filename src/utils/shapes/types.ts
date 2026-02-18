@@ -20,6 +20,11 @@ export interface ShapeRenderConfig {
   radius?: number
   gradient?: GradientConfig | string
   shadowPreset?: keyof typeof SHADOW_PRESETS
+  // 序列图相关属性
+  fillOpacity?: number
+  fontSize?: number
+  fontWeight?: number | string
+  color?: string
 }
 
 export interface PortGroup {

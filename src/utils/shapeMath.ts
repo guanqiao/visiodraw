@@ -300,19 +300,45 @@ export function createLaptopPath(width: number, height: number): string {
 
 export function createUmlActorPath(width: number, height: number): string {
   const cx = width / 2
-  const headR = Math.min(width, height) * 0.12
-  const headCy = headR + height * 0.02
+  // 头部比例：占整体高度的20%
+  const headR = height * 0.12
+  const headCy = headR + height * 0.05
 
-  const neckY = headCy + headR
-  const bodyTop = neckY + height * 0.02
-  const bodyBottom = height * 0.65
-  const armY = bodyTop + (bodyBottom - bodyTop) * 0.3
-  const armSpread = width * 0.4
+  // 颈部位置
+  const neckY = headCy + headR + height * 0.02
 
-  const legSpread = width * 0.3
-  const legBottom = height * 0.98
+  // 肩部：呈倒梯形，比头部宽
+  const shoulderY = neckY + height * 0.05
+  const shoulderWidth = width * 0.45
 
-  return `M${cx},${headCy - headR} A${headR},${headR} 0 1,1 ${cx},${headCy + headR} A${headR},${headR} 0 1,1 ${cx},${headCy - headR} M${cx},${neckY} L${cx},${bodyBottom} M${cx - armSpread},${armY} L${cx + armSpread},${armY} M${cx},${bodyBottom} L${cx - legSpread},${legBottom} M${cx},${bodyBottom} L${cx + legSpread},${legBottom}`
+  // 身体底部
+  const bodyBottom = height * 0.6
+
+  // 手臂位置（从肩部伸出）
+  const armY = shoulderY + height * 0.08
+  const armSpread = width * 0.42
+
+  // 腿部：呈V字形分开
+  const legSpread = width * 0.32
+  const legBottom = height * 0.95
+
+  // 构建标准UML Actor路径
+  // 1. 头部（圆形）
+  const headPath = `M${cx},${headCy - headR} A${headR},${headR} 0 1,1 ${cx},${headCy + headR} A${headR},${headR} 0 1,1 ${cx},${headCy - headR}`
+
+  // 2. 身体（从颈部到身体底部）
+  const bodyPath = `M${cx},${neckY} L${cx},${bodyBottom}`
+
+  // 3. 肩部线条（倒梯形效果）
+  const shoulderPath = `M${cx - shoulderWidth},${shoulderY} Q${cx},${shoulderY - height * 0.08} ${cx + shoulderWidth},${shoulderY}`
+
+  // 4. 手臂（水平线）
+  const armPath = `M${cx - armSpread},${armY} L${cx + armSpread},${armY}`
+
+  // 5. 腿部（V字形）
+  const legPath = `M${cx},${bodyBottom} L${cx - legSpread},${legBottom} M${cx},${bodyBottom} L${cx + legSpread},${legBottom}`
+
+  return `${headPath} ${bodyPath} ${shoulderPath} ${armPath} ${legPath}`
 }
 
 export function createUmlClassPath(

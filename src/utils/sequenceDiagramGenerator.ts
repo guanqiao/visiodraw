@@ -66,52 +66,64 @@ export class SequenceDiagramGenerator {
     noteHeight: 45,
   }
 
-  // 样式配置 - 专业 UML 配色
+  // 样式配置 - 专业 UML 配色（统一优化版）
   private styles = {
     participant: {
       fill: '#f0f5ff',
+      fillGradient: ['#ffffff', '#f0f5ff'],
       stroke: '#2f54eb',
       strokeWidth: 2,
+      cornerRadius: 6,
       fontSize: 13,
       fontWeight: 600,
+      shadow: { blur: 4, color: 'rgba(0,0,0,0.1)', offsetX: 2, offsetY: 2 },
     },
     actor: {
       fill: '#fff7e6',
+      fillGradient: ['#ffffff', '#fff7e6'],
       stroke: '#fa8c16',
       strokeWidth: 2.5,
+      cornerRadius: 6,
       fontSize: 12,
       fontWeight: 600,
+      shadow: { blur: 4, color: 'rgba(0,0,0,0.1)', offsetX: 2, offsetY: 2 },
     },
     database: {
       fill: '#f6ffed',
+      fillGradient: ['#ffffff', '#f6ffed'],
       stroke: '#52c41a',
       strokeWidth: 2,
+      cornerRadius: 6,
       fontSize: 12,
       fontWeight: 600,
+      shadow: { blur: 4, color: 'rgba(0,0,0,0.1)', offsetX: 2, offsetY: 2 },
     },
     lifeline: {
-      stroke: '#8c8c8c',
+      stroke: '#bfbfbf',
       strokeWidth: 1.5,
-      dashArray: '4,4',
+      dashArray: '5,5',
     },
     activation: {
       fill: '#1890ff',
       fillGradient: ['#40a9ff', '#1890ff'],
       stroke: '#096dd9',
       strokeWidth: 1.5,
-      cornerRadius: 3,
+      cornerRadius: 4,
+      shadow: { blur: 3, color: 'rgba(24,144,255,0.3)', offsetX: 1, offsetY: 1 },
     },
     fragment: {
-      fillOpacity: 0.6,
+      fillOpacity: 0.4,
       strokeWidth: 1.5,
-      cornerRadius: 4,
+      cornerRadius: 6,
       headerHeight: 28,
+      shadow: { blur: 2, color: 'rgba(0,0,0,0.05)', offsetX: 1, offsetY: 1 },
     },
     note: {
       fill: '#fffbe6',
       stroke: '#ffd666',
       strokeWidth: 1.5,
       cornerRadius: 4,
+      shadow: { blur: 3, color: 'rgba(0,0,0,0.08)', offsetX: 1, offsetY: 1 },
     },
     message: {
       fontSize: 12,
@@ -122,6 +134,8 @@ export class SequenceDiagramGenerator {
   private participantLayouts: Map<string, ParticipantLayout> = new Map()
   private messageYMap: Map<number, number> = new Map()
   private totalHeight: number = 0
+  private autoNumber: boolean = false
+  private diagramData: ParsedSequenceDiagram | null = null
 
   /**
    * 生成时序图
@@ -129,6 +143,10 @@ export class SequenceDiagramGenerator {
   generate(data: ParsedSequenceDiagram): GeneratedDiagram {
     const nodes: ShapeData[] = []
     const edges: Connector[] = []
+
+    // 保存数据引用和自动编号状态
+    this.diagramData = data
+    this.autoNumber = data.autoNumber || false
 
     // 计算布局
     this.calculateLayout(data)
@@ -247,13 +265,16 @@ export class SequenceDiagramGenerator {
 
   private generateLifelines(nodes: ShapeData[]): void {
     this.participantLayouts.forEach(layout => {
+      const lifelineHeight = this.totalHeight - layout.bottomY
+
+      // 生命线主体
       const lifeline: ShapeData = {
         id: `lifeline-${layout.id}`,
         type: 'uml-lifeline',
         x: layout.centerX,
         y: layout.bottomY,
         width: 1,
-        height: this.totalHeight - layout.bottomY,
+        height: lifelineHeight,
         text: '',
         fill: 'transparent',
         stroke: this.styles.lifeline.stroke,
@@ -262,6 +283,40 @@ export class SequenceDiagramGenerator {
         zIndex: 1,
       }
       nodes.push(lifeline)
+
+      // 生命线顶部连接点（实心小圆点）
+      const topMarker: ShapeData = {
+        id: `lifeline-top-${layout.id}`,
+        type: 'uml-lifeline-marker',
+        x: layout.centerX - 3,
+        y: layout.bottomY - 3,
+        width: 6,
+        height: 6,
+        text: '',
+        fill: this.styles.lifeline.stroke,
+        stroke: 'transparent',
+        strokeWidth: 0,
+        cornerRadius: 3,
+        zIndex: 2,
+      }
+      nodes.push(topMarker)
+
+      // 生命线底部终止标记（X形）
+      const bottomY = layout.bottomY + lifelineHeight
+      const bottomMarker: ShapeData = {
+        id: `lifeline-bottom-${layout.id}`,
+        type: 'uml-lifeline-end',
+        x: layout.centerX - 6,
+        y: bottomY - 6,
+        width: 12,
+        height: 12,
+        text: '',
+        fill: 'transparent',
+        stroke: this.styles.lifeline.stroke,
+        strokeWidth: 1.5,
+        zIndex: 2,
+      }
+      nodes.push(bottomMarker)
     })
   }
 
@@ -347,6 +402,9 @@ export class SequenceDiagramGenerator {
       nodes.push(sourceNode, targetNode)
 
       // 创建消息边
+      const messageLabel = this.generateMessageLabel(message)
+      const labelPosition = this.calculateLabelPosition(message)
+      const labelOffsetY = this.calculateLabelOffsetY(message.order)
       const edge: Connector = {
         id: `msg-${message.id}`,
         sourceShapeId: sourceId,
@@ -359,16 +417,20 @@ export class SequenceDiagramGenerator {
         startStyle: 'none',
         endStyle: this.getMessageArrow(message.type),
         style: 'straight',
-        labels: message.text ? [{
+        labels: messageLabel ? [{
           id: `label-${uuidv4()}`,
-          text: message.text,
-          position: 0.5,
+          text: messageLabel,
+          position: labelPosition,
+          offsetY: labelOffsetY,
           fontSize: 12,
           color: message.color || '#333333',
         }] : undefined,
       }
 
       edges.push(edge)
+
+      // 添加消息连接点标记（小圆点）
+      this.generateMessageConnectionMarkers(message, fromLayout.centerX, toLayout.centerX, y, nodes)
 
       // 创建消息特殊处理：在目标位置添加创建标记
       if (message.type === 'create') {
@@ -389,12 +451,12 @@ export class SequenceDiagramGenerator {
     nodes: ShapeData[],
     edges: Connector[]
   ): void {
-    // 使用新的自连线路由算法
+    // 使用优化的自连线路由算法 - 右侧半圆弧线更符合UML标准
     const router = new SelfLoopRouter({
-      radius: 25,
+      radius: 30,
       direction: 'right',
       useBezier: true,
-      bezierControlOffset: 40,
+      bezierControlOffset: 45,
       startPosition: 0.5,
       endPosition: 0.5,
     })
@@ -428,6 +490,9 @@ export class SequenceDiagramGenerator {
     const pathPoints = path.points.map(p => ({ x: p.x, y: p.y }))
 
     // 创建自调用消息边（使用贝塞尔曲线）
+    const selfMessageLabel = this.generateMessageLabel(message)
+    const selfLabelPosition = this.calculateLabelPosition(message)
+    const selfLabelOffsetY = this.calculateLabelOffsetY(message.order)
     const edge: Connector = {
       id: `msg-${message.id}`,
       sourceShapeId: anchorIds[0],
@@ -441,10 +506,11 @@ export class SequenceDiagramGenerator {
       endStyle: this.getMessageArrow(message.type),
       style: 'bezier',
       pathPoints: pathPoints,
-      labels: message.text ? [{
+      labels: selfMessageLabel ? [{
         id: `label-${uuidv4()}`,
-        text: message.text,
-        position: 0.5,
+        text: selfMessageLabel,
+        position: selfLabelPosition,
+        offsetY: selfLabelOffsetY,
         fontSize: 12,
         color: '#333333',
       }] : undefined,
@@ -462,6 +528,9 @@ export class SequenceDiagramGenerator {
     const leftX = minCenter - 30
     const rightX = maxCenter + 30
 
+    // 计算每个片段的嵌套深度
+    const fragmentDepths = this.calculateFragmentDepths(fragments)
+
     fragments.forEach((fragment, index) => {
       const startY = this.messageYMap.get(fragment.startMessageOrder)
       const endY = fragment.endMessageOrder > 0
@@ -470,29 +539,64 @@ export class SequenceDiagramGenerator {
 
       if (!startY) return
 
+      const depth = fragmentDepths.get(fragment.id) || 0
+      const indent = depth * 12  // 每层缩进12px
+
       const strokeColor = this.getFragmentStroke(fragment.type)
       const fillColor = this.getFragmentFill(fragment.type)
       const fragmentLabel = this.getFragmentLabel(fragment)
 
+      // 根据嵌套深度调整样式
+      const adjustedStrokeWidth = this.styles.fragment.strokeWidth + depth * 0.5
+      const adjustedFillOpacity = Math.max(0.2, this.styles.fragment.fillOpacity - depth * 0.1)
+      const adjustedZIndex = depth  // 嵌套越深，zIndex越高（显示在上层）
+
       const fragmentNode: ShapeData = {
         id: `fragment-${fragment.id}`,
         type: 'uml-fragment',
-        x: leftX - 15,
+        x: leftX - 15 + indent,
         y: startY - 30,
-        width: rightX - leftX + 30,
+        width: rightX - leftX + 30 - indent * 2,
         height: Math.max((endY || startY) - startY + 60, 80),
         text: fragmentLabel,
         fill: fillColor,
-        fillOpacity: this.styles.fragment.fillOpacity,
+        fillOpacity: adjustedFillOpacity,
         stroke: strokeColor,
-        strokeWidth: this.styles.fragment.strokeWidth,
+        strokeWidth: adjustedStrokeWidth,
         cornerRadius: this.styles.fragment.cornerRadius,
         headerHeight: this.styles.fragment.headerHeight,
-        zIndex: 0,
+        zIndex: adjustedZIndex,
       }
 
       nodes.push(fragmentNode)
     })
+  }
+
+  /**
+   * 计算每个片段的嵌套深度
+   */
+  private calculateFragmentDepths(fragments: SequenceFragment[]): Map<string, number> {
+    const depths = new Map<string, number>()
+
+    // 按开始消息顺序排序
+    const sortedFragments = [...fragments].sort((a, b) => a.startMessageOrder - b.startMessageOrder)
+
+    sortedFragments.forEach(fragment => {
+      let depth = 0
+      // 检查该片段是否在其他片段内部
+      sortedFragments.forEach(other => {
+        if (other.id !== fragment.id) {
+          // 如果 other 包含 fragment
+          if (other.startMessageOrder < fragment.startMessageOrder &&
+              other.endMessageOrder > fragment.endMessageOrder) {
+            depth++
+          }
+        }
+      })
+      depths.set(fragment.id, depth)
+    })
+
+    return depths
   }
 
   private getFragmentLabel(fragment: SequenceFragment): string {
@@ -562,7 +666,48 @@ export class SequenceDiagramGenerator {
       }
 
       nodes.push(noteNode)
+
+      // 添加Note到参与者的虚线连接
+      this.generateNoteConnection(note, x, y, layout, nodes)
     })
+  }
+
+  /**
+   * 生成Note到参与者的虚线连接
+   */
+  private generateNoteConnection(
+    note: SequenceNote,
+    noteX: number,
+    noteY: number,
+    layout: ParticipantLayout,
+    nodes: ShapeData[]
+  ): void {
+    // 只在left/right位置添加连接线
+    if (note.position !== 'left' && note.position !== 'right') return
+
+    const isLeft = note.position === 'left'
+    const startX = isLeft ? noteX + this.config.noteWidth : noteX
+    const startY = noteY + this.config.noteHeight / 2
+    const endX = isLeft ? layout.x : layout.x + layout.width
+    const endY = layout.bottomY + 10
+
+    // 创建连接线（使用小线段模拟虚线效果）
+    const connectionId = `note-conn-${note.id}`
+    const connection: ShapeData = {
+      id: connectionId,
+      type: 'uml-note-connection',
+      x: Math.min(startX, endX),
+      y: Math.min(startY, endY),
+      width: Math.abs(endX - startX),
+      height: Math.abs(endY - startY),
+      text: '',
+      fill: 'transparent',
+      stroke: this.styles.note.stroke,
+      strokeWidth: 1,
+      dashArray: '3,3',
+      zIndex: 14,
+    }
+    nodes.push(connection)
   }
 
   // ==================== 样式方法 ====================
@@ -606,18 +751,112 @@ export class SequenceDiagramGenerator {
     }
   }
 
+  /**
+   * 生成带编号的消息标签
+   */
+  private generateMessageLabel(message: SequenceMessage): string {
+    if (this.autoNumber) {
+      return `${message.order}: ${message.text}`
+    }
+    return message.text
+  }
+
+  /**
+   * 根据消息类型计算标签位置
+   * - 返回消息偏左，便于阅读
+   * - 自调用消息偏上，避免与弧线重叠
+   * - 普通消息居中
+   */
+  private calculateLabelPosition(message: SequenceMessage): number {
+    switch (message.type) {
+      case 'return':
+        return 0.35  // 返回消息偏左
+      case 'self':
+        return 0.25  // 自调用消息偏上
+      case 'create':
+        return 0.4   // 创建消息略偏左
+      case 'destroy':
+        return 0.4   // 销毁消息略偏左
+      default:
+        return 0.5   // 普通消息居中
+    }
+  }
+
+  /**
+   * 计算标签垂直偏移，避免相邻消息标签重叠
+   */
+  private calculateLabelOffsetY(messageOrder: number): number {
+    // 奇数消息向上偏移，偶数消息向下偏移，错开显示
+    const baseOffset = -8
+    const staggerOffset = (messageOrder % 2 === 1) ? -12 : 5
+    return baseOffset + staggerOffset
+  }
+
+  /**
+   * 生成消息连接点标记（在消息与生命线交点处添加小圆点）
+   */
+  private generateMessageConnectionMarkers(
+    message: SequenceMessage,
+    fromCenterX: number,
+    toCenterX: number,
+    y: number,
+    nodes: ShapeData[]
+  ): void {
+    const markerSize = 4
+    const halfSize = markerSize / 2
+    const color = message.color || this.getMessageColor(message.type)
+
+    // 源点标记（发送方）
+    const sourceMarker: ShapeData = {
+      id: `msg-marker-src-${message.id}`,
+      type: 'uml-message-marker',
+      x: fromCenterX - halfSize,
+      y: y - halfSize,
+      width: markerSize,
+      height: markerSize,
+      text: '',
+      fill: color,
+      stroke: 'transparent',
+      strokeWidth: 0,
+      cornerRadius: 2,
+      zIndex: 3,
+    }
+    nodes.push(sourceMarker)
+
+    // 目标点标记（接收方）- 销毁消息不添加目标标记（已有X形标记）
+    if (message.type !== 'destroy') {
+      const targetMarker: ShapeData = {
+        id: `msg-marker-tgt-${message.id}`,
+        type: 'uml-message-marker',
+        x: toCenterX - halfSize,
+        y: y - halfSize,
+        width: markerSize,
+        height: markerSize,
+        text: '',
+        fill: color,
+        stroke: 'transparent',
+        strokeWidth: 0,
+        cornerRadius: 2,
+        zIndex: 3,
+      }
+      nodes.push(targetMarker)
+    }
+  }
+
   private getMessageArrow(type: SequenceMessage['type']): ConnectorEndStyle {
     switch (type) {
       case 'return':
-        return 'arrow'
+        return 'open-arrow'  // 返回消息使用开放箭头（空心）
       case 'async':
-        return 'open-arrow'
+        return 'open-arrow'  // 异步消息使用开放箭头
       case 'destroy':
-        return 'diamond'
+        return 'none'        // 销毁消息不使用箭头，使用X形标记
       case 'create':
+        return 'arrow'       // 创建消息使用实心箭头
+      case 'self':
         return 'arrow'
       default:
-        return 'arrow'
+        return 'arrow'       // 同步消息使用实心箭头
     }
   }
 
@@ -680,23 +919,45 @@ export class SequenceDiagramGenerator {
     y: number,
     nodes: ShapeData[]
   ): void {
-    // 在创建消息位置添加一个小标记表示新参与者被创建
-    const markerSize = 8
+    // 在创建消息位置添加标记和标签表示新参与者被创建
+    const markerSize = 10
+    const halfSize = markerSize / 2
+    
+    // 创建绿色方块标记
     const marker: ShapeData = {
       id: `create-marker-${message.id}`,
       type: 'uml-create-marker',
-      x: centerX - markerSize / 2,
-      y: y - markerSize / 2,
+      x: centerX - halfSize,
+      y: y - halfSize,
       width: markerSize,
       height: markerSize,
       text: '',
       fill: '#52c41a',
       stroke: '#237804',
-      strokeWidth: 1,
+      strokeWidth: 1.5,
       cornerRadius: 2,
       zIndex: 10,
     }
     nodes.push(marker)
+    
+    // 添加 «create» 标签
+    const label: ShapeData = {
+      id: `create-label-${message.id}`,
+      type: 'uml-create-label',
+      x: centerX + 15,
+      y: y - 12,
+      width: 60,
+      height: 16,
+      text: '«create»',
+      fill: 'transparent',
+      stroke: 'transparent',
+      strokeWidth: 0,
+      fontSize: 10,
+      color: '#52c41a',
+      fontWeight: 600,
+      zIndex: 11,
+    }
+    nodes.push(label)
   }
 
   private generateDestroyMarker(
@@ -705,23 +966,27 @@ export class SequenceDiagramGenerator {
     y: number,
     nodes: ShapeData[]
   ): void {
-    // 在销毁消息位置添加一个大X标记表示参与者被销毁
-    const markerSize = 16
+    // 在销毁消息位置添加一个专业X形标记表示参与者被销毁
+    const markerSize = 20
+    const halfSize = markerSize / 2
+    
+    // 创建X形路径
+    const xPath = `M${centerX - halfSize},${y} L${centerX + halfSize},${y + markerSize} M${centerX + halfSize},${y} L${centerX - halfSize},${y + markerSize}`
+    
     const marker: ShapeData = {
       id: `destroy-marker-${message.id}`,
       type: 'uml-destroy-marker',
-      x: centerX - markerSize / 2,
+      x: centerX - halfSize,
       y: y,
       width: markerSize,
       height: markerSize,
-      text: '✕',
-      fill: '#fff2f0',
+      text: '',
+      fill: 'none',
       stroke: '#f5222d',
-      strokeWidth: 2,
-      fontSize: 12,
-      color: '#f5222d',
-      fontWeight: 'bold',
+      strokeWidth: 2.5,
       zIndex: 10,
+      // 使用pathData存储X形路径
+      pathData: xPath,
     }
     nodes.push(marker)
 
@@ -729,7 +994,7 @@ export class SequenceDiagramGenerator {
     const lifelineId = `lifeline-${message.to}`
     const lifeline = nodes.find(n => n.id === lifelineId)
     if (lifeline) {
-      lifeline.height = y - lifeline.y + markerSize / 2
+      lifeline.height = y - lifeline.y + halfSize
     }
   }
 

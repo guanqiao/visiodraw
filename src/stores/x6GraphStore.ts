@@ -29,6 +29,15 @@ export interface ShapeData {
   zIndex?: number
   visible?: boolean
   locked?: boolean
+  // 序列图相关属性
+  fontWeight?: number | string
+  color?: string
+  dashArray?: string
+  cornerRadius?: number
+  fillOpacity?: number
+  fillGradient?: string[]
+  headerHeight?: number
+  pathData?: string  // 用于自定义路径（如销毁标记的X形）
 }
 
 export type GridType = 'dot' | 'line' | 'none'
@@ -876,15 +885,19 @@ function createX6Node(node: ShapeData): Node {
 
 // Helper function to create X6 edge
 function createX6Edge(edge: Connector): Edge {
-  const router = edge.style === 'orthogonal' ? 'manhattan' : 
-                 edge.style === 'curved' ? 'er' : 'normal'
-  
+  const router = edge.style === 'orthogonal' ? 'manhattan' :
+                 edge.style === 'curved' ? 'er' :
+                 edge.style === 'straight' ? null : 'normal'
+
+  // 对于 straight 样式，不使用 connector（避免圆角）
+  const connector = edge.style === 'straight' ? null : { name: 'rounded' }
+
   return new Shape.Edge({
     id: edge.id,
     source: { cell: edge.sourceShapeId, port: edge.sourcePointId },
     target: { cell: edge.targetShapeId, port: edge.targetPointId },
-    router: { name: router },
-    connector: { name: 'rounded' },
+    router: router ? { name: router } : null,
+    connector,
     attrs: {
       line: {
         stroke: edge.stroke || '#333333',

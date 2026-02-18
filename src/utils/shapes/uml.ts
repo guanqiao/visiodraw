@@ -659,27 +659,49 @@ export const renderUmlActorSequence = (config: ShapeRenderConfig): Node => {
  * 序列图数据库参与者 - 圆柱形数据库图标
  */
 export const renderUmlDatabaseParticipant = (config: ShapeRenderConfig): Node => {
-  const base = createBaseConfig(config, { 
+  const base = createBaseConfig(config, {
     gradient: GRADIENT_PRESETS.green,
-    ...MERMAID_SHADOW 
+    ...MERMAID_SHADOW
   })
-  
+
   const width = config.width
   const height = config.height
-  const ellipseHeight = height * 0.15
+  const ellipseHeight = height * 0.18  // 增加椭圆高度
   const bodyTop = ellipseHeight
-  
-  // 数据库圆柱形路径
-  const dbPath = `
-    M0,${bodyTop} 
-    Q${width / 2},${ellipseHeight * 0.3} ${width},${bodyTop}
-    L${width},${height - ellipseHeight}
-    Q${width / 2},${height - ellipseHeight * 0.3} 0,${height - ellipseHeight}
-    Z
+
+  // 构建更专业的数据库圆柱形路径
+  // 1. 主体轮廓（左侧、底部、右侧）
+  const bodyPath = `
     M0,${bodyTop}
-    Q${width / 2},${ellipseHeight * 1.7} ${width},${bodyTop}
+    L0,${height - ellipseHeight}
+    Q${width / 2},${height} ${width},${height - ellipseHeight}
+    L${width},${bodyTop}
   `
-  
+
+  // 2. 顶部椭圆（突出效果）
+  const topEllipse = `
+    M0,${bodyTop}
+    Q${width / 2},${-ellipseHeight * 0.5} ${width},${bodyTop}
+    Q${width / 2},${ellipseHeight * 2.5} 0,${bodyTop}
+  `
+
+  // 3. 中间装饰线（表示数据库层级）
+  const midLine1Y = bodyTop + (height - ellipseHeight * 2) * 0.33
+  const midLine2Y = bodyTop + (height - ellipseHeight * 2) * 0.66
+
+  const midLine1 = `
+    M${width * 0.1},${midLine1Y}
+    Q${width / 2},${midLine1Y + ellipseHeight * 0.3} ${width * 0.9},${midLine1Y}
+  `
+
+  const midLine2 = `
+    M${width * 0.1},${midLine2Y}
+    Q${width / 2},${midLine2Y + ellipseHeight * 0.3} ${width * 0.9},${midLine2Y}
+  `
+
+  // 组合路径
+  const dbPath = `${bodyPath} ${topEllipse} ${midLine1} ${midLine2}`
+
   return new Shape.Path({
     ...base,
     attrs: {
@@ -690,14 +712,244 @@ export const renderUmlDatabaseParticipant = (config: ShapeRenderConfig): Node =>
         fill: config.fill || '#f6ffed',
         stroke: config.stroke || '#52c41a',
         strokeWidth: config.strokeWidth || 2,
+        fillRule: 'evenodd',
       },
       label: {
         ...base.attrs.label,
         text: config.text || 'Database',
-        refY: height * 0.55,
+        refY: height * 0.58,
         fontSize: 12,
         fontWeight: 600,
         fill: config.color || '#389e0d',
+      },
+    },
+  })
+}
+
+/**
+ * 序列图引用框渲染器 - 带 ref: 标签头
+ */
+export const renderUmlReference = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config, {
+    rx: 4,
+    ry: 4,
+    shadowBlur: 4,
+    shadowColor: 'rgba(0, 0, 0, 0.08)',
+    shadowOffsetX: 1,
+    shadowOffsetY: 1,
+  })
+
+  const width = config.width
+  const height = config.height
+  const headerHeight = Math.min(height * 0.25, 30)
+
+  return new Shape.Rect({
+    ...base,
+    markup: [
+      {
+        tagName: 'rect',
+        selector: 'body',
+      },
+      {
+        tagName: 'rect',
+        selector: 'header',
+      },
+      {
+        tagName: 'text',
+        selector: 'headerLabel',
+      },
+      {
+        tagName: 'text',
+        selector: 'label',
+      },
+    ],
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: config.fill || '#f0f5ff',
+        fillOpacity: config.fillOpacity || 0.3,
+        stroke: config.stroke || '#2f54eb',
+        strokeWidth: config.strokeWidth || 1.5,
+        strokeDasharray: '5,3',
+        rx: 4,
+        ry: 4,
+      },
+      header: {
+        x: 0,
+        y: 0,
+        width: width,
+        height: headerHeight,
+        fill: config.stroke || '#2f54eb',
+        fillOpacity: 0.15,
+        stroke: 'none',
+      },
+      headerLabel: {
+        text: 'ref:',
+        x: 10,
+        y: headerHeight / 2,
+        textVerticalAnchor: 'middle',
+        textAnchor: 'start',
+        fontSize: 12,
+        fontWeight: 700,
+        fill: config.stroke || '#2f54eb',
+      },
+      label: {
+        ...base.attrs.label,
+        text: config.text || '',
+        refY: headerHeight + (height - headerHeight) / 2,
+        fontSize: 11,
+        fill: config.color || '#434343',
+      },
+    },
+  })
+}
+
+/**
+ * 销毁标记渲染器 - X形标记
+ */
+export const renderUmlDestroyMarker = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const width = config.width
+  const height = config.height
+
+  // X形路径
+  const xPath = `M0,0 L${width},${height} M${width},0 L0,${height}`
+
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        refD: xPath,
+        fill: 'none',
+        stroke: config.stroke || '#f5222d',
+        strokeWidth: config.strokeWidth || 2.5,
+        strokeLinecap: 'round',
+        strokeLinejoin: 'round',
+      },
+    },
+  })
+}
+
+/**
+ * 创建标记标签渲染器
+ */
+export const renderUmlCreateLabel = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: 'transparent',
+        stroke: 'transparent',
+      },
+      label: {
+        ...base.attrs.label,
+        text: config.text || '«create»',
+        fontSize: config.fontSize || 10,
+        fontWeight: config.fontWeight || 600,
+        fill: config.color || '#52c41a',
+      },
+    },
+  })
+}
+
+/**
+ * 生命线顶部标记渲染器 - 实心圆点
+ */
+export const renderUmlLifelineMarker = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: config.fill || '#8c8c8c',
+        stroke: 'transparent',
+        rx: config.width / 2,
+        ry: config.height / 2,
+      },
+    },
+  })
+}
+
+/**
+ * 生命线底部终止标记渲染器 - X形
+ */
+export const renderUmlLifelineEnd = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const width = config.width
+  const height = config.height
+
+  // X形路径
+  const xPath = `M0,0 L${width},${height} M${width},0 L0,${height}`
+
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        refD: xPath,
+        fill: 'none',
+        stroke: config.stroke || '#8c8c8c',
+        strokeWidth: config.strokeWidth || 1.5,
+        strokeLinecap: 'round',
+      },
+    },
+  })
+}
+
+/**
+ * 消息连接点标记渲染器 - 小圆点
+ */
+export const renderUmlMessageMarker = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: config.fill || '#333333',
+        stroke: 'transparent',
+        rx: config.width / 2,
+        ry: config.height / 2,
+      },
+    },
+  })
+}
+
+/**
+ * Note连接线渲染器 - 虚线
+ */
+export const renderUmlNoteConnection = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+  const width = config.width
+  const height = config.height
+
+  // 简单的斜线路径
+  const linePath = `M0,0 L${width},${height}`
+
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        refD: linePath,
+        fill: 'none',
+        stroke: config.stroke || '#ffd666',
+        strokeWidth: config.strokeWidth || 1,
+        strokeDasharray: config.dashArray || '3,3',
       },
     },
   })
@@ -734,4 +986,11 @@ export const umlRenderers = {
   'uml-participant': renderUmlParticipant,
   'uml-actor-sequence': renderUmlActorSequence,
   'uml-database-participant': renderUmlDatabaseParticipant,
+  'uml-reference': renderUmlReference,
+  'uml-destroy-marker': renderUmlDestroyMarker,
+  'uml-create-label': renderUmlCreateLabel,
+  'uml-lifeline-marker': renderUmlLifelineMarker,
+  'uml-lifeline-end': renderUmlLifelineEnd,
+  'uml-message-marker': renderUmlMessageMarker,
+  'uml-note-connection': renderUmlNoteConnection,
 }
