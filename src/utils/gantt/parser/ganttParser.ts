@@ -208,6 +208,14 @@ export class GanttParser {
         continue
       }
 
+      // 依赖关系 - 必须在扩展属性之前检查
+      const depMatch = part.match(/^after\s+(.+)$/i)
+      if (depMatch) {
+        const deps = depMatch[1].split(/\s*,\s*/).map(id => id.trim())
+        rawTask.dependencies.push(...deps)
+        continue
+      }
+
       // 扩展属性
       const extProp = parseExtendedProperty(part)
       if (extProp) {
@@ -239,13 +247,6 @@ export class GanttParser {
       const duration = parseDuration(part)
       if (duration !== null) {
         rawTask.duration = duration
-        continue
-      }
-
-      // 依赖关系
-      const dependencies = parseDependency(part)
-      if (dependencies) {
-        rawTask.dependencies.push(...dependencies)
         continue
       }
 

@@ -13,6 +13,8 @@
 import type { ShapeData } from '../stores/x6GraphStore'
 import type { Connector } from '../types/connection'
 import { v4 as uuidv4 } from 'uuid'
+import { criticalPathCalculator, type TaskTimeData } from './gantt/criticalPath'
+import { workCalendar, WorkCalendar } from './gantt/workCalendar'
 
 export type TaskStatus = 'done' | 'active' | 'crit' | 'default'
 export type TaskType = 'task' | 'milestone' | 'section'
@@ -58,6 +60,8 @@ export interface ParsedGanttDiagram {
   startDate: Date
   endDate: Date
   view?: TimelineView
+  showCriticalPath?: boolean  // 是否显示关键路径
+  workCalendar?: WorkCalendar // 工作日历配置
 }
 
 // 重新导出类型供其他模块使用
@@ -176,6 +180,8 @@ export class GanttDiagramGenerator {
 
   private taskLayouts: Map<string, TaskLayout> = new Map()
   private totalDays: number = 0
+  private criticalPathData: Map<string, TaskTimeData> = new Map()
+  private currentCalendar: WorkCalendar = workCalendar
 
   generate(data: ParsedGanttDiagram): GeneratedGanttDiagram {
     const nodes: ShapeData[] = []
@@ -184,6 +190,17 @@ export class GanttDiagramGenerator {
     // 设置视图模式
     this.currentView = data.view || 'day'
     this.applyViewConfig()
+
+    // 设置工作日历
+    this.currentCalendar = data.workCalendar || workCalendar
+
+    // 计算关键路径（如果启用）
+    if (data.showCriticalPath) {
+      const cpResult = criticalPathCalculator.calculate(data.tasks)
+      this.criticalPathData = cpResult.taskTimes
+    } else {
+      this.criticalPathData.clear()
+    }
 
     // 计算布局
     this.calculateLayout(data)
@@ -211,6 +228,11 @@ export class GanttDiagramGenerator {
     // 7. 生成项目图例（多项目模式）
     if (data.projects && data.projects.length > 0) {
       this.generateProjectLegend(data.projects, nodes)
+    }
+
+    // 8. 生成关键路径高亮（如果启用）
+    if (data.showCriticalPath) {
+      this.generateCriticalPathHighlight(data, nodes, edges)
     }
 
     return { nodes, edges }
@@ -511,7 +533,19 @@ export class GanttDiagramGenerator {
   }
 
   private generateTask(task: GanttTask, layout: TaskLayout, nodes: ShapeData[]): void {
-    const style = this.styles.task[task.status] || this.styles.task.default
+    // 检查是否为关键路径任务
+    const isCritical = this.criticalPathData.get(task.id)?.isCritical
+    
+    // 如果是关键路径任务，使用关键路径样式，否则使用任务状态样式
+    let style = this.styles.task[task.status] || this.styles.task.default
+    if (isCritical && task.status !== 'crit') {
+      // 关键路径任务使用特殊的边框样式
+      style = {
+        ...style,
+        stroke: '#f5222d',
+        strokeWidth: 2,
+      }
+    }
 
     // 任务条形
     nodes.push({
@@ -696,6 +730,11 @@ export class GanttDiagramGenerator {
         const targetX = targetLayout.x
         const targetY = targetLayout.y + targetLayout.height / 2
 
+        // 检查是否为关键路径上的依赖
+        const sourceCritical = this.criticalPathData.get(depId)?.isCritical
+        const targetCritical = this.criticalPathData.get(task.id)?.isCritical
+        const isCriticalDep = sourceCritical && targetCritical
+
         // 创建依赖连线
         edges.push({
           id: `dep-${depId}-${task.id}`,
@@ -703,15 +742,87 @@ export class GanttDiagramGenerator {
           sourcePointId: 'right',
           targetShapeId: `task-${task.id}`,
           targetPointId: 'left',
-          stroke: this.styles.dependency.stroke,
-          strokeWidth: this.styles.dependency.strokeWidth,
+          stroke: isCriticalDep ? '#f5222d' : this.styles.dependency.stroke,
+          strokeWidth: isCriticalDep ? 2.5 : this.styles.dependency.strokeWidth,
           lineStyle: 'solid',
           startStyle: 'none',
           endStyle: 'arrow',
           style: 'orthogonal',
-          zIndex: 8,
+          zIndex: isCriticalDep ? 9 : 8,
         })
       })
+    })
+  }
+
+  /**
+   * 生成关键路径高亮
+   */
+  private generateCriticalPathHighlight(
+    data: ParsedGanttDiagram,
+    nodes: ShapeData[],
+    edges: Connector[]
+  ): void {
+    // 为关键路径上的任务添加高亮边框
+    data.tasks.forEach(task => {
+      const taskTimeData = this.criticalPathData.get(task.id)
+      if (taskTimeData?.isCritical) {
+        const layout = this.taskLayouts.get(task.id)
+        if (!layout) return
+
+        // 添加关键路径高亮边框
+        nodes.push({
+          id: `critical-highlight-${task.id}`,
+          type: 'uml-rect',
+          x: layout.x,
+          y: layout.y - 2,
+          width: layout.width + 4,
+          height: layout.height + 4,
+          text: '',
+          fill: 'transparent',
+          stroke: '#f5222d',
+          strokeWidth: 3,
+          dashArray: '5,3',
+          zIndex: 12,
+        })
+
+        // 添加浮动时间标签（如果有）
+        if (taskTimeData.totalFloat > 0) {
+          nodes.push({
+            id: `float-label-${task.id}`,
+            type: 'uml-label',
+            x: layout.x + layout.width + 5,
+            y: layout.y,
+            width: 60,
+            height: 16,
+            text: `+${taskTimeData.totalFloat}d`,
+            fill: '#fff2f0',
+            stroke: '#ff4d4f',
+            fontSize: 10,
+            color: '#cf1322',
+            zIndex: 13,
+          })
+        }
+      }
+    })
+
+    // 添加关键路径信息标签
+    const criticalTaskCount = Array.from(this.criticalPathData.values()).filter(t => t.isCritical).length
+    const projectDuration = Math.max(...Array.from(this.criticalPathData.values()).map(t => t.earliestFinish))
+
+    nodes.push({
+      id: 'critical-path-info',
+      type: 'uml-label',
+      x: this.config.startX,
+      y: 20,
+      width: 300,
+      height: 24,
+      text: `关键路径: ${criticalTaskCount}个任务, 总工期: ${projectDuration}天`,
+      fill: '#fff2f0',
+      stroke: '#ff4d4f',
+      fontSize: 12,
+      fontWeight: 600,
+      color: '#cf1322',
+      zIndex: 15,
     })
   }
 

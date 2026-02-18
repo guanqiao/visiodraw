@@ -31,15 +31,17 @@ describe('GanttValidator', () => {
 
   describe('依赖关系验证', () => {
     it('应该检测无效依赖', () => {
+      // 注意：现在的解析器会在解析阶段检测无效依赖
+      // 所以这里我们测试解析器是否正确检测
       const script = `gantt
         section 测试
         任务1 :t1, 2024-01-01, 1d
         任务2 :t2, after nonexistent, 1d`
       
       const parseResult = parseGanttScript(script)
-      const validationResult = validateGanttData(parseResult.data!)
-      
-      expect(validationResult.errors.some(e => e.type === 'invalid-dependency')).toBe(true)
+      // 解析应该失败，因为依赖不存在的任务
+      expect(parseResult.success).toBe(false)
+      expect(parseResult.errors.some(e => e.message.includes('nonexistent'))).toBe(true)
     })
 
     it('应该检测自依赖', () => {
