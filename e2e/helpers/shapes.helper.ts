@@ -299,22 +299,17 @@ export class ShapesHelper {
     const canvasBounds = await this.canvas.getCanvasBounds()
     if (!canvasBounds) throw new Error('Canvas not found')
     
-    const box = await shapeItem.boundingBox()
-    if (!box) throw new Error('Shape item not found')
+    const canvas = this.page.locator('[data-testid="x6-canvas"]')
+    const targetX = canvasBounds.x + canvasX
+    const targetY = canvasBounds.y + canvasY
     
-    const startX = box.x + box.width / 2
-    const startY = box.y + box.height / 2
-    const endX = canvasBounds.x + canvasX
-    const endY = canvasBounds.y + canvasY
-    
-    await this.page.mouse.move(startX, startY)
+    await shapeItem.scrollIntoViewIfNeeded()
     await this.page.waitForTimeout(100)
-    await this.page.mouse.down()
-    await this.page.waitForTimeout(200)
-    await this.page.mouse.move(endX, endY, { steps: 15 })
-    await this.page.waitForTimeout(200)
-    await this.page.mouse.up()
-    await this.page.waitForTimeout(800)
+    
+    await shapeItem.dragTo(canvas, {
+      targetPosition: { x: canvasX, y: canvasY }
+    })
+    await this.page.waitForTimeout(1000)
     
     const shapeCount = await this.page.locator('.x6-node').count()
     if (shapeCount === 0) {

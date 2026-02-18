@@ -18,6 +18,8 @@ export interface ShapeRenderConfig {
   centerX?: number
   centerY?: number
   radius?: number
+  gradient?: GradientConfig | string
+  shadowPreset?: keyof typeof SHADOW_PRESETS
 }
 
 export interface PortGroup {
@@ -103,6 +105,33 @@ export interface TextWrapConfig {
   [key: string]: any
 }
 
+export interface GradientConfig {
+  type: 'linear' | 'radial'
+  id?: string
+  x1?: number | string
+  y1?: number | string
+  x2?: number | string
+  y2?: number | string
+  cx?: number | string
+  cy?: number | string
+  r?: number | string
+  stops: GradientStop[]
+}
+
+export interface GradientStop {
+  offset: number
+  color: string
+  opacity?: number
+}
+
+export interface ShadowPreset {
+  name: string
+  blur: number
+  color: string
+  offsetX: number
+  offsetY: number
+}
+
 export interface ShapeStyleConfig {
   rx?: number
   ry?: number
@@ -112,6 +141,139 @@ export interface ShapeStyleConfig {
   shadowColor?: string
   shadowOffsetX?: number
   shadowOffsetY?: number
+  gradient?: GradientConfig | string
+  shadowPreset?: keyof typeof SHADOW_PRESETS
+}
+
+export const SHADOW_PRESETS: Record<string, ShadowPreset> = {
+  soft: {
+    name: 'soft',
+    blur: 4,
+    color: 'rgba(0, 0, 0, 0.08)',
+    offsetX: 1,
+    offsetY: 2,
+  },
+  medium: {
+    name: 'medium',
+    blur: 8,
+    color: 'rgba(0, 0, 0, 0.12)',
+    offsetX: 2,
+    offsetY: 4,
+  },
+  strong: {
+    name: 'strong',
+    blur: 16,
+    color: 'rgba(0, 0, 0, 0.2)',
+    offsetX: 4,
+    offsetY: 8,
+  },
+  inner: {
+    name: 'inner',
+    blur: 4,
+    color: 'rgba(0, 0, 0, 0.15)',
+    offsetX: 0,
+    offsetY: 0,
+  },
+  glow: {
+    name: 'glow',
+    blur: 12,
+    color: 'rgba(24, 144, 255, 0.4)',
+    offsetX: 0,
+    offsetY: 0,
+  },
+  colored: {
+    name: 'colored',
+    blur: 8,
+    color: 'rgba(24, 144, 255, 0.25)',
+    offsetX: 0,
+    offsetY: 4,
+  },
+}
+
+export const GRADIENT_PRESETS: Record<string, GradientConfig> = {
+  blue: {
+    type: 'linear',
+    id: 'gradient-blue',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#e6f7ff' },
+      { offset: 1, color: '#1890ff' },
+    ],
+  },
+  green: {
+    type: 'linear',
+    id: 'gradient-green',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#f6ffed' },
+      { offset: 1, color: '#52c41a' },
+    ],
+  },
+  orange: {
+    type: 'linear',
+    id: 'gradient-orange',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#fff7e6' },
+      { offset: 1, color: '#fa8c16' },
+    ],
+  },
+  red: {
+    type: 'linear',
+    id: 'gradient-red',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#fff1f0' },
+      { offset: 1, color: '#f5222d' },
+    ],
+  },
+  purple: {
+    type: 'linear',
+    id: 'gradient-purple',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#f9f0ff' },
+      { offset: 1, color: '#722ed1' },
+    ],
+  },
+  cyan: {
+    type: 'linear',
+    id: 'gradient-cyan',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#e6fffb' },
+      { offset: 1, color: '#13c2c2' },
+    ],
+  },
+  gray: {
+    type: 'linear',
+    id: 'gradient-gray',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#fafafa' },
+      { offset: 1, color: '#d9d9d9' },
+    ],
+  },
+  radialBlue: {
+    type: 'radial',
+    id: 'gradient-radial-blue',
+    cx: '50%', cy: '50%', r: '50%',
+    stops: [
+      { offset: 0, color: '#ffffff', opacity: 1 },
+      { offset: 0.5, color: '#e6f7ff', opacity: 0.8 },
+      { offset: 1, color: '#1890ff', opacity: 0.4 },
+    ],
+  },
+  radialGreen: {
+    type: 'radial',
+    id: 'gradient-radial-green',
+    cx: '50%', cy: '50%', r: '50%',
+    stops: [
+      { offset: 0, color: '#ffffff', opacity: 1 },
+      { offset: 0.5, color: '#f6ffed', opacity: 0.8 },
+      { offset: 1, color: '#52c41a', opacity: 0.4 },
+    ],
+  },
 }
 
 export const createBaseConfig = (config: ShapeRenderConfig, styleConfig: ShapeStyleConfig = {}) => {
