@@ -520,6 +520,7 @@ export function calculateDirectionVector(
 
 /**
  * 动态添加自定义 Port 到节点
+ * 使用绝对位置配置，确保连接点显示为小圆点
  */
 export function addCustomPort(
   node: any,
@@ -528,12 +529,13 @@ export function addCustomPort(
 ): { id: string; x: number; y: number; dirX: number; dirY: number } {
   const portId = `custom-${uuidv4()}`
   const size = node.getSize()
-  
+
   const absoluteX = relativeX * size.width
   const absoluteY = relativeY * size.height
-  
+
   const { dirX, dirY } = calculateDirectionVector(relativeX, relativeY)
 
+  // 使用绝对位置配置，确保连接点精确定位并显示为小圆点
   node.addPort({
     id: portId,
     group: 'custom',
@@ -543,12 +545,13 @@ export function addCustomPort(
     },
     attrs: {
       circle: {
-        r: 6,
+        r: 5,
         magnet: true,
-        stroke: '#52c41a',
-        strokeWidth: 2,
-        fill: '#fff',
+        stroke: '#1890ff',
+        strokeWidth: 1.5,
+        fill: '#ffffff',
         opacity: 1,
+        cursor: 'crosshair',
       },
     },
   })

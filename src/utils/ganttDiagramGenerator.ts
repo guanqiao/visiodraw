@@ -31,6 +31,7 @@ export interface GanttTask {
   assignee?: string
   progress?: number
   tags?: string[]
+  project?: string
 }
 
 export interface GanttSection {
@@ -39,13 +40,24 @@ export interface GanttSection {
   order: number
 }
 
+export interface GanttProject {
+  id: string
+  name: string
+  color: string
+  order: number
+}
+
+export type TimelineView = 'day' | 'week' | 'month'
+
 export interface ParsedGanttDiagram {
   title?: string
   dateFormat: string
   sections: GanttSection[]
   tasks: GanttTask[]
+  projects?: GanttProject[]
   startDate: Date
   endDate: Date
+  view?: TimelineView
 }
 
 // 重新导出类型供其他模块使用
@@ -90,6 +102,8 @@ export class GanttDiagramGenerator {
     milestoneSize: 16,
     timelineHeight: 30,
   }
+
+  private currentView: TimelineView = 'day'
 
   private styles = {
     section: {
@@ -167,6 +181,10 @@ export class GanttDiagramGenerator {
     const nodes: ShapeData[] = []
     const edges: Connector[] = []
 
+    // 设置视图模式
+    this.currentView = data.view || 'day'
+    this.applyViewConfig()
+
     // 计算布局
     this.calculateLayout(data)
 
@@ -190,7 +208,27 @@ export class GanttDiagramGenerator {
     // 6. 生成依赖关系
     this.generateDependencies(data, edges)
 
+    // 7. 生成项目图例（多项目模式）
+    if (data.projects && data.projects.length > 0) {
+      this.generateProjectLegend(data.projects, nodes)
+    }
+
     return { nodes, edges }
+  }
+
+  private applyViewConfig(): void {
+    switch (this.currentView) {
+      case 'week':
+        this.config.dayWidth = 20
+        break
+      case 'month':
+        this.config.dayWidth = 8
+        break
+      case 'day':
+      default:
+        this.config.dayWidth = 40
+        break
+    }
   }
 
   private calculateLayout(data: ParsedGanttDiagram): void {
@@ -282,56 +320,66 @@ export class GanttDiagramGenerator {
       const date = new Date(data.startDate.getTime() + i * 24 * 60 * 60 * 1000)
       const x = this.config.startX + i * this.config.dayWidth
 
-      // 日期刻度线
-      const isWeekend = date.getDay() === 0 || date.getDay() === 6
-      const isFirstDayOfMonth = date.getDate() === 1
+      // 根据视图模式决定是否显示刻度
+      const shouldShowTick = this.shouldShowTick(i, date)
+      const shouldShowLabel = this.shouldShowLabel(i, date)
 
-      nodes.push({
-        id: `timeline-tick-${i}`,
-        type: 'uml-line',
-        x: x,
-        y: this.config.startY + this.config.timelineHeight - 5,
-        width: 1,
-        height: isFirstDayOfMonth ? 10 : 5,
-        text: '',
-        stroke: isWeekend ? '#ff4d4f' : '#bfbfbf',
-        strokeWidth: 1,
-        zIndex: 2,
-      })
+      if (shouldShowTick) {
+        // 日期刻度线
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6
+        const isFirstDayOfMonth = date.getDate() === 1
+        const isFirstDayOfWeek = date.getDay() === 1
 
-      // 日期标签（每5天或月初显示）
-      if (i % 5 === 0 || isFirstDayOfMonth) {
         nodes.push({
-          id: `timeline-label-${i}`,
-          type: 'uml-label',
-          x: x - 20,
-          y: this.config.startY + 5,
-          width: 40,
-          height: 20,
-          text: dateFormat(date),
-          fill: 'transparent',
-          stroke: 'transparent',
-          fontSize: this.styles.timeline.fontSize,
-          color: isWeekend ? '#ff4d4f' : this.styles.timeline.color,
+          id: `timeline-tick-${i}`,
+          type: 'uml-line',
+          x: x,
+          y: this.config.startY + this.config.timelineHeight - 5,
+          width: 1,
+          height: isFirstDayOfMonth ? 10 : (isFirstDayOfWeek ? 8 : 5),
+          text: '',
+          stroke: isWeekend ? '#ff4d4f' : '#bfbfbf',
+          strokeWidth: 1,
           zIndex: 2,
         })
+
+        // 日期标签
+        if (shouldShowLabel) {
+          nodes.push({
+            id: `timeline-label-${i}`,
+            type: 'uml-label',
+            x: x - 20,
+            y: this.config.startY + 5,
+            width: 40,
+            height: 20,
+            text: dateFormat(date),
+            fill: 'transparent',
+            stroke: 'transparent',
+            fontSize: this.styles.timeline.fontSize,
+            color: isWeekend ? '#ff4d4f' : this.styles.timeline.color,
+            zIndex: 2,
+          })
+        }
       }
 
-      // 周末背景色
-      if (isWeekend) {
-        nodes.push({
-          id: `weekend-bg-${i}`,
-          type: 'uml-rect',
-          x: x,
-          y: this.config.startY + this.config.timelineHeight,
-          width: this.config.dayWidth,
-          height: this.calculateTotalHeight(data) - this.config.timelineHeight,
-          text: '',
-          fill: '#fff2f0',
-          fillOpacity: 0.3,
-          stroke: 'transparent',
-          zIndex: 0,
-        })
+      // 周末背景色（只在日视图显示）
+      if (this.currentView === 'day') {
+        const isWeekend = date.getDay() === 0 || date.getDay() === 6
+        if (isWeekend) {
+          nodes.push({
+            id: `weekend-bg-${i}`,
+            type: 'uml-rect',
+            x: x,
+            y: this.config.startY + this.config.timelineHeight,
+            width: this.config.dayWidth,
+            height: this.calculateTotalHeight(data) - this.config.timelineHeight,
+            text: '',
+            fill: '#fff2f0',
+            fillOpacity: 0.3,
+            stroke: 'transparent',
+            zIndex: 0,
+          })
+        }
       }
     }
   }
@@ -339,8 +387,9 @@ export class GanttDiagramGenerator {
   private generateGridLines(data: ParsedGanttDiagram, nodes: ShapeData[]): void {
     const totalHeight = this.calculateTotalHeight(data)
 
-    // 垂直网格线
-    for (let i = 0; i <= this.totalDays; i += 7) {
+    // 垂直网格线（根据视图调整间隔）
+    const gridInterval = this.currentView === 'month' ? 30 : (this.currentView === 'week' ? 7 : 7)
+    for (let i = 0; i <= this.totalDays; i += gridInterval) {
       const x = this.config.startX + i * this.config.dayWidth
       nodes.push({
         id: `grid-line-v-${i}`,
@@ -355,6 +404,36 @@ export class GanttDiagramGenerator {
         dashArray: '3,3',
         zIndex: 0,
       })
+    }
+  }
+
+  private shouldShowTick(index: number, date: Date): boolean {
+    switch (this.currentView) {
+      case 'week':
+        // 周视图：只显示周一
+        return date.getDay() === 1
+      case 'month':
+        // 月视图：只显示每月1号
+        return date.getDate() === 1
+      case 'day':
+      default:
+        // 日视图：显示所有天
+        return true
+    }
+  }
+
+  private shouldShowLabel(index: number, date: Date): boolean {
+    switch (this.currentView) {
+      case 'week':
+        // 周视图：每周一显示标签
+        return date.getDay() === 1
+      case 'month':
+        // 月视图：每月1号显示标签
+        return date.getDate() === 1
+      case 'day':
+      default:
+        // 日视图：每5天或月初显示
+        return index % 5 === 0 || date.getDate() === 1
     }
   }
 
@@ -507,6 +586,65 @@ export class GanttDiagramGenerator {
       default:
         return '#8c8c8c'
     }
+  }
+
+  private generateProjectLegend(projects: GanttProject[], nodes: ShapeData[]): void {
+    const legendX = this.config.startX + this.totalDays * this.config.dayWidth + 20
+    const legendY = this.config.startY
+
+    // 图例标题
+    nodes.push({
+      id: 'project-legend-title',
+      type: 'uml-label',
+      x: legendX,
+      y: legendY,
+      width: 120,
+      height: 20,
+      text: '项目图例',
+      fill: 'transparent',
+      stroke: 'transparent',
+      fontSize: 14,
+      fontWeight: 600,
+      color: '#262626',
+      zIndex: 10,
+    })
+
+    // 图例项
+    projects.forEach((project, index) => {
+      const itemY = legendY + 30 + index * 25
+
+      // 颜色块
+      nodes.push({
+        id: `legend-color-${project.id}`,
+        type: 'uml-rect',
+        x: legendX,
+        y: itemY,
+        width: 16,
+        height: 16,
+        text: '',
+        fill: project.color,
+        stroke: project.color,
+        strokeWidth: 1,
+        cornerRadius: 2,
+        zIndex: 10,
+      })
+
+      // 项目名称
+      nodes.push({
+        id: `legend-text-${project.id}`,
+        type: 'uml-label',
+        x: legendX + 24,
+        y: itemY,
+        width: 100,
+        height: 16,
+        text: project.name,
+        fill: 'transparent',
+        stroke: 'transparent',
+        fontSize: 12,
+        color: '#595959',
+        zIndex: 10,
+      })
+    })
   }
 
   private generateMilestone(task: GanttTask, layout: TaskLayout, nodes: ShapeData[]): void {

@@ -15,6 +15,8 @@ import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
 import { useSelfLoopDrawing } from '@hooks/useSelfLoopDrawing'
 import { VirtualRenderer } from '@utils/rendering/VirtualRenderer'
 import { AnimationManager } from '@utils/rendering/AnimationManager'
+import { SmartRouter } from '@utils/rendering/SmartRouter'
+import { ParallelEdgeHandler } from '@utils/parallelEdgeHandler'
 import { v4 as uuidv4 } from 'uuid'
 import { parseDragData } from '../types/dragDrop'
 import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVisibility, isNearNodeEdge, getEdgePointFromMouse, addCustomPort, createCustomConnectionPoint, removeCustomPort, updateCustomPortPosition } from '@utils/connectionPoints'
@@ -348,23 +350,50 @@ const X6Canvas: React.FC = () => {
     })
 
     // Ctrl+Click to add custom connection point anywhere on node
+    // Click on existing custom connection point to delete it
     graph.on('node:click', ({ node, e }: { node: Node; e: any }) => {
       if (!e.ctrlKey && !e.metaKey && currentTool !== 'connection-point') return
 
       const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
       const position = node.getPosition()
       const size = node.getSize()
-      
+
+      // Check if clicking on an existing custom connection point
+      const ports = node.getPorts()
+      for (const port of ports) {
+        if (port.id?.startsWith('custom-')) {
+          const portArgs = (port as any).args
+          if (portArgs) {
+            const portX = position.x + (portArgs.x || 0)
+            const portY = position.y + (portArgs.y || 0)
+
+            const distance = Math.sqrt(
+              Math.pow(localPoint.x - portX, 2) +
+              Math.pow(localPoint.y - portY, 2)
+            )
+
+            // If clicking on existing custom port, delete it
+            if (distance < 12) {
+              removeCustomPort(node, port.id)
+              removeConnectionPoint(node.id, port.id)
+              message.success('已删除连接点')
+              return
+            }
+          }
+        }
+      }
+
+      // Add new connection point
       const relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
       const relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
 
       const portInfo = addCustomPort(node, relativeX, relativeY)
-      
+
       const connectionPoint = createCustomConnectionPoint(relativeX, relativeY)
       connectionPoint.id = portInfo.id
-      
+
       addConnectionPoint(node.id, connectionPoint)
-      
+
       message.success('已添加连接点')
     })
 
@@ -1027,9 +1056,21 @@ const X6Canvas: React.FC = () => {
       easing: 'easeOutCubic',
     })
 
+    // Initialize SmartRouter for intelligent edge routing
+    const smartRouter = new SmartRouter(graph)
+
+    // Initialize ParallelEdgeHandler for parallel edge distribution
+    const parallelEdgeHandler = new ParallelEdgeHandler(graph, {
+      spacing: 20,
+      useCurve: true,
+      curveOffset: 30,
+    })
+
     // Store references for cleanup
     ;(graph as any).virtualRenderer = virtualRenderer
     ;(graph as any).animationManager = animationManager
+    ;(graph as any).smartRouter = smartRouter
+    ;(graph as any).parallelEdgeHandler = parallelEdgeHandler
 
     // Set up auto save interval (check every minute)
     const autoSaveInterval = setInterval(() => {
