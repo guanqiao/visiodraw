@@ -13,6 +13,8 @@ import useFormatPainterStore from '@stores/formatPainterStore'
 import { THEME_CHANGE_EVENT } from '@hooks/useTheme'
 import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
 import { useSelfLoopDrawing } from '@hooks/useSelfLoopDrawing'
+import { VirtualRenderer } from '@utils/rendering/VirtualRenderer'
+import { AnimationManager } from '@utils/rendering/AnimationManager'
 import { v4 as uuidv4 } from 'uuid'
 import { parseDragData } from '../types/dragDrop'
 import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVisibility, isNearNodeEdge, getEdgePointFromMouse, addCustomPort, createCustomConnectionPoint, removeCustomPort, updateCustomPortPosition } from '@utils/connectionPoints'
@@ -187,9 +189,43 @@ const X6Canvas: React.FC = () => {
             },
           })
         },
-        validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell }) {
-          // 确保从连接点(magnet)开始，允许自连线
-          return !!sourceMagnet && !!targetMagnet
+        validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell, sourceView, targetView }) {
+          // 确保从连接点(magnet)开始
+          if (!sourceMagnet || !targetMagnet) {
+            return false
+          }
+
+          // 获取源节点和目标节点
+          const sourceNode = sourceView?.cell
+          const targetNode = targetView?.cell
+
+          if (!sourceNode || !targetNode) {
+            return false
+          }
+
+          // 检查是否是同一类型的节点（某些情况下可能不允许）
+          // 这里可以根据业务需求添加更多验证
+
+          // 检查是否已存在相同的连接（避免重复边）
+          const existingEdges = graph.getEdges()
+          const isDuplicate = existingEdges.some((edge) => {
+            const edgeSource = edge.getSourceCell()
+            const edgeTarget = edge.getTargetCell()
+            return (
+              edgeSource?.id === sourceNode.id &&
+              edgeTarget?.id === targetNode.id &&
+              edge.getSourcePortId() === sourceMagnet.getAttribute('port') &&
+              edge.getTargetPortId() === targetMagnet.getAttribute('port')
+            )
+          })
+
+          if (isDuplicate) {
+            message.warning('该连接已存在')
+            return false
+          }
+
+          // 允许自连线（sourceCell === targetCell）
+          return true
         },
       },
     })
@@ -977,6 +1013,23 @@ const X6Canvas: React.FC = () => {
 
     graphRef.current = graph
     setGraph(graph)
+
+    // Initialize VirtualRenderer for performance optimization
+    const virtualRenderer = new VirtualRenderer(graph, {
+      enableCulling: true,
+      maxVisibleNodes: 500,
+      bufferRatio: 0.2,
+    })
+
+    // Initialize AnimationManager for smooth animations
+    const animationManager = new AnimationManager(graph, {
+      duration: 300,
+      easing: 'easeOutCubic',
+    })
+
+    // Store references for cleanup
+    ;(graph as any).virtualRenderer = virtualRenderer
+    ;(graph as any).animationManager = animationManager
 
     // Set up auto save interval (check every minute)
     const autoSaveInterval = setInterval(() => {

@@ -352,7 +352,7 @@ export class SequenceDiagramGenerator {
         targetPointId: 'default',
         stroke: this.getMessageColor(message.type),
         strokeWidth: 1.5,
-        lineStyle: message.type === 'return' ? 'dashed' : 'solid',
+        lineStyle: this.getMessageLineStyle(message.type),
         startStyle: 'none',
         endStyle: this.getMessageArrow(message.type),
         style: 'straight',
@@ -366,6 +366,16 @@ export class SequenceDiagramGenerator {
       }
 
       edges.push(edge)
+
+      // 创建消息特殊处理：在目标位置添加创建标记
+      if (message.type === 'create') {
+        this.generateCreateMarker(message, toLayout.centerX, y, nodes)
+      }
+
+      // 销毁消息特殊处理：在目标位置添加销毁标记
+      if (message.type === 'destroy') {
+        this.generateDestroyMarker(message, toLayout.centerX, y, nodes)
+      }
     })
   }
 
@@ -605,6 +615,76 @@ export class SequenceDiagramGenerator {
         return 'arrow'
       default:
         return 'arrow'
+    }
+  }
+
+  private getMessageLineStyle(type: SequenceMessage['type']): 'solid' | 'dashed' | 'dotted' {
+    switch (type) {
+      case 'return':
+        return 'dashed'
+      case 'create':
+        return 'dashed'
+      default:
+        return 'solid'
+    }
+  }
+
+  private generateCreateMarker(
+    message: SequenceMessage,
+    centerX: number,
+    y: number,
+    nodes: ShapeData[]
+  ): void {
+    // 在创建消息位置添加一个小标记表示新参与者被创建
+    const markerSize = 8
+    const marker: ShapeData = {
+      id: `create-marker-${message.id}`,
+      type: 'uml-create-marker',
+      x: centerX - markerSize / 2,
+      y: y - markerSize / 2,
+      width: markerSize,
+      height: markerSize,
+      text: '',
+      fill: '#52c41a',
+      stroke: '#237804',
+      strokeWidth: 1,
+      cornerRadius: 2,
+      zIndex: 10,
+    }
+    nodes.push(marker)
+  }
+
+  private generateDestroyMarker(
+    message: SequenceMessage,
+    centerX: number,
+    y: number,
+    nodes: ShapeData[]
+  ): void {
+    // 在销毁消息位置添加一个大X标记表示参与者被销毁
+    const markerSize = 16
+    const marker: ShapeData = {
+      id: `destroy-marker-${message.id}`,
+      type: 'uml-destroy-marker',
+      x: centerX - markerSize / 2,
+      y: y,
+      width: markerSize,
+      height: markerSize,
+      text: '✕',
+      fill: '#fff2f0',
+      stroke: '#f5222d',
+      strokeWidth: 2,
+      fontSize: 12,
+      color: '#f5222d',
+      fontWeight: 'bold',
+      zIndex: 10,
+    }
+    nodes.push(marker)
+
+    // 截断生命线（在销毁标记处结束）
+    const lifelineId = `lifeline-${message.to}`
+    const lifeline = nodes.find(n => n.id === lifelineId)
+    if (lifeline) {
+      lifeline.height = y - lifeline.y + markerSize / 2
     }
   }
 

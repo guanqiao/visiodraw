@@ -1,6 +1,7 @@
 import type { ConnectorStyle, RoutingConfig, RoutingConstraint } from '../types/connection'
 import { defaultRoutingConfig, connectorStyleConfigs } from '../types/connection'
 import { SelfLoopRouter, SelfLoopConfig } from './selfLoopRouter'
+import { edgePathCache } from './edgePathCache'
 
 export interface RoutePoint {
   x: number
@@ -78,29 +79,80 @@ export class ConnectorRouter {
   /**
    * Calculate route points for a connector
    */
-  calculateRoute(context: RouteContext): RoutePoint[] {
-    const { sourceX, sourceY, targetX, targetY, constraint, isSelfLoop, selfLoopConfig } = context
+  calculateRoute(context: RouteContext, edgeId?: string): RoutePoint[] {
+    const { sourceX, sourceY, targetX, targetY, constraint, isSelfLoop, selfLoopConfig, sourceShape, targetShape } = context
 
     // 处理自连线
-    if (isSelfLoop && context.sourceShape) {
+    if (isSelfLoop && sourceShape) {
       return this.calculateSelfLoopRoute(context)
     }
 
+    // 尝试从缓存获取路径
+    if (edgeId) {
+      const cachedPath = edgePathCache.get(
+        edgeId,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        sourceShape?.width,
+        sourceShape?.height,
+        targetShape?.width,
+        targetShape?.height,
+        { constraint, algorithm: this.config.algorithm }
+      )
+
+      if (cachedPath) {
+        return cachedPath
+      }
+    }
+
+    let points: RoutePoint[]
+
     // If constraint is specified, apply it
     if (constraint === 'horizontal') {
-      return this.calculateHorizontalFirstRoute(context)
-    }
-    if (constraint === 'vertical') {
-      return this.calculateVerticalFirstRoute(context)
+      points = this.calculateHorizontalFirstRoute(context)
+    } else if (constraint === 'vertical') {
+      points = this.calculateVerticalFirstRoute(context)
+    } else if (this.config.algorithm === 'manhattan' || this.config.algorithm === 'metro') {
+      points = this.calculateOrthogonalRoute(context)
+    } else {
+      // Direct line for normal/smooth
+      points = [{ x: sourceX, y: sourceY }, { x: targetX, y: targetY }]
     }
 
-    // Default: direct line or simple orthogonal
-    if (this.config.algorithm === 'manhattan' || this.config.algorithm === 'metro') {
-      return this.calculateOrthogonalRoute(context)
+    // 缓存计算的路径
+    if (edgeId) {
+      edgePathCache.set(
+        edgeId,
+        sourceX,
+        sourceY,
+        targetX,
+        targetY,
+        points,
+        sourceShape?.width,
+        sourceShape?.height,
+        targetShape?.width,
+        targetShape?.height,
+        { constraint, algorithm: this.config.algorithm }
+      )
     }
 
-    // Direct line for normal/smooth
-    return [{ x: sourceX, y: sourceY }, { x: targetX, y: targetY }]
+    return points
+  }
+
+  /**
+   * Invalidate cached path for an edge
+   */
+  invalidateCache(edgeId: string): void {
+    edgePathCache.invalidate(edgeId)
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return edgePathCache.getStats()
   }
 
   /**
