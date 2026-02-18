@@ -210,3 +210,78 @@ describe('Template Library', () => {
     })
 
     it('templates should have descriptions', () => {
+      const builtinTemplates = getBuiltinTemplates()
+      const diagramTemplates = getAllTemplates()
+
+      builtinTemplates.forEach((template) => {
+        if (template.description) {
+          expect(template.description.length).toBeGreaterThan(0)
+        }
+      })
+
+      diagramTemplates.forEach((template) => {
+        if (template.description) {
+          expect(template.description.length).toBeGreaterThan(0)
+        }
+      })
+    })
+  })
+
+  describe('Template Uniqueness', () => {
+    it('should not have duplicate template IDs', () => {
+      const builtinTemplates = getBuiltinTemplates()
+      const diagramTemplates = getAllTemplates()
+      const allTemplates = [...builtinTemplates, ...diagramTemplates]
+
+      const ids = allTemplates.map((t) => t.id)
+      const uniqueIds = new Set(ids)
+
+      expect(uniqueIds.size).toBe(ids.length)
+    })
+
+    it('should not have duplicate template names within same category', () => {
+      const builtinTemplates = getBuiltinTemplates()
+      const groupedByCategory = builtinTemplates.reduce((acc, template) => {
+        if (!acc[template.category]) {
+          acc[template.category] = []
+        }
+        acc[template.category].push(template.name)
+        return acc
+      }, {} as Record<string, string[]>)
+
+      Object.values(groupedByCategory).forEach((names) => {
+        const uniqueNames = new Set(names)
+        expect(uniqueNames.size).toBe(names.length)
+      })
+    })
+  })
+
+  describe('Template Completeness', () => {
+    it('flowchart templates should have connectors', () => {
+      const templates = getBuiltinTemplates().filter((t) => t.category === 'flowchart')
+
+      templates.forEach((template) => {
+        expect(template.connectors).toBeDefined()
+        expect(Array.isArray(template.connectors)).toBe(true)
+      })
+    })
+
+    it('org templates should have connectors', () => {
+      const templates = getBuiltinTemplates().filter((t) => t.category === 'org')
+
+      templates.forEach((template) => {
+        expect(template.connectors).toBeDefined()
+        expect(Array.isArray(template.connectors)).toBe(true)
+      })
+    })
+
+    it('network templates should have connectors', () => {
+      const templates = getBuiltinTemplates().filter((t) => t.category === 'network')
+
+      templates.forEach((template) => {
+        expect(template.connectors).toBeDefined()
+        expect(Array.isArray(template.connectors)).toBe(true)
+      })
+    })
+  })
+})
