@@ -77,6 +77,37 @@ export const useGraphEvents = (options: UseGraphEventsOptions) => {
       showPorts(node, false)
     }
 
+    const handleEdgeMouseEnter = ({ edge }: { edge: Edge }) => {
+      // 悬停效果：加粗线条、改变颜色
+      const originalStrokeWidth = edge.attr('line/strokeWidth') as number || 2
+      const originalStroke = edge.attr('line/stroke') as string || '#333333'
+      
+      edge.setData({
+        ...edge.getData(),
+        _hoverOriginal: {
+          strokeWidth: originalStrokeWidth,
+          stroke: originalStroke,
+        },
+      })
+      
+      edge.attr('line/strokeWidth', originalStrokeWidth + 1)
+      edge.attr('line/stroke', '#1890ff')
+    }
+
+    const handleEdgeMouseLeave = ({ edge }: { edge: Edge }) => {
+      // 恢复原始样式
+      const data = edge.getData() as any
+      if (data?._hoverOriginal) {
+        edge.attr('line/strokeWidth', data._hoverOriginal.strokeWidth)
+        edge.attr('line/stroke', data._hoverOriginal.stroke)
+        
+        // 清理临时数据
+        const newData = { ...data }
+        delete newData._hoverOriginal
+        edge.setData(newData)
+      }
+    }
+
     const handleNodeAdded = ({ node }: { node: Node }) => {
       const data = node.getData() as any
       if (data?.fromStore) return
@@ -264,6 +295,8 @@ export const useGraphEvents = (options: UseGraphEventsOptions) => {
     graph.on('node:selected', handleNodeSelected)
     graph.on('node:unselected', handleNodeUnselected)
     graph.on('node:dblclick', handleNodeDblClick)
+    graph.on('edge:mouseenter', handleEdgeMouseEnter)
+    graph.on('edge:mouseleave', handleEdgeMouseLeave)
     graph.on('edge:added', handleEdgeAdded)
     graph.on('edge:connected', handleEdgeConnected)
     graph.on('edge:selected', handleEdgeSelected)
@@ -280,6 +313,8 @@ export const useGraphEvents = (options: UseGraphEventsOptions) => {
       graph.off('node:selected', handleNodeSelected)
       graph.off('node:unselected', handleNodeUnselected)
       graph.off('node:dblclick', handleNodeDblClick)
+      graph.off('edge:mouseenter', handleEdgeMouseEnter)
+      graph.off('edge:mouseleave', handleEdgeMouseLeave)
       graph.off('edge:added', handleEdgeAdded)
       graph.off('edge:connected', handleEdgeConnected)
       graph.off('edge:selected', handleEdgeSelected)
