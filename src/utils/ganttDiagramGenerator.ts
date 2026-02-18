@@ -28,6 +28,9 @@ export interface GanttTask {
   section?: string
   dependencies: string[]
   order: number
+  assignee?: string
+  progress?: number
+  tags?: string[]
 }
 
 export interface GanttSection {
@@ -431,6 +434,7 @@ export class GanttDiagramGenerator {
   private generateTask(task: GanttTask, layout: TaskLayout, nodes: ShapeData[]): void {
     const style = this.styles.task[task.status] || this.styles.task.default
 
+    // 任务条形
     nodes.push({
       id: `task-${task.id}`,
       type: 'uml-gantt-task',
@@ -448,7 +452,33 @@ export class GanttDiagramGenerator {
       zIndex: 10,
     })
 
+    // 进度条（如果有进度）
+    if (task.progress !== undefined && task.progress > 0) {
+      const progressWidth = layout.width * (task.progress / 100)
+      nodes.push({
+        id: `task-progress-${task.id}`,
+        type: 'uml-gantt-progress',
+        x: layout.x + 2,
+        y: layout.y + layout.height - 4,
+        width: progressWidth,
+        height: 4,
+        text: '',
+        fill: this.getProgressColor(task.status),
+        stroke: 'transparent',
+        cornerRadius: 2,
+        zIndex: 11,
+      })
+    }
+
     // 任务名称标签（左侧）
+    let labelText = task.name
+    if (task.assignee) {
+      labelText = `${task.name} (${task.assignee})`
+    }
+    if (task.tags && task.tags.length > 0) {
+      labelText += ` [${task.tags.join(', ')}]`
+    }
+
     nodes.push({
       id: `task-label-${task.id}`,
       type: 'uml-label',
@@ -456,7 +486,7 @@ export class GanttDiagramGenerator {
       y: layout.y + 6,
       width: this.config.startX - 20,
       height: 20,
-      text: task.name,
+      text: labelText,
       fill: 'transparent',
       stroke: 'transparent',
       fontSize: 12,
@@ -464,6 +494,19 @@ export class GanttDiagramGenerator {
       textAlign: 'left',
       zIndex: 10,
     })
+  }
+
+  private getProgressColor(status: TaskStatus): string {
+    switch (status) {
+      case 'done':
+        return '#52c41a'
+      case 'active':
+        return '#1890ff'
+      case 'crit':
+        return '#f5222d'
+      default:
+        return '#8c8c8c'
+    }
   }
 
   private generateMilestone(task: GanttTask, layout: TaskLayout, nodes: ShapeData[]): void {

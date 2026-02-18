@@ -16,6 +16,7 @@ import type {
   SequenceFragment,
   SequenceNote,
   SequenceActivation,
+  SequenceReference,
 } from './mermaidSequenceParser'
 import type { ShapeData } from '../stores/x6GraphStore'
 import type { Connector, ConnectorEndStyle } from '../types/connection'
@@ -150,6 +151,9 @@ export class SequenceDiagramGenerator {
     // 6. 生成注释
     this.generateNotes(data.notes, nodes)
 
+    // 7. 生成引用框
+    this.generateReferences(data.references, nodes)
+
     return { nodes, edges }
   }
 
@@ -229,8 +233,8 @@ export class SequenceDiagramGenerator {
         width,
         height,
         text: participant.name,
-        fill: style.fill,
-        stroke: style.stroke,
+        fill: participant.color || style.fill,
+        stroke: participant.color || style.stroke,
         strokeWidth: style.strokeWidth,
         fontSize: style.fontSize,
         fontWeight: style.fontWeight,
@@ -350,7 +354,7 @@ export class SequenceDiagramGenerator {
         sourcePointId: 'default',
         targetShapeId: targetId,
         targetPointId: 'default',
-        stroke: this.getMessageColor(message.type),
+        stroke: message.color || this.getMessageColor(message.type),
         strokeWidth: 1.5,
         lineStyle: this.getMessageLineStyle(message.type),
         startStyle: 'none',
@@ -361,7 +365,7 @@ export class SequenceDiagramGenerator {
           text: message.text,
           position: 0.5,
           fontSize: 12,
-          color: '#333333',
+          color: message.color || '#333333',
         }] : undefined,
       }
 
@@ -616,6 +620,48 @@ export class SequenceDiagramGenerator {
       default:
         return 'arrow'
     }
+  }
+
+  private generateReferences(references: SequenceReference[], nodes: ShapeData[]): void {
+    if (this.participantLayouts.size === 0) return
+
+    references.forEach(reference => {
+      const y = this.messageYMap.get(reference.messageOrder)
+      if (!y) return
+
+      // 获取引用涉及的所有参与者的布局
+      const layouts = reference.participants
+        .map(p => this.participantLayouts.get(p))
+        .filter((l): l is ParticipantLayout => l !== undefined)
+
+      if (layouts.length === 0) return
+
+      // 计算引用框的位置和大小
+      const minX = Math.min(...layouts.map(l => l.centerX))
+      const maxX = Math.max(...layouts.map(l => l.centerX))
+      const leftX = minX - 40
+      const rightX = maxX + 40
+
+      const refNode: ShapeData = {
+        id: `ref-${reference.id}`,
+        type: 'uml-reference',
+        x: leftX,
+        y: y - 25,
+        width: rightX - leftX,
+        height: 50,
+        text: reference.text,
+        fill: '#f0f5ff',
+        fillOpacity: 0.3,
+        stroke: '#2f54eb',
+        strokeWidth: 1.5,
+        cornerRadius: 4,
+        fontSize: 12,
+        color: '#1d39c4',
+        zIndex: 5,
+      }
+
+      nodes.push(refNode)
+    })
   }
 
   private getMessageLineStyle(type: SequenceMessage['type']): 'solid' | 'dashed' | 'dotted' {

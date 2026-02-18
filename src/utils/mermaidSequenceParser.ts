@@ -54,6 +54,13 @@ export interface SequenceNote {
   messageOrder: number
 }
 
+export interface SequenceReference {
+  id: string
+  participants: string[]
+  text: string
+  messageOrder: number
+}
+
 export interface SequenceActivation {
   id: string
   participant: string
@@ -66,6 +73,7 @@ export interface ParsedSequenceDiagram {
   messages: SequenceMessage[]
   fragments: SequenceFragment[]
   notes: SequenceNote[]
+  references: SequenceReference[]
   activations: SequenceActivation[]
   autoNumber: boolean
 }
@@ -75,6 +83,7 @@ interface ParseContext {
   messages: SequenceMessage[]
   fragments: SequenceFragment[]
   notes: SequenceNote[]
+  references: SequenceReference[]
   activations: SequenceActivation[]
   autoNumber: boolean
   messageOrder: number
@@ -97,6 +106,7 @@ export class MermaidSequenceParser {
       messages: [],
       fragments: [],
       notes: [],
+      references: [],
       activations: [],
       autoNumber: false,
       messageOrder: 0,
@@ -147,6 +157,7 @@ export class MermaidSequenceParser {
       messages: ctx.messages,
       fragments: ctx.fragments,
       notes: ctx.notes,
+      references: ctx.references,
       activations: ctx.activations,
       autoNumber: ctx.autoNumber,
     }
@@ -171,6 +182,12 @@ export class MermaidSequenceParser {
     // 解析注释
     if (line.startsWith('Note ')) {
       this.parseNote(line, ctx)
+      return
+    }
+
+    // 解析引用
+    if (line.startsWith('ref over ')) {
+      this.parseReference(line, ctx)
       return
     }
 
@@ -254,6 +271,7 @@ export class MermaidSequenceParser {
         name: match[2] ? match[2].trim() : match[1],
         type: 'database',
         order: ctx.participants.length,
+        color: match[3] ? match[3].trim() : undefined,
       })
     }
   }
@@ -265,8 +283,9 @@ export class MermaidSequenceParser {
     // A->B: text (异步)
     // A--xB: text (删除)
     // A*)B: text (创建)
+    // A->>B: text #color (带颜色)
 
-    const match = line.match(/^([\w\s]+?)(-+)(>>|>|x|\)|\)|\*\)|#\))([\w\s]*):(.+)$/)
+    const match = line.match(/^([\w\s]+?)(-+)(>>|>|x|\)|\)|\*\)|#\))([\w\s]*):\s*([^#]+)(?:#(.+))?$/)
     if (!match) return
 
     const from = match[1].trim()
@@ -274,6 +293,7 @@ export class MermaidSequenceParser {
     const arrow = match[3].trim()
     const to = match[4].trim() || from
     const text = match[5].trim()
+    const color = match[6] ? match[6].trim() : undefined
 
     ctx.messageOrder++
 
@@ -314,6 +334,7 @@ export class MermaidSequenceParser {
       order: ctx.messageOrder,
       activate,
       deactivate,
+      color,
     }
 
     ctx.messages.push(message)
@@ -370,6 +391,21 @@ export class MermaidSequenceParser {
         messageOrder: ctx.messageOrder,
       })
       return
+    }
+  }
+
+  private parseReference(line: string, ctx: ParseContext): void {
+    // ref over A,B: text
+    const match = line.match(/ref over\s+(.+):\s*(.+)/)
+    if (match) {
+      const participants = match[1].split(',').map(p => p.trim())
+      ctx.messageOrder++
+      ctx.references.push({
+        id: `ref-${ctx.references.length}`,
+        participants,
+        text: match[2].trim(),
+        messageOrder: ctx.messageOrder,
+      })
     }
   }
 
