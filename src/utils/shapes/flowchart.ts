@@ -1,17 +1,52 @@
 import { Shape, Node } from '@antv/x6'
-import { ShapeRenderConfig, createBaseConfig } from './types'
+import { ShapeRenderConfig, createBaseConfig, GRADIENT_PRESETS } from './types'
 import { 
   createCylinderPath,
   createDocumentPath,
   createParallelogramPoints,
   createTrapezoidPoints,
   createArrowPath,
+  calculatePolygonPoints,
 } from '../shapeMath'
 import { renderRectangle, renderDiamond, renderHexagon } from './base'
 
 export const renderProcess = renderRectangle
 
+export const renderProcessGradient = (config: ShapeRenderConfig): Node => {
+  const gradientKey = config.gradient as string || 'flowchartProcess'
+  const gradient = GRADIENT_PRESETS[gradientKey] || GRADIENT_PRESETS.flowchartProcess
+  const base = createBaseConfig(config, { gradient })
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        rx: 5,
+        ry: 5,
+      },
+    },
+  })
+}
+
 export const renderDecision = renderDiamond
+
+export const renderDecisionGradient = (config: ShapeRenderConfig): Node => {
+  const gradientKey = config.gradient as string || 'flowchartDecision'
+  const gradient = GRADIENT_PRESETS[gradientKey] || GRADIENT_PRESETS.flowchartDecision
+  const base = createBaseConfig(config, { gradient })
+  const points = calculatePolygonPoints(4, config.width, config.height)
+  return new Shape.Polygon({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        refPoints: points,
+      },
+    },
+  })
+}
 
 export const renderStartEnd = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
@@ -123,7 +158,9 @@ export const renderOffPage = (config: ShapeRenderConfig): Node => {
 
 export const flowchartRenderers = {
   process: renderProcess,
+  'process-gradient': renderProcessGradient,
   decision: renderDecision,
+  'decision-gradient': renderDecisionGradient,
   'start-end': renderStartEnd,
   'input-output': renderInputOutput,
   document: renderDocument,

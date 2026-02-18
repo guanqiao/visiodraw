@@ -85,6 +85,23 @@ export interface Connector {
   isSelected?: boolean
   routingConstraint?: RoutingConstraint
   routingPadding?: number
+  gradient?: {
+    type: 'linear' | 'radial'
+    id?: string
+    color1: string
+    color2: string
+    angle?: number
+  }
+  glow?: {
+    enabled: boolean
+    color?: string
+    blur?: number
+  }
+  animated?: {
+    enabled: boolean
+    type: 'flow' | 'pulse' | 'dash'
+    speed?: number
+  }
 }
 
 export interface ConnectionPointRenderOptions {

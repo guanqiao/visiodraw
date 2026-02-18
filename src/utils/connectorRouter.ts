@@ -1,5 +1,6 @@
 import type { ConnectorStyle, RoutingConfig, RoutingConstraint } from '../types/connection'
 import { defaultRoutingConfig, connectorStyleConfigs } from '../types/connection'
+import { SelfLoopRouter, SelfLoopConfig } from './selfLoopRouter'
 
 export interface RoutePoint {
   x: number
@@ -16,6 +17,8 @@ export interface RouteContext {
   obstacles: any[]
   constraint?: RoutingConstraint
   padding?: number
+  isSelfLoop?: boolean
+  selfLoopConfig?: Partial<SelfLoopConfig>
 }
 
 export class ConnectorRouter {
@@ -76,7 +79,12 @@ export class ConnectorRouter {
    * Calculate route points for a connector
    */
   calculateRoute(context: RouteContext): RoutePoint[] {
-    const { sourceX, sourceY, targetX, targetY, constraint } = context
+    const { sourceX, sourceY, targetX, targetY, constraint, isSelfLoop, selfLoopConfig } = context
+
+    // 处理自连线
+    if (isSelfLoop && context.sourceShape) {
+      return this.calculateSelfLoopRoute(context)
+    }
 
     // If constraint is specified, apply it
     if (constraint === 'horizontal') {
@@ -93,6 +101,24 @@ export class ConnectorRouter {
 
     // Direct line for normal/smooth
     return [{ x: sourceX, y: sourceY }, { x: targetX, y: targetY }]
+  }
+
+  /**
+   * Calculate self-loop route
+   */
+  private calculateSelfLoopRoute(context: RouteContext): RoutePoint[] {
+    const { sourceShape, selfLoopConfig } = context
+
+    const router = new SelfLoopRouter(selfLoopConfig)
+    const path = router.calculatePath(
+      sourceShape.x + sourceShape.width / 2,
+      sourceShape.y + sourceShape.height / 2,
+      sourceShape.width,
+      sourceShape.height,
+      0
+    )
+
+    return path.points
   }
 
   /**

@@ -108,16 +108,51 @@ export class ConnectorRenderer {
       },
     }
 
-    // Apply line style - Mermaid style
+    if (connector.gradient) {
+      const gradientId = connector.gradient.id || `edge-gradient-${Date.now()}`
+      attrs.line.stroke = `url(#${gradientId})`
+    }
+
+    if (connector.glow?.enabled) {
+      attrs.line.filter = {
+        name: 'dropShadow',
+        args: {
+          dx: 0,
+          dy: 0,
+          blur: connector.glow.blur || 8,
+          color: connector.glow.color || 'rgba(24, 144, 255, 0.6)',
+        },
+      }
+    }
+
+    if (connector.animated?.enabled) {
+      const speed = connector.animated.speed || 1
+      if (connector.animated.type === 'flow') {
+        attrs.line.strokeDasharray = '8,4'
+        attrs.line.lineAnimations = [{
+          attributeName: 'stroke-dashoffset',
+          from: '0',
+          to: '-12',
+          dur: `${1 / speed}s`,
+          repeatCount: 'indefinite',
+        }]
+      } else if (connector.animated.type === 'dash') {
+        attrs.line.strokeDasharray = '4,4'
+      } else if (connector.animated.type === 'pulse') {
+        attrs.line.opacity = 0.5
+      }
+    }
+
+    if (connector.opacity !== undefined) {
+      attrs.line.opacity = connector.opacity
+    }
+
     if (connector.lineStyle === 'dashed') {
-      // Mermaid 虚线样式: 长虚线
       attrs.line.strokeDasharray = '8,4'
     } else if (connector.lineStyle === 'dotted') {
-      // Mermaid 点线样式
       attrs.line.strokeDasharray = '2,4'
     }
 
-    // Apply markers with Mermaid style
     const targetMarker = this.getMermaidMarker(connector.endStyle)
     const sourceMarker = this.getMermaidMarker(connector.startStyle)
 

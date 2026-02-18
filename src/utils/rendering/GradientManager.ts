@@ -1,4 +1,5 @@
 import { Graph } from '@antv/x6'
+import { devWarn } from '../logger'
 
 export interface GradientStop {
   offset: number
@@ -89,7 +90,7 @@ export class GradientManager {
     }
 
     if (!this.defsElement) {
-      console.warn('[GradientManager] 无法创建渐变：defs元素不存在')
+      devWarn('[GradientManager] 无法创建渐变：defs元素不存在')
       return config.stops[0]?.color || '#ffffff'
     }
 

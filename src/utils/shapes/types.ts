@@ -132,6 +132,13 @@ export interface ShadowPreset {
   offsetY: number
 }
 
+export interface HighlightConfig {
+  type: 'top' | 'left' | 'right' | 'bottom' | 'corners' | 'full'
+  color: string
+  opacity?: number
+  width?: number
+}
+
 export interface ShapeStyleConfig {
   rx?: number
   ry?: number
@@ -143,6 +150,7 @@ export interface ShapeStyleConfig {
   shadowOffsetY?: number
   gradient?: GradientConfig | string
   shadowPreset?: keyof typeof SHADOW_PRESETS
+  highlight?: HighlightConfig
 }
 
 export const SHADOW_PRESETS: Record<string, ShadowPreset> = {
@@ -274,36 +282,209 @@ export const GRADIENT_PRESETS: Record<string, GradientConfig> = {
       { offset: 1, color: '#52c41a', opacity: 0.4 },
     ],
   },
+  erEntity: {
+    type: 'linear',
+    id: 'gradient-er-entity',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#e6f7ff' },
+      { offset: 1, color: '#1890ff' },
+    ],
+  },
+  erWeakEntity: {
+    type: 'linear',
+    id: 'gradient-er-weak',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#fff7e6' },
+      { offset: 1, color: '#fa8c16' },
+    ],
+  },
+  erAttribute: {
+    type: 'linear',
+    id: 'gradient-er-attribute',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#f6ffed' },
+      { offset: 1, color: '#52c41a' },
+    ],
+  },
+  flowchartProcess: {
+    type: 'linear',
+    id: 'gradient-flowchart-process',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#ffffff' },
+      { offset: 1, color: '#f0f0f0' },
+    ],
+  },
+  flowchartDecision: {
+    type: 'linear',
+    id: 'gradient-flowchart-decision',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#fff7e6' },
+      { offset: 1, color: '#ffd591' },
+    ],
+  },
+  flowchartStart: {
+    type: 'linear',
+    id: 'gradient-flowchart-start',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#f6ffed' },
+      { offset: 1, color: '#95de64' },
+    ],
+  },
+  flowchartEnd: {
+    type: 'linear',
+    id: 'gradient-flowchart-end',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#fff1f0' },
+      { offset: 1, color: '#ff7875' },
+    ],
+  },
+  bpmnStart: {
+    type: 'radial',
+    id: 'gradient-bpmn-start',
+    cx: '50%', cy: '50%', r: '50%',
+    stops: [
+      { offset: 0, color: '#52c41a' },
+      { offset: 1, color: '#389e0d' },
+    ],
+  },
+  bpmnEnd: {
+    type: 'radial',
+    id: 'gradient-bpmn-end',
+    cx: '50%', cy: '50%', r: '50%',
+    stops: [
+      { offset: 0, color: '#f5222d' },
+      { offset: 1, color: '#cf1322' },
+    ],
+  },
+  bpmnTask: {
+    type: 'linear',
+    id: 'gradient-bpmn-task',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#e6f7ff' },
+      { offset: 1, color: '#91d5ff' },
+    ],
+  },
+  umlClass: {
+    type: 'linear',
+    id: 'gradient-uml-class',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#fff7e6' },
+      { offset: 1, color: '#ffd591' },
+    ],
+  },
+  umlInterface: {
+    type: 'linear',
+    id: 'gradient-uml-interface',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#e6fffb' },
+      { offset: 1, color: '#36cfc9' },
+    ],
+  },
+  sequenceActor: {
+    type: 'linear',
+    id: 'gradient-sequence-actor',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#f9f0ff' },
+      { offset: 1, color: '#b37feb' },
+    ],
+  },
+  sequenceDatabase: {
+    type: 'linear',
+    id: 'gradient-sequence-db',
+    x1: 0, y1: 0, x2: 0, y2: 1,
+    stops: [
+      { offset: 0, color: '#fff7e6' },
+      { offset: 1, color: '#ffc069' },
+    ],
+  },
+}
+
+function resolveShadow(
+  preset: keyof typeof SHADOW_PRESETS | undefined,
+  custom: { shadowBlur?: number; shadowColor?: string; shadowOffsetX?: number; shadowOffsetY?: number }
+): { name: string; args: any } | null {
+  if (preset && SHADOW_PRESETS[preset]) {
+    const p = SHADOW_PRESETS[preset]
+    return {
+      name: 'dropShadow',
+      args: {
+        dx: p.offsetX,
+        dy: p.offsetY,
+        blur: p.blur,
+        color: p.color,
+      },
+    }
+  }
+  
+  if (custom.shadowBlur !== undefined) {
+    return {
+      name: 'dropShadow',
+      args: {
+        dx: custom.shadowOffsetX || 2,
+        dy: custom.shadowOffsetY || 2,
+        blur: custom.shadowBlur,
+        color: custom.shadowColor || 'rgba(0,0,0,0.1)',
+      },
+    }
+  }
+  
+  return null
 }
 
 export const createBaseConfig = (config: ShapeRenderConfig, styleConfig: ShapeStyleConfig = {}) => {
-  const { rx, ry, strokeDasharray, opacity, shadowBlur, shadowColor, shadowOffsetX, shadowOffsetY } = styleConfig
+  const { rx, ry, strokeDasharray, opacity, shadowBlur, shadowColor, shadowOffsetX, shadowOffsetY, gradient, shadowPreset, highlight } = styleConfig
   
-  const bodyAttrs: Record<string, any> = {
-    fill: config.fill || '#ffffff',
-    stroke: config.stroke || '#333333',
-    strokeWidth: config.strokeWidth || 2,
+  const bodyAttrs: Record<string, any> = {}
+  
+  if (gradient) {
+    if (typeof gradient === 'string') {
+      bodyAttrs.fill = gradient
+    } else {
+      const gradientId = gradient.id || `gradient-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      bodyAttrs.fill = `url(#${gradientId})`
+    }
+  } else {
+    bodyAttrs.fill = config.fill || '#ffffff'
   }
   
-  // 添加圆角
+  bodyAttrs.stroke = config.stroke || '#333333'
+  bodyAttrs.strokeWidth = config.strokeWidth || 2
+  
   if (rx !== undefined) bodyAttrs.rx = rx
   if (ry !== undefined) bodyAttrs.ry = ry
   
-  // 添加虚线
   if (strokeDasharray) bodyAttrs.strokeDasharray = strokeDasharray
   
-  // 添加透明度
   if (opacity !== undefined) bodyAttrs.opacity = opacity
   
-  // 添加阴影
-  if (shadowBlur !== undefined) bodyAttrs.filter = {
-    name: 'dropShadow',
-    args: {
-      dx: shadowOffsetX || 2,
-      dy: shadowOffsetY || 2,
-      blur: shadowBlur,
-      color: shadowColor || 'rgba(0,0,0,0.1)',
+  const resolvedShadow = resolveShadow(shadowPreset, { shadowBlur, shadowColor, shadowOffsetX, shadowOffsetY })
+  if (resolvedShadow) {
+    bodyAttrs.filter = resolvedShadow
+  }
+  
+  let attrs: Record<string, any> = {
+    body: bodyAttrs,
+    label: {
+      text: config.text || '',
+      fontSize: 14,
+      fill: '#333333',
+      fontFamily: 'trebuchet ms, verdana, arial, sans-serif',
     },
+  }
+  
+  if (highlight) {
+    attrs = addHighlight(config, highlight, attrs)
   }
   
   return {
@@ -312,20 +493,60 @@ export const createBaseConfig = (config: ShapeRenderConfig, styleConfig: ShapeSt
     y: config.y,
     width: config.width,
     height: config.height,
-    attrs: {
-      body: bodyAttrs,
-      label: {
-        text: config.text || '',
-        fontSize: 14,
-        fill: '#333333',
-        fontFamily: 'trebuchet ms, verdana, arial, sans-serif',
-      },
-    },
+    attrs,
     ports: {
       groups: getPortGroups(),
       items: getPortItems(),
     },
     data: { fromStore: true, shapeType: config.shapeType },
+  }
+}
+
+function addHighlight(config: ShapeRenderConfig, highlight: HighlightConfig, attrs: Record<string, any>): Record<string, any> {
+  const { width, height } = config
+  const { type, color, opacity = 0.5, width: strokeWidth = 2 } = highlight
+  
+  const highlightPath = createHighlightPath(type, width, height)
+  
+  return {
+    ...attrs,
+    ...(attrs.body && {
+      body: {
+        ...attrs.body,
+        stroke: attrs.body.stroke || color,
+        strokeWidth: attrs.body.strokeWidth || strokeWidth,
+      },
+    }),
+    highlight: {
+      refD: highlightPath,
+      fill: color,
+      opacity,
+      stroke: color,
+      strokeWidth: 1,
+      strokeDasharray: 'none',
+    },
+  }
+}
+
+function createHighlightPath(type: HighlightConfig['type'], width: number, height: number): string {
+  const w = width
+  const h = height
+  
+  switch (type) {
+    case 'top':
+      return `M0,0 L${w},0 L${w},3 L0,3 Z`
+    case 'bottom':
+      return `M0,${h - 3} L${w},${h - 3} L${w},${h} L0,${h} Z`
+    case 'left':
+      return `M0,0 L3,0 L3,${h} L0,${h} Z`
+    case 'right':
+      return `M${w - 3},0 L${w},0 L${w},${h} L${w - 3},${h} Z`
+    case 'corners':
+      const size = Math.min(w, h) * 0.15
+      return `M0,0 L${size},0 L0,${size} Z M${w - size},0 L${w},0 L${w},${size} Z M0,${h - size} L0,${h} L${size},${h} Z M${w - size},${h} L${w},${h} L${w},${h - size} Z`
+    case 'full':
+    default:
+      return `M0,0 L${w},0 L${w},${h} L0,${h} Z`
   }
 }
 

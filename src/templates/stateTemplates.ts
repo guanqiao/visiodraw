@@ -52,7 +52,15 @@ export function createSelfLoopStateTemplate(options: TemplateGenerateOptions = {
 
   const edges = [
     createTemplateEdge('start', 'processing', undefined, 0),
-    createTemplateEdge('processing', 'processing', '继续', 1),
+    {
+      ...createTemplateEdge('processing', 'processing', '继续', 1),
+      // 自循环边配置
+      isSelfLoop: true,
+      selfLoopConfig: {
+        direction: 'top',
+        radius: 35,
+      },
+    },
     createTemplateEdge('processing', 'end', '完成', 2),
   ]
 

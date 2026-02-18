@@ -1,5 +1,5 @@
 import { Shape, Node } from '@antv/x6'
-import { ShapeRenderConfig, createBaseConfig, ShapeStyleConfig } from './types'
+import { ShapeRenderConfig, createBaseConfig, ShapeStyleConfig, GRADIENT_PRESETS } from './types'
 import {
   createUmlActorPath,
   createUmlClassPath,
@@ -443,15 +443,96 @@ export const renderUmlFinalState = (config: ShapeRenderConfig): Node => {
   })
 }
 
+export const renderUmlClassGradient = (config: ShapeRenderConfig): Node => {
+  const gradientKey = config.gradient as string || 'umlClass'
+  const gradient = GRADIENT_PRESETS[gradientKey] || GRADIENT_PRESETS.umlClass
+  const styleConfig: ShapeStyleConfig = { ...MERMAID_SHADOW, gradient }
+  const base = createBaseConfig(config, styleConfig)
+  
+  const lines = config.text?.split('\n') || []
+  const className = lines[0] || ''
+  const attributes = lines.slice(1).filter(line => 
+    line.startsWith('-') || line.startsWith('+') || line.startsWith('#') || line.startsWith('~') ||
+    line.includes(':') && !line.includes('()')
+  )
+  const methods = lines.slice(1).filter(line => 
+    line.includes('()')
+  )
+  
+  const lineHeight = 20
+  const headerHeight = Math.max(35, lineHeight + 15)
+  const attrHeight = Math.max(30, attributes.length * lineHeight + 15)
+  const methodHeight = Math.max(30, methods.length * lineHeight + 15)
+  const minHeight = headerHeight + attrHeight + methodHeight
+  const adaptiveHeight = Math.max(config.height, minHeight)
+  
+  const path = createUmlClassPath(config.width, adaptiveHeight, headerHeight, attrHeight)
+  
+  return new Shape.Path({
+    ...base,
+    height: adaptiveHeight,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        refD: path,
+        fillRule: 'evenodd',
+      },
+    },
+  })
+}
+
+export const renderUmlPackageGradient = (config: ShapeRenderConfig): Node => {
+  const gradientKey = config.gradient as string || 'blue'
+  const gradient = GRADIENT_PRESETS[gradientKey] || GRADIENT_PRESETS.blue
+  const styleConfig: ShapeStyleConfig = { ...MERMAID_SHADOW, gradient }
+  const base = createBaseConfig(config, styleConfig)
+  const path = createUmlPackagePath(config.width, config.height)
+  
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        refD: path,
+        fillRule: 'evenodd',
+      },
+    },
+  })
+}
+
+export const renderUmlNoteGradient = (config: ShapeRenderConfig): Node => {
+  const gradientKey = config.gradient as string || 'orange'
+  const gradient = GRADIENT_PRESETS[gradientKey] || GRADIENT_PRESETS.orange
+  const styleConfig: ShapeStyleConfig = { ...MERMAID_SHADOW, gradient }
+  const base = createBaseConfig(config, styleConfig)
+  const path = createUmlNotePath(config.width, config.height)
+  
+  return new Shape.Path({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        refD: path,
+      },
+    },
+  })
+}
+
 export const umlRenderers = {
   'uml-class': renderUmlClass,
+  'uml-class-gradient': renderUmlClassGradient,
   'uml-interface': renderUmlInterface,
   'uml-actor': renderUmlActor,
   'uml-usecase': renderUmlUseCase,
   'uml-package': renderUmlPackage,
+  'uml-package-gradient': renderUmlPackageGradient,
   'uml-component': renderUmlComponent,
   'uml-node': renderUmlNode,
   'uml-note': renderUmlNote,
+  'uml-note-gradient': renderUmlNoteGradient,
   'uml-lifeline': renderUmlLifeline,
   'uml-activation': renderUmlActivation,
   'uml-fragment': renderUmlFragment,

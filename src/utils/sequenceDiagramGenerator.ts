@@ -20,6 +20,7 @@ import type {
 import type { ShapeData } from '../stores/x6GraphStore'
 import type { Connector, ConnectorEndStyle } from '../types/connection'
 import { v4 as uuidv4 } from 'uuid'
+import { SelfLoopRouter, selfLoopManager } from './selfLoopRouter'
 
 export interface GeneratedDiagram {
   nodes: ShapeData[]
@@ -314,85 +315,58 @@ export class SequenceDiagramGenerator {
     nodes: ShapeData[],
     edges: Connector[]
   ): void {
-    const sourceId = `self-src-${message.id}`
-    const cornerId = `self-corner-${message.id}`
-    const targetId = `self-tgt-${message.id}`
+    // 使用新的自连线路由算法
+    const router = new SelfLoopRouter({
+      radius: 25,
+      direction: 'right',
+      useBezier: true,
+      bezierControlOffset: 40,
+      startPosition: 0.5,
+      endPosition: 0.5,
+    })
 
-    // 自调用消息的锚点（在生命线上）
-    const sourceNode: ShapeData = {
-      id: sourceId,
-      type: 'uml-anchor',
-      x: centerX,
-      y: y,
-      width: 1,
-      height: 1,
-      text: '',
-      fill: 'transparent',
-      stroke: 'transparent',
-      strokeWidth: 0,
-      zIndex: 0,
-    }
+    // 计算自连线路径
+    const path = router.calculatePath(centerX, y, 10, 10, 0)
 
-    // 拐角点（向右偏移）
-    const cornerNode: ShapeData = {
-      id: cornerId,
-      type: 'uml-anchor',
-      x: centerX + 30,
-      y: y,
-      width: 1,
-      height: 1,
-      text: '',
-      fill: 'transparent',
-      stroke: 'transparent',
-      strokeWidth: 0,
-      zIndex: 0,
-    }
+    // 创建路径点作为锚点节点
+    const anchorIds: string[] = []
+    path.points.forEach((point, index) => {
+      const anchorId = `self-anchor-${message.id}-${index}`
+      anchorIds.push(anchorId)
 
-    // 目标点（向下偏移）
-    const targetNode: ShapeData = {
-      id: targetId,
-      type: 'uml-anchor',
-      x: centerX + 30,
-      y: y + 25,
-      width: 1,
-      height: 1,
-      text: '',
-      fill: 'transparent',
-      stroke: 'transparent',
-      strokeWidth: 0,
-      zIndex: 0,
-    }
+      const anchorNode: ShapeData = {
+        id: anchorId,
+        type: 'uml-anchor',
+        x: point.x,
+        y: point.y,
+        width: 1,
+        height: 1,
+        text: '',
+        fill: 'transparent',
+        stroke: 'transparent',
+        strokeWidth: 0,
+        zIndex: 0,
+      }
+      nodes.push(anchorNode)
+    })
 
-    nodes.push(sourceNode, cornerNode, targetNode)
+    // 创建贝塞尔曲线路径点
+    const pathPoints = path.points.map(p => ({ x: p.x, y: p.y }))
 
-    // 第一段：水平向右
-    const edge1: Connector = {
-      id: `msg-${message.id}-1`,
-      sourceShapeId: sourceId,
-      sourcePointId: 'default',
-      targetShapeId: cornerId,
-      targetPointId: 'default',
-      stroke: '#333333',
-      strokeWidth: 1.5,
-      lineStyle: 'solid',
-      startStyle: 'none',
-      endStyle: 'none',
-      style: 'straight',
-    }
-
-    // 第二段：垂直向下带箭头
-    const edge2: Connector = {
+    // 创建自调用消息边（使用贝塞尔曲线）
+    const edge: Connector = {
       id: `msg-${message.id}`,
-      sourceShapeId: cornerId,
+      sourceShapeId: anchorIds[0],
       sourcePointId: 'default',
-      targetShapeId: targetId,
+      targetShapeId: anchorIds[anchorIds.length - 1],
       targetPointId: 'default',
-      stroke: '#333333',
+      stroke: this.getMessageColor(message.type),
       strokeWidth: 1.5,
-      lineStyle: 'solid',
+      lineStyle: message.type === 'return' ? 'dashed' : 'solid',
       startStyle: 'none',
-      endStyle: 'arrow',
-      style: 'straight',
+      endStyle: this.getMessageArrow(message.type),
+      style: 'bezier',
+      pathPoints: pathPoints,
       labels: message.text ? [{
         id: `label-${uuidv4()}`,
         text: message.text,
@@ -402,7 +376,7 @@ export class SequenceDiagramGenerator {
       }] : undefined,
     }
 
-    edges.push(edge1, edge2)
+    edges.push(edge)
   }
 
   private generateFragments(fragments: SequenceFragment[], nodes: ShapeData[]): void {

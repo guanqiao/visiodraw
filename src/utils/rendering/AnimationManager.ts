@@ -246,6 +246,124 @@ export class AnimationManager {
   }
 
   /**
+   * 脉冲动画 - 节点呼吸效果
+   */
+  async animatePulse(node: Node, config: AnimationConfig = {}): Promise<void> {
+    const duration = config.duration || 1500
+    const easing = config.easing || 'easeInOut'
+    
+    const originalOpacity = node.attr('body/opacity') ?? 1
+    const originalStroke = node.attr('body/stroke') as string
+    const originalStrokeWidth = node.attr('body/strokeWidth') as number
+    
+    node.attr('body/stroke', '#1890ff')
+    node.attr('body/strokeWidth', (originalStrokeWidth || 2) + 1)
+    
+    await this.animateNodeAttrs(node, {
+      'body/opacity': 0.6,
+      'body/stroke': '#40a9ff',
+    }, { duration: duration / 2, easing: 'easeIn' })
+    
+    await this.animateNodeAttrs(node, {
+      'body/opacity': originalOpacity,
+      'body/stroke': originalStroke || '#1890ff',
+    }, { duration: duration / 2, easing: 'easeOut' })
+    
+    node.attr('body/strokeWidth', originalStrokeWidth || 2)
+  }
+
+  /**
+   * 波纹动画 - 从中心向外扩散
+   */
+  async animateRipple(node: Node, config: AnimationConfig = {}): Promise<void> {
+    const duration = config.duration || 1000
+    
+    const bbox = node.getBBox()
+    const cx = bbox.width / 2
+    const cy = bbox.height / 2
+    
+    node.attr('body/opacity', 0.3)
+    
+    const ripple = new (window as any).SVG('circle')
+      .attr({
+        cx,
+        cy,
+        r: 0,
+        fill: 'none',
+        stroke: '#1890ff',
+        strokeWidth: 2,
+        opacity: 1,
+      })
+    
+    const parent = node.getMountedElement()
+    if (parent) {
+      const svg = parent.ownerSVGElement
+      if (svg) {
+        ripple.appendTo(svg)
+        
+        ripple.animate(duration, 0, 'now')
+          .attr({ r: Math.max(bbox.width, bbox.height), opacity: 0 })
+          .after(() => ripple.remove())
+      }
+    }
+    
+    await this.sleep(duration)
+    node.attr('body/opacity', 1)
+  }
+
+  /**
+   * 闪烁动画
+   */
+  async animateBlink(node: Node, times: number = 3, config: AnimationConfig = {}): Promise<void> {
+    const duration = config.duration || 300
+    
+    for (let i = 0; i < times; i++) {
+      await this.animateNodeAttrs(node, {
+        'body/opacity': 0.3,
+      }, { duration: duration / 2 })
+      
+      await this.animateNodeAttrs(node, {
+        'body/opacity': 1,
+      }, { duration: duration / 2 })
+    }
+  }
+
+  /**
+   * 弹跳动画
+   */
+  async animateBounce(node: Node, config: AnimationConfig = {}): Promise<void> {
+    const duration = config.duration || 600
+    const easing = config.easing || 'easeOutBounce'
+    
+    const position = node.getPosition()
+    const originalY = position.y
+    
+    await this.animateNodePosition(node, position.x, originalY - 20, { duration: duration / 2, easing: 'easeIn' })
+    await this.animateNodePosition(node, position.x, originalY, { duration: duration / 2, easing })
+  }
+
+  /**
+   * 摇晃动画
+   */
+  async animateShake(node: Node, config: AnimationConfig = {}): Promise<void> {
+    const duration = config.duration || 500
+    
+    const position = node.getPosition()
+    const originalX = position.x
+    
+    const shakeDistance = 5
+    const steps = 4
+    const stepDuration = duration / steps
+    
+    for (let i = 0; i < steps; i++) {
+      const offset = (i % 2 === 0 ? 1 : -1) * shakeDistance * (1 - i / steps)
+      await this.animateNodePosition(node, originalX + offset, position.y, { duration: stepDuration })
+    }
+    
+    await this.animateNodePosition(node, originalX, position.y, { duration: stepDuration })
+  }
+
+  /**
    * 悬停动画
    */
   animateHover(node: Node, isHovering: boolean, config: AnimationConfig = {}): Promise<void> {

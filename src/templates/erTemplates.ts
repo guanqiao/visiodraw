@@ -97,7 +97,15 @@ export function createSelfReferenceErTemplate(options: TemplateGenerateOptions =
   ]
 
   const edges = [
-    createTemplateEdge('employee', 'employee', 'manages', 0),
+    {
+      ...createTemplateEdge('employee', 'employee', 'manages', 0),
+      // 自引用边配置
+      isSelfLoop: true,
+      selfLoopConfig: {
+        direction: 'top',
+        radius: 40,
+      },
+    },
   ]
 
   return {

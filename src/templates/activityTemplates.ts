@@ -92,7 +92,12 @@ export function createLoopFlowTemplate(options: TemplateGenerateOptions = {}): D
     createTemplateEdge('condition', 'process', '是', 2),
     createTemplateEdge('condition', 'end', '否', 3),
     createTemplateEdge('process', 'increment', undefined, 4),
-    createTemplateEdge('increment', 'condition', undefined, 5),
+    {
+      ...createTemplateEdge('increment', 'condition', undefined, 5),
+      // 循环回边配置 - 使用自循环样式
+      isSelfLoop: false, // 这不是真正的自循环，是节点间的循环
+      style: 'curved',
+    },
   ]
 
   return {
