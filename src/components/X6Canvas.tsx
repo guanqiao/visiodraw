@@ -12,13 +12,15 @@ import useClipboardStore from '@stores/clipboardStore'
 import useFormatPainterStore from '@stores/formatPainterStore'
 import { THEME_CHANGE_EVENT } from '@hooks/useTheme'
 import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
+import { useSelfLoopDrawing } from '@hooks/useSelfLoopDrawing'
 import { v4 as uuidv4 } from 'uuid'
 import { parseDragData } from '../types/dragDrop'
 import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVisibility, isNearNodeEdge, getEdgePointFromMouse, addCustomPort, createCustomConnectionPoint, removeCustomPort, updateCustomPortPosition } from '@utils/connectionPoints'
 import { ConnectorRenderer } from '@utils/connectorRenderer'
 import { renderShape } from '@utils/shapeRenderers'
 import ERRelationQuickSelector, { isErTableNode, getErNodeName } from '@components/ERRelationQuickSelector'
-import type { ERRelationType } from '../types/connection'
+import { EdgeContextMenu } from '@components/ContextMenu'
+import type { ERRelationType, LineStyle, ConnectorStyle } from '../types/connection'
 import { erRelations } from '../types/connection'
 import { devLog } from '../utils/logger'
 
@@ -98,6 +100,25 @@ const X6Canvas: React.FC = () => {
   const [hoveredEdgePoint, setHoveredEdgePoint] = useState<{ x: number; y: number } | null>(null)
   const indicatorRef = useRef<HTMLDivElement>(null)
 
+  // Edge context menu state
+  const [edgeContextMenu, setEdgeContextMenu] = useState<{
+    visible: boolean
+    edge: Edge | null
+    position: { x: number; y: number }
+  }>({
+    visible: false,
+    edge: null,
+    position: { x: 0, y: 0 },
+  })
+
+  // Self-loop drawing hook
+  const { handleEdgeConnected } = useSelfLoopDrawing({
+    graph: graphRef.current,
+    onSelfLoopCreate: (edge) => {
+      devLog('Self-loop created:', edge.id)
+    },
+  })
+
   // Initialize X6 Graph
   useEffect(() => {
     if (!containerRef.current) return
@@ -137,7 +158,7 @@ const X6Canvas: React.FC = () => {
       connecting: {
         allowBlank: false,
         allowMulti: true,
-        allowLoop: false,
+        allowLoop: true,
         allowNode: true,
         allowEdge: false,
         highlight: true,
@@ -167,8 +188,8 @@ const X6Canvas: React.FC = () => {
           })
         },
         validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell }) {
-          // 确保从连接点(magnet)开始，且不是同一个节点
-          return !!sourceMagnet && !!targetMagnet && sourceCell !== targetCell
+          // 确保从连接点(magnet)开始，允许自连线
+          return !!sourceMagnet && !!targetMagnet
         },
       },
     })
