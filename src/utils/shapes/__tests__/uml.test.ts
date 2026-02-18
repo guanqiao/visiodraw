@@ -15,6 +15,9 @@ import {
   renderUmlSwimlaneHorizontal,
   renderUmlSwimlaneVertical,
   renderUmlSwimlaneSeparator,
+  renderUmlParticipant,
+  renderUmlActorSequence,
+  renderUmlDatabaseParticipant,
 } from '../uml'
 import type { ShapeRenderConfig } from '../types'
 
@@ -211,6 +214,59 @@ describe('UML shape renderers', () => {
       const strokeDasharray = node.attr('body/strokeDasharray')
 
       expect(strokeDasharray).toBe('4,2')
+    })
+  })
+
+  // ==================== 序列图专用渲染器测试 ====================
+
+  describe('renderUmlParticipant', () => {
+    it('should create a sequence diagram participant shape', () => {
+      const node = renderUmlParticipant(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('rect')
+    })
+
+    it('should have correct styling', () => {
+      const node = renderUmlParticipant(defaultConfig)
+
+      expect(node.attr('body/rx')).toBe(6)
+      expect(node.attr('body/ry')).toBe(6)
+      expect(node.attr('label/fontWeight')).toBe(600)
+    })
+  })
+
+  describe('renderUmlActorSequence', () => {
+    it('should create a sequence diagram actor shape', () => {
+      const node = renderUmlActorSequence(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should have actor label at bottom', () => {
+      const node = renderUmlActorSequence({ ...defaultConfig, text: 'User' })
+
+      expect(node.attr('label/text')).toBe('User')
+      expect(node.attr('label/refY')).toBe(defaultConfig.height * 0.85)
+    })
+  })
+
+  describe('renderUmlDatabaseParticipant', () => {
+    it('should create a sequence diagram database shape', () => {
+      const node = renderUmlDatabaseParticipant(defaultConfig)
+
+      expect(node.id).toBe('test-uml')
+      expect(node.shape).toBe('path')
+    })
+
+    it('should have database path with cylinder shape', () => {
+      const node = renderUmlDatabaseParticipant(defaultConfig)
+      const pathData = node.attr('body/refD')
+
+      expect(pathData).toBeDefined()
+      expect(pathData).toContain('Q')
+      expect(pathData).toContain('M')
     })
   })
 })

@@ -54,64 +54,64 @@ interface ParticipantLayout {
 
 export class SequenceDiagramGenerator {
   private config: LayoutConfig = {
-    startX: 80,
-    startY: 30,
+    startX: 60,
+    startY: 25,
     participantWidth: 120,
     participantHeight: 55,
-    participantSpacing: 180,
-    lifelineExtension: 60,
-    messageSpacing: 50,
-    activationWidth: 12,
+    participantSpacing: 160,
+    lifelineExtension: 50,
+    messageSpacing: 45,
+    activationWidth: 14,
     noteWidth: 110,
     noteHeight: 45,
   }
 
-  // 样式配置
+  // 样式配置 - 专业 UML 配色
   private styles = {
     participant: {
-      fill: '#ffffff',
-      stroke: '#1890ff',
+      fill: '#f0f5ff',
+      stroke: '#2f54eb',
       strokeWidth: 2,
       fontSize: 13,
-      fontWeight: 500,
+      fontWeight: 600,
     },
     actor: {
-      fill: '#ffffff',
-      stroke: '#722ed1',
-      strokeWidth: 2,
-      fontSize: 13,
-      fontWeight: 500,
+      fill: '#fff7e6',
+      stroke: '#fa8c16',
+      strokeWidth: 2.5,
+      fontSize: 12,
+      fontWeight: 600,
     },
     database: {
-      fill: '#ffffff',
+      fill: '#f6ffed',
       stroke: '#52c41a',
       strokeWidth: 2,
-      fontSize: 13,
-      fontWeight: 500,
+      fontSize: 12,
+      fontWeight: 600,
     },
     lifeline: {
-      stroke: '#d9d9d9',
-      strokeWidth: 1,
-      dashArray: '5,5',
+      stroke: '#8c8c8c',
+      strokeWidth: 1.5,
+      dashArray: '4,4',
     },
     activation: {
-      fill: '#e6f7ff',
-      fillGradient: ['#e6f7ff', '#bae7ff'],
-      stroke: '#1890ff',
-      strokeWidth: 1,
-      cornerRadius: 2,
+      fill: '#1890ff',
+      fillGradient: ['#40a9ff', '#1890ff'],
+      stroke: '#096dd9',
+      strokeWidth: 1.5,
+      cornerRadius: 3,
     },
     fragment: {
-      fillOpacity: 0.15,
+      fillOpacity: 0.6,
       strokeWidth: 1.5,
       cornerRadius: 4,
-      headerHeight: 24,
+      headerHeight: 28,
     },
     note: {
       fill: '#fffbe6',
       stroke: '#ffd666',
-      strokeWidth: 1,
-      cornerRadius: 3,
+      strokeWidth: 1.5,
+      cornerRadius: 4,
     },
     message: {
       fontSize: 12,
@@ -281,12 +281,11 @@ export class SequenceDiagramGenerator {
         id: `activation-${activation.id}`,
         type: 'uml-activation',
         x: layout.centerX - this.config.activationWidth / 2,
-        y: startY - 8,
+        y: startY - 6,
         width: this.config.activationWidth,
-        height: Math.max(endY - startY + 16, 24),
+        height: Math.max(endY - startY + 12, 28),
         text: '',
         fill: this.styles.activation.fill,
-        fillGradient: this.styles.activation.fillGradient,
         stroke: this.styles.activation.stroke,
         strokeWidth: this.styles.activation.strokeWidth,
         cornerRadius: this.styles.activation.cornerRadius,
@@ -478,10 +477,10 @@ export class SequenceDiagramGenerator {
       const fragmentNode: ShapeData = {
         id: `fragment-${fragment.id}`,
         type: 'uml-fragment',
-        x: leftX - 10,
-        y: startY - 25,
-        width: rightX - leftX + 20,
-        height: Math.max((endY || startY) - startY + 50, 70),
+        x: leftX - 15,
+        y: startY - 30,
+        width: rightX - leftX + 30,
+        height: Math.max((endY || startY) - startY + 60, 80),
         text: fragmentLabel,
         fill: fillColor,
         fillOpacity: this.styles.fragment.fillOpacity,
@@ -527,10 +526,10 @@ export class SequenceDiagramGenerator {
 
       switch (note.position) {
         case 'left':
-          x = layout.x - this.config.noteWidth - 20
+          x = layout.x - this.config.noteWidth - 15
           break
         case 'right':
-          x = layout.x + layout.width + 20
+          x = layout.x + layout.width + 15
           break
         case 'over':
         case 'across':
@@ -542,7 +541,7 @@ export class SequenceDiagramGenerator {
           } else {
             x = layout.centerX - this.config.noteWidth / 2
           }
-          y = messageY - 35
+          y = messageY - 30
           break
       }
 

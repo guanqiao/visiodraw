@@ -393,7 +393,9 @@ describe('connectionPoints', () => {
     it('should have custom port group', () => {
       const groups = getX6PortGroups()
       expect(groups).toHaveProperty('custom')
-      expect(groups.custom.attrs.circle.stroke).toBe('#52c41a')
+      expect(groups.custom.attrs.circle.stroke).toBe('#1890ff')
+      expect(groups.custom.attrs.circle.r).toBe(5)
+      expect(groups.custom.attrs.circle.magnet).toBe(true)
     })
   })
 

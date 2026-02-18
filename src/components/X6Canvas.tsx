@@ -1528,22 +1528,22 @@ const X6Canvas: React.FC = () => {
         onCancel={handleERRelationCancel}
       />
 
-      {/* Custom connection point indicator */}
-      {ctrlPressed && hoveredEdgePoint && (
+      {/* Custom connection point indicator - shown in connection point tool mode */}
+      {(ctrlPressed || currentTool === 'connection-point') && hoveredEdgePoint && (
         <div
           ref={indicatorRef}
           style={{
             position: 'fixed',
-            left: hoveredEdgePoint.x - 8,
-            top: hoveredEdgePoint.y - 8,
-            width: 16,
-            height: 16,
+            left: hoveredEdgePoint.x - 6,
+            top: hoveredEdgePoint.y - 6,
+            width: 12,
+            height: 12,
             borderRadius: '50%',
-            border: '2px solid #52c41a',
-            backgroundColor: 'rgba(82, 196, 26, 0.3)',
+            border: '2px solid #1890ff',
+            backgroundColor: 'rgba(24, 144, 255, 0.2)',
             pointerEvents: 'none',
             zIndex: 9999,
-            boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)',
+            boxShadow: '0 0 6px rgba(24, 144, 255, 0.4)',
             transition: 'transform 0.1s ease-out',
           }}
         />

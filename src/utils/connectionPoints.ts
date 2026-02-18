@@ -346,12 +346,13 @@ export function getX6PortGroups() {
       },
       attrs: {
         circle: {
-          r: 6,
+          r: 5,
           magnet: true,
-          stroke: '#52c41a',
-          strokeWidth: 2,
-          fill: '#fff',
-          opacity: 0.9,
+          stroke: '#1890ff',
+          strokeWidth: 1.5,
+          fill: '#ffffff',
+          opacity: 1,
+          cursor: 'crosshair',
         },
       },
     },
