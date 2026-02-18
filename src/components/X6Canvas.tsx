@@ -648,8 +648,22 @@ const X6Canvas: React.FC = () => {
       })
     })
 
+    // Edge context menu
+    graph.on('edge:contextmenu', ({ edge, e }: { edge: Edge; e: any }) => {
+      e.preventDefault()
+      e.stopPropagation()
+      
+      setEdgeContextMenu({
+        visible: true,
+        edge,
+        position: { x: e.clientX, y: e.clientY },
+      })
+    })
+
+    // Hide context menu on blank click
     graph.on('blank:click', () => {
       clearSelection()
+      setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
     })
 
     graph.on('scale', ({ sx }: { sx: number }) => {
@@ -1249,6 +1263,149 @@ const X6Canvas: React.FC = () => {
     setPendingEdgeInfo(null)
   }, [pendingEdgeInfo])
 
+  // Edge context menu handlers
+  const handleEdgeDelete = useCallback((edgeId: string) => {
+    if (graphRef.current) {
+      const edge = graphRef.current.getCellById(edgeId) as Edge
+      if (edge) {
+        graphRef.current.removeCell(edge)
+        deleteEdge(edgeId)
+      }
+    }
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [deleteEdge])
+
+  const handleEdgeEditLabel = useCallback((edgeId: string) => {
+    // Trigger double click to edit label
+    if (graphRef.current) {
+      const edge = graphRef.current.getCellById(edgeId) as Edge
+      if (edge) {
+        // Simulate double click event
+        const event = new MouseEvent('dblclick', {
+          bubbles: true,
+          cancelable: true,
+          clientX: edgeContextMenu.position.x,
+          clientY: edgeContextMenu.position.y,
+        })
+        const container = containerRef.current
+        if (container) {
+          container.dispatchEvent(event)
+        }
+      }
+    }
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [edgeContextMenu.position])
+
+  const handleEdgeChangeLineStyle = useCallback((edgeId: string, lineStyle: LineStyle) => {
+    if (graphRef.current) {
+      const edge = graphRef.current.getCellById(edgeId) as Edge
+      if (edge) {
+        const connector = ConnectorRenderer.fromX6Edge(edge)
+        connector.lineStyle = lineStyle
+        
+        // Update edge appearance
+        if (lineStyle === 'dashed') {
+          edge.attr('line/strokeDasharray', '5,5')
+        } else if (lineStyle === 'dotted') {
+          edge.attr('line/strokeDasharray', '2,2')
+        } else {
+          edge.attr('line/strokeDasharray', null)
+        }
+        
+        updateEdge(edgeId, { lineStyle })
+      }
+    }
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [updateEdge])
+
+  const handleEdgeChangeRouter = useCallback((edgeId: string, style: ConnectorStyle) => {
+    if (graphRef.current) {
+      const edge = graphRef.current.getCellById(edgeId) as Edge
+      if (edge) {
+        // Update router
+        let routerName = 'manhattan'
+        switch (style) {
+          case 'straight':
+            routerName = 'normal'
+            break
+          case 'orthogonal':
+          case 'manhattan':
+            routerName = 'manhattan'
+            break
+          case 'curved':
+          case 'bezier':
+            routerName = 'normal'
+            break
+          case 'metro':
+            routerName = 'metro'
+            break
+        }
+        
+        edge.setRouter({ name: routerName })
+        updateEdge(edgeId, { style })
+      }
+    }
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [updateEdge])
+
+  const handleEdgeReverseDirection = useCallback((edgeId: string) => {
+    if (graphRef.current) {
+      const edge = graphRef.current.getCellById(edgeId) as Edge
+      if (edge) {
+        const source = edge.getSource()
+        const target = edge.getTarget()
+        
+        // Swap source and target
+        edge.setSource(target)
+        edge.setTarget(source)
+        
+        // Update store
+        const connector = ConnectorRenderer.fromX6Edge(edge)
+        updateEdge(edgeId, {
+          sourceShapeId: connector.targetShapeId,
+          targetShapeId: connector.sourceShapeId,
+        })
+      }
+    }
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [updateEdge])
+
+  const handleEdgeCopyStyle = useCallback((edgeId: string) => {
+    if (graphRef.current) {
+      const edge = graphRef.current.getCellById(edgeId) as Edge
+      if (edge) {
+        const connector = ConnectorRenderer.fromX6Edge(edge)
+        copyEdgeStyle(connector)
+        message.success('边样式已复制')
+      }
+    }
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [copyEdgeStyle])
+
+  const handleEdgeBringToFront = useCallback((edgeId: string) => {
+    if (graphRef.current) {
+      const edge = graphRef.current.getCellById(edgeId) as Edge
+      if (edge) {
+        edge.toFront()
+      }
+    }
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [])
+
+  const handleEdgeSendToBack = useCallback((edgeId: string) => {
+    if (graphRef.current) {
+      const edge = graphRef.current.getCellById(edgeId) as Edge
+      if (edge) {
+        edge.toBack()
+      }
+    }
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [])
+
+  const handleCloseEdgeContextMenu = useCallback(() => {
+    setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [])
+
   return (
     <>
       <div
@@ -1295,6 +1452,24 @@ const X6Canvas: React.FC = () => {
             boxShadow: '0 0 8px rgba(82, 196, 26, 0.5)',
             transition: 'transform 0.1s ease-out',
           }}
+        />
+      )}
+
+      {/* Edge Context Menu */}
+      {edgeContextMenu.visible && edgeContextMenu.edge && (
+        <EdgeContextMenu
+          edge={ConnectorRenderer.fromX6Edge(edgeContextMenu.edge)}
+          visible={edgeContextMenu.visible}
+          position={edgeContextMenu.position}
+          onClose={handleCloseEdgeContextMenu}
+          onDelete={handleEdgeDelete}
+          onEditLabel={handleEdgeEditLabel}
+          onChangeLineStyle={handleEdgeChangeLineStyle}
+          onChangeRouter={handleEdgeChangeRouter}
+          onReverseDirection={handleEdgeReverseDirection}
+          onCopyStyle={handleEdgeCopyStyle}
+          onBringToFront={handleEdgeBringToFront}
+          onSendToBack={handleEdgeSendToBack}
         />
       )}
     </>
