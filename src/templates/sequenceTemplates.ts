@@ -41,36 +41,85 @@ import {
   createDestroyMarker as createDestroyMarkerUtil,
   createCreateMarker as createCreateMarkerUtil,
   createMessageEdge as createMessageEdgeUtil,
+  generateMessageLabel,
   getMessageArrow,
   getMessageLineStyle,
 } from '../utils/sequenceDiagramUtils'
 
 // ==================== 类型定义 ====================
+
+/**
+ * 消息创建结果
+ */
 interface MessageResult {
+  /** 锚点节点（用于消息边连接） */
   anchors: TemplateNode[]
+  /** 消息连接点标记 */
   markers: TemplateNode[]
+  /** 消息边 */
   edge: TemplateEdge
 }
 
+/**
+ * 参与者配置
+ */
 interface ParticipantConfig {
+  /** 唯一标识 */
   id: string
+  /** 显示名称 */
   name: string
+  /** 参与者类型 */
   type?: 'participant' | 'actor' | 'database'
 }
 
+/**
+ * 消息配置
+ */
 interface MessageConfig {
+  /** 源参与者ID */
   from: string
+  /** 目标参与者ID */
   to: string
+  /** 消息标签 */
   label: string
+  /** 消息类型 */
   type?: MessageType
 }
 
+/**
+ * 片段（组合片段）配置
+ */
 interface FragmentConfig {
+  /** 片段类型（alt/opt/loop/par等） */
   type: FragmentType
+  /** 起始消息索引 */
   startMessageIndex: number
+  /** 结束消息索引 */
   endMessageIndex: number
+  /** 条件表达式 */
   condition?: string
+  /** 涉及的参与者ID列表 */
   participantIds?: string[]
+}
+
+/**
+ * 参与者布局信息
+ */
+interface ParticipantLayout {
+  /** 索引位置 */
+  index: number
+  /** X坐标 */
+  x: number
+  /** Y坐标 */
+  y: number
+  /** 宽度 */
+  width: number
+  /** 高度 */
+  height: number
+  /** 中心X坐标 */
+  centerX: number
+  /** 底部Y坐标 */
+  bottomY: number
 }
 
 // ==================== 布局适配器 ====================
@@ -86,15 +135,7 @@ function adaptLayout(layout: {
   height: number
   centerX: number
   bottomY: number
-}): {
-  index: number
-  x: number
-  y: number
-  width: number
-  height: number
-  centerX: number
-  bottomY: number
-} {
+}): ParticipantLayout {
   return {
     index: 0, // 将在外部设置
     x: layout.x,
@@ -111,17 +152,17 @@ function adaptLayout(layout: {
  */
 function calculateParticipantLayout(
   participants: ParticipantConfig[],
-): Map<string, { index: number; x: number; y: number; width: number; height: number; centerX: number; bottomY: number }> {
+): Map<string, ParticipantLayout> {
   const participantIds = participants.map(p => p.id)
   const layouts = calculateParticipantLayouts(participantIds, DEFAULT_LAYOUT_CONFIG)
-  
-  const result = new Map<string, { index: number; x: number; y: number; width: number; height: number; centerX: number; bottomY: number }>()
-  
+
+  const result = new Map<string, ParticipantLayout>()
+
   participants.forEach((participant, index) => {
     const sharedLayout = layouts.get(participant.id)!
     const adapted = adaptLayout(sharedLayout)
     adapted.index = index
-    
+
     // 根据参与者类型调整尺寸
     if (participant.type === 'actor') {
       adapted.width = 60
@@ -134,10 +175,10 @@ function calculateParticipantLayout(
       adapted.centerX = adapted.x + adapted.width / 2
       adapted.bottomY = adapted.y + adapted.height
     }
-    
+
     result.set(participant.id, adapted)
   })
-  
+
   return result
 }
 
@@ -161,6 +202,32 @@ function calculateMessageYPositions(
   }
   
   return positions
+}
+
+// ==================== 通用适配函数 ====================
+
+/**
+ * 将共享库的节点转换为 TemplateNode
+ * 自动提取所有非 undefined 属性
+ */
+function adaptNodeToTemplate<T extends Record<string, any>>(node: T): TemplateNode {
+  const result: Record<string, any> = {}
+  
+  // 提取所有非 undefined 的属性
+  for (const [key, value] of Object.entries(node)) {
+    if (value !== undefined) {
+      result[key] = value
+    }
+  }
+  
+  return result as TemplateNode
+}
+
+/**
+ * 批量转换节点数组
+ */
+function adaptNodesToTemplate<T extends Record<string, any>>(nodes: T[]): TemplateNode[] {
+  return nodes.map(adaptNodeToTemplate)
 }
 
 // ==================== 节点创建函数 ====================
@@ -194,23 +261,14 @@ function createParticipantNode(
     participant.type || 'participant'
   )
   
-  // 转换为TemplateNode格式
-  return {
-    id: node.id,
-    type: node.type,
+  // 使用通用适配函数转换
+  return adaptNodeToTemplate({
+    ...node,
     x: layout.x + (layout.width - adjustedLayout.width) / 2,
     y: layout.y,
     width: adjustedLayout.width,
     height: adjustedLayout.height,
-    text: node.text,
-    fill: node.fill,
-    stroke: node.stroke,
-    strokeWidth: node.strokeWidth,
-    rx: node.rx,
-    ry: node.ry,
-    fontSize: node.fontSize,
-    fontWeight: node.fontWeight,
-  }
+  })
 }
 
 /**
@@ -221,55 +279,17 @@ function createLifelineNodes(
   layout: any,
   totalHeight: number
 ): TemplateNode[] {
-  const nodes: TemplateNode[] = []
-  
   // 生命线主体
   const lifeline = createLifelineNodeUtil(participantId, layout, totalHeight)
-  nodes.push({
-    id: lifeline.id,
-    type: lifeline.type,
-    x: lifeline.x,
-    y: lifeline.y,
-    width: lifeline.width,
-    height: lifeline.height,
-    text: lifeline.text,
-    fill: lifeline.fill,
-    stroke: lifeline.stroke,
-    strokeWidth: lifeline.strokeWidth,
-    dashArray: lifeline.dashArray,
-  })
   
   // 顶部标记
   const topMarker = createLifelineTopMarkerUtil(participantId, layout)
-  nodes.push({
-    id: topMarker.id,
-    type: topMarker.type,
-    x: topMarker.x,
-    y: topMarker.y,
-    width: topMarker.width,
-    height: topMarker.height,
-    text: topMarker.text,
-    fill: topMarker.fill,
-    stroke: topMarker.stroke,
-    strokeWidth: topMarker.strokeWidth,
-  })
   
   // 底部标记
   const bottomMarker = createLifelineBottomMarkerUtil(participantId, layout, totalHeight)
-  nodes.push({
-    id: bottomMarker.id,
-    type: bottomMarker.type,
-    x: bottomMarker.x,
-    y: bottomMarker.y,
-    width: bottomMarker.width,
-    height: bottomMarker.height,
-    text: bottomMarker.text,
-    fill: bottomMarker.fill,
-    stroke: bottomMarker.stroke,
-    strokeWidth: bottomMarker.strokeWidth,
-  })
   
-  return nodes
+  // 使用通用适配函数批量转换
+  return adaptNodesToTemplate([lifeline, topMarker, bottomMarker])
 }
 
 /**
@@ -282,19 +302,7 @@ function createActivationBar(
   endY: number
 ): TemplateNode {
   const node = createActivationNodeUtil(id, layout, startY, endY)
-  
-  return {
-    id: node.id,
-    type: node.type,
-    x: node.x,
-    y: node.y,
-    width: node.width,
-    height: node.height,
-    text: node.text,
-    fill: node.fill,
-    stroke: node.stroke,
-    strokeWidth: node.strokeWidth,
-  }
+  return adaptNodeToTemplate(node)
 }
 
 /**
@@ -308,19 +316,7 @@ function createMessageMarkers(
   type: MessageType
 ): TemplateNode[] {
   const markers = createMessageMarkersUtil(String(index), fromCenterX, toCenterX, y, type)
-  
-  return markers.map(marker => ({
-    id: marker.id,
-    type: marker.type,
-    x: marker.x,
-    y: marker.y,
-    width: marker.width,
-    height: marker.height,
-    text: marker.text,
-    fill: marker.fill,
-    stroke: marker.stroke,
-    strokeWidth: marker.strokeWidth,
-  }))
+  return adaptNodesToTemplate(markers)
 }
 
 /**
@@ -332,19 +328,7 @@ function createDestroyMarker(
   y: number
 ): TemplateNode {
   const marker = createDestroyMarkerUtil(String(index), centerX, y)
-  
-  return {
-    id: marker.id,
-    type: marker.type,
-    x: marker.x,
-    y: marker.y,
-    width: marker.width,
-    height: marker.height,
-    text: marker.text,
-    fill: marker.fill,
-    stroke: marker.stroke,
-    strokeWidth: marker.strokeWidth,
-  }
+  return adaptNodeToTemplate(marker)
 }
 
 /**
@@ -356,22 +340,7 @@ function createCreateMarkers(
   y: number
 ): TemplateNode[] {
   const markers = createCreateMarkerUtil(String(index), centerX, y)
-  
-  return markers.map(marker => ({
-    id: marker.id,
-    type: marker.type,
-    x: marker.x,
-    y: marker.y,
-    width: marker.width,
-    height: marker.height,
-    text: marker.text,
-    fill: marker.fill,
-    stroke: marker.stroke,
-    strokeWidth: marker.strokeWidth,
-    fontSize: marker.fontSize,
-    color: marker.color,
-    fontWeight: marker.fontWeight,
-  }))
+  return adaptNodesToTemplate(markers)
 }
 
 // ==================== 消息处理 ====================
@@ -512,6 +481,108 @@ function createNoteNode(
   }
 }
 
+/**
+ * 创建注释连接线
+ * 连接注释和参与者/消息的虚线
+ */
+function createNoteConnector(
+  noteId: string,
+  noteX: number,
+  noteY: number,
+  targetX: number,
+  targetY: number
+): TemplateEdge {
+  const sourceId = `${noteId}-anchor`
+  const targetAnchorId = `${noteId}-target-anchor`
+
+  // 创建两个锚点用于连接线
+  const noteAnchor: TemplateNode = {
+    id: sourceId,
+    type: 'anchor',
+    x: noteX + DEFAULT_LAYOUT_CONFIG.noteWidth / 2,
+    y: noteY + DEFAULT_LAYOUT_CONFIG.noteHeight / 2,
+    width: 1,
+    height: 1,
+    text: '',
+    fill: 'transparent',
+    stroke: 'transparent',
+    strokeWidth: 0,
+  }
+
+  const targetAnchor: TemplateNode = {
+    id: targetAnchorId,
+    type: 'anchor',
+    x: targetX,
+    y: targetY,
+    width: 1,
+    height: 1,
+    text: '',
+    fill: 'transparent',
+    stroke: 'transparent',
+    strokeWidth: 0,
+  }
+
+  // 返回边和锚点
+  return {
+    id: `${noteId}-connector`,
+    source: sourceId,
+    target: targetAnchorId,
+    label: '',
+    style: 'dashed',
+    lineStyle: 'dashed',
+    stroke: DEFAULT_STYLES.note.stroke,
+    strokeWidth: 1,
+    dashArray: '3,3',
+  }
+}
+
+// ==================== 参数校验 ====================
+
+/**
+ * 验证参与者配置
+ */
+function validateParticipantConfig(config: ParticipantConfig): void {
+  if (!config.id || typeof config.id !== 'string') {
+    throw new Error('Participant must have a valid id')
+  }
+  if (!config.name || typeof config.name !== 'string') {
+    throw new Error('Participant must have a valid name')
+  }
+}
+
+/**
+ * 验证消息配置
+ */
+function validateMessageConfig(config: MessageConfig, participantIds: Set<string>): void {
+  if (!config.from || typeof config.from !== 'string') {
+    throw new Error('Message must have a valid from participant')
+  }
+  if (!config.to || typeof config.to !== 'string') {
+    throw new Error('Message must have a valid to participant')
+  }
+  if (!participantIds.has(config.from)) {
+    throw new Error(`Message from participant '${config.from}' not found`)
+  }
+  if (!participantIds.has(config.to)) {
+    throw new Error(`Message to participant '${config.to}' not found`)
+  }
+}
+
+/**
+ * 验证片段配置
+ */
+function validateFragmentConfig(config: FragmentConfig, messageCount: number): void {
+  if (config.startMessageIndex < 0 || config.startMessageIndex >= messageCount) {
+    throw new Error(`Fragment startMessageIndex ${config.startMessageIndex} out of range`)
+  }
+  if (config.endMessageIndex < 0 || config.endMessageIndex >= messageCount) {
+    throw new Error(`Fragment endMessageIndex ${config.endMessageIndex} out of range`)
+  }
+  if (config.startMessageIndex > config.endMessageIndex) {
+    throw new Error('Fragment startMessageIndex must be <= endMessageIndex')
+  }
+}
+
 // ==================== 模板生成 ====================
 
 /**
@@ -523,6 +594,24 @@ function generateBaseSequenceDiagram(
   fragments: FragmentConfig[] = [],
   options: TemplateGenerateOptions = {}
 ): { nodes: TemplateNode[]; edges: TemplateEdge[] } {
+  // 参数校验
+  if (!Array.isArray(participants) || participants.length === 0) {
+    throw new Error('Participants must be a non-empty array')
+  }
+  if (!Array.isArray(messages)) {
+    throw new Error('Messages must be an array')
+  }
+
+  // 验证参与者配置
+  participants.forEach(validateParticipantConfig)
+
+  // 验证消息配置
+  const participantIds = new Set(participants.map(p => p.id))
+  messages.forEach(msg => validateMessageConfig(msg, participantIds))
+
+  // 验证片段配置
+  fragments.forEach(frag => validateFragmentConfig(frag, messages.length))
+
   const nodes: TemplateNode[] = []
   const edges: TemplateEdge[] = []
 
@@ -555,7 +644,12 @@ function generateBaseSequenceDiagram(
     if (!fromLayout || !toLayout) return
 
     const y = messageYPositions[index]
-    const result = createMessage(index, fromLayout, toLayout, y, message.label, message.type)
+
+    // 生成带编号的消息标签
+    const autoNumber = options.autoNumber ?? false
+    const messageLabel = generateMessageLabel(message.label, index + 1, autoNumber)
+
+    const result = createMessage(index, fromLayout, toLayout, y, messageLabel, message.type)
 
     nodes.push(...result.anchors)
     nodes.push(...result.markers)

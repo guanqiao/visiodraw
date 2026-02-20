@@ -165,4 +165,6 @@ export interface TemplateGenerateOptions {
   spacing?: number
   /** 布局方向 */
   direction?: LayoutDirection
+  /** 是否自动编号消息 */
+  autoNumber?: boolean
 }
