@@ -4,3 +4,6 @@
 
 export { EdgeContextMenu } from './EdgeContextMenu'
 export type { EdgeContextMenuProps } from './EdgeContextMenu'
+
+export { NodeContextMenu } from './NodeContextMenu'
+export type { NodeContextMenuProps } from './NodeContextMenu'

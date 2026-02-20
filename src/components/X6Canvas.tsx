@@ -11,7 +11,7 @@ import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import useFormatPainterStore from '@stores/formatPainterStore'
 import { THEME_CHANGE_EVENT } from '@hooks/useTheme'
-import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
+// import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
 import { useSelfLoopDrawing } from '@hooks/useSelfLoopDrawing'
 import { VirtualRenderer } from '@utils/rendering/VirtualRenderer'
 import { AnimationManager } from '@utils/rendering/AnimationManager'
@@ -23,7 +23,7 @@ import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVi
 import { ConnectorRenderer } from '@utils/connectorRenderer'
 import { renderShape } from '@utils/shapeRenderers'
 import ERRelationQuickSelector, { isErTableNode, getErNodeName } from '@components/ERRelationQuickSelector'
-import { EdgeContextMenu } from '@components/ContextMenu'
+import { EdgeContextMenu, NodeContextMenu } from '@components/ContextMenu'
 import type { ERRelationType, LineStyle, ConnectorStyle } from '../types/connection'
 import { erRelations } from '../types/connection'
 import { devLog } from '../utils/logger'
@@ -117,6 +117,17 @@ const X6Canvas: React.FC = () => {
   }>({
     visible: false,
     edge: null,
+    position: { x: 0, y: 0 },
+  })
+
+  // Node context menu state
+  const [nodeContextMenu, setNodeContextMenu] = useState<{
+    visible: boolean
+    node: Node | null
+    position: { x: number; y: number }
+  }>({
+    visible: false,
+    node: null,
     position: { x: 0, y: 0 },
   })
 
@@ -507,8 +518,11 @@ const X6Canvas: React.FC = () => {
       setHoveredPort(null)
     })
 
-    // Right-click on custom port to remove it
+    // Right-click on custom port to remove it, or show node context menu
     graph.on('node:contextmenu', ({ node, e }: { node: Node; e: any }) => {
+      e.preventDefault()
+      e.stopPropagation()
+      
       const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
       const ports = node.getPorts()
       const nodePos = node.getPosition()
@@ -527,9 +541,6 @@ const X6Canvas: React.FC = () => {
             )
             
             if (distance < 15) {
-              e.preventDefault()
-              e.stopPropagation()
-              
               removeCustomPort(node, port.id)
               removeConnectionPoint(node.id, port.id)
               message.success('已删除连接点')
@@ -538,6 +549,12 @@ const X6Canvas: React.FC = () => {
           }
         }
       }
+      
+      setNodeContextMenu({
+        visible: true,
+        node,
+        position: { x: e.clientX, y: e.clientY },
+      })
     })
 
     // Double click to edit node text
@@ -811,6 +828,7 @@ const X6Canvas: React.FC = () => {
     graph.on('blank:click', () => {
       clearSelection()
       setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
+      setNodeContextMenu((prev) => ({ ...prev, visible: false }))
     })
 
     graph.on('scale', ({ sx }: { sx: number }) => {
@@ -1167,11 +1185,11 @@ const X6Canvas: React.FC = () => {
     }
   }, [])
 
-  // 使用优化的 Store 同步 Hook
-  useOptimizedStoreSync(graphRef.current, nodes, edges, {
-    debounceMs: 16, // 约 60fps
-    batchSize: 50,
-  })
+  // 使用优化的 Store 同步 Hook - 已禁用，改用 x6GraphStore 直接操作
+  // useOptimizedStoreSync(graphRef.current, nodes, edges, {
+  //   debounceMs: 16, // 约 60fps
+  //   batchSize: 50,
+  // })
 
   // Handle theme changes - update canvas background and grid
   useEffect(() => {
@@ -1616,6 +1634,127 @@ const X6Canvas: React.FC = () => {
     setEdgeContextMenu((prev) => ({ ...prev, visible: false }))
   }, [])
 
+  // Node context menu handlers
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    if (graphRef.current) {
+      const node = graphRef.current.getCellById(nodeId) as Node
+      if (node) {
+        graphRef.current.removeCell(node)
+        deleteNode(nodeId)
+      }
+    }
+    setNodeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [deleteNode])
+
+  const handleNodeCopy = useCallback((nodeId: string) => {
+    if (graphRef.current) {
+      const node = graphRef.current.getCellById(nodeId) as Node
+      if (node) {
+        const nodeData = nodes.find(n => n.id === nodeId)
+        if (nodeData) {
+          copy([nodeData])
+          message.success('节点已复制')
+        }
+      }
+    }
+    setNodeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [nodes, copy])
+
+  const handleNodeBringToFront = useCallback((nodeId: string) => {
+    if (graphRef.current) {
+      const node = graphRef.current.getCellById(nodeId) as Node
+      if (node) {
+        node.toFront()
+      }
+    }
+    setNodeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [])
+
+  const handleNodeSendToBack = useCallback((nodeId: string) => {
+    if (graphRef.current) {
+      const node = graphRef.current.getCellById(nodeId) as Node
+      if (node) {
+        node.toBack()
+      }
+    }
+    setNodeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [])
+
+  const handleNodeEditLabel = useCallback((nodeId: string) => {
+    if (graphRef.current && nodeContextMenu.node) {
+      const node = nodeContextMenu.node
+      const currentText = (node.attr('label/text') as string) || ''
+      
+      const editor = document.createElement('div')
+      editor.contentEditable = 'true'
+      editor.innerText = currentText
+      const editorBgColor = isDark ? '#2c2c2c' : '#ffffff'
+      const editorTextColor = isDark ? '#e0e0e0' : '#333333'
+      const editorBorderColor = isDark ? '#18a0fb' : '#1890ff'
+      editor.style.cssText = `
+        position: fixed;
+        background: ${editorBgColor};
+        color: ${editorTextColor};
+        border: 2px solid ${editorBorderColor};
+        padding: 4px 8px;
+        border-radius: 4px;
+        outline: none;
+        min-width: 60px;
+        text-align: center;
+        font-size: 14px;
+        z-index: 1000;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      `
+      
+      const position = node.getPosition()
+      const size = node.getSize()
+      const clientPoint = graphRef.current.localToClient(
+        position.x + size.width / 2,
+        position.y + size.height / 2
+      )
+      
+      editor.style.left = `${clientPoint.x - 30}px`
+      editor.style.top = `${clientPoint.y - 15}px`
+      
+      document.body.appendChild(editor)
+      editor.focus()
+      
+      const range = document.createRange()
+      range.selectNodeContents(editor)
+      const sel = window.getSelection()
+      sel?.removeAllRanges()
+      sel?.addRange(range)
+      
+      const save = () => {
+        const newText = editor.innerText.trim()
+        if (newText !== currentText) {
+          node.attr('label/text', newText)
+          updateNode(nodeId, { text: newText })
+        }
+        editor.remove()
+      }
+      
+      const cancel = () => {
+        editor.remove()
+      }
+      
+      editor.addEventListener('blur', save)
+      editor.addEventListener('keydown', (evt) => {
+        if (evt.key === 'Enter') {
+          evt.preventDefault()
+          editor.blur()
+        } else if (evt.key === 'Escape') {
+          cancel()
+        }
+      })
+    }
+    setNodeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [nodeContextMenu.node, isDark, updateNode])
+
+  const handleCloseNodeContextMenu = useCallback(() => {
+    setNodeContextMenu((prev) => ({ ...prev, visible: false }))
+  }, [])
+
   return (
     <>
       <div
@@ -1753,6 +1892,24 @@ const X6Canvas: React.FC = () => {
           onSendToBack={handleEdgeSendToBack}
         />
       )}
+
+      {/* Node Context Menu */}
+      {nodeContextMenu.visible && nodeContextMenu.node && (() => {
+        const nodeData = nodes.find(n => n.id === nodeContextMenu.node?.id)
+        return nodeData && (
+          <NodeContextMenu
+            node={nodeData}
+            visible={nodeContextMenu.visible}
+            position={nodeContextMenu.position}
+            onClose={handleCloseNodeContextMenu}
+            onDelete={handleNodeDelete}
+            onCopy={handleNodeCopy}
+            onBringToFront={handleNodeBringToFront}
+            onSendToBack={handleNodeSendToBack}
+            onEditLabel={handleNodeEditLabel}
+          />
+        )
+      })()}
     </>
   )
 }
