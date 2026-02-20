@@ -228,6 +228,22 @@ export function drawCloud(
 }
 
 /**
+ * 检查是否应该跳过绘制该节点（辅助节点）
+ */
+function shouldSkipNode(type: string): boolean {
+  const skipTypes = [
+    'uml-anchor',
+    'uml-lifeline-marker',
+    'uml-lifeline-end',
+    'uml-message-marker',
+    'uml-destroy-marker',
+    'uml-create-marker',
+    'uml-create-label',
+  ]
+  return skipTypes.includes(type)
+}
+
+/**
  * 根据形状类型绘制形状
  */
 export function drawShapeByType(
@@ -260,9 +276,160 @@ export function drawShapeByType(
       ctx.arc(x + width / 2, y + height / 2, Math.min(width, height) / 2, 0, Math.PI * 2)
       ctx.closePath()
       break
+    // 序列图节点类型
+    case 'uml-participant':
+      drawRoundedRect(ctx, x, y, width, height, Math.min(4, height * 0.1))
+      break
+    case 'uml-actor-sequence':
+      drawActor(ctx, x, y, width, height)
+      break
+    case 'uml-database-sequence':
+      drawDatabase(ctx, x, y, width, height)
+      break
+    case 'uml-fragment':
+      drawFragment(ctx, x, y, width, height)
+      break
+    case 'uml-note':
+      drawNote(ctx, x, y, width, height)
+      break
+    case 'uml-activation':
+      drawRoundedRect(ctx, x, y, width, height, 2)
+      break
     default:
       drawRoundedRect(ctx, x, y, width, height, Math.min(4, 8))
   }
+}
+
+/**
+ * 绘制参与者（人形图标）
+ */
+function drawActor(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  const centerX = x + width / 2
+  const headRadius = Math.min(width, height) * 0.15
+  const bodyY = y + headRadius * 2.5
+
+  ctx.beginPath()
+  // 头部
+  ctx.arc(centerX, y + headRadius * 1.2, headRadius, 0, Math.PI * 2)
+  // 身体
+  ctx.moveTo(centerX, bodyY)
+  ctx.lineTo(centerX, y + height * 0.7)
+  // 手臂
+  ctx.moveTo(centerX - width * 0.25, y + height * 0.45)
+  ctx.lineTo(centerX + width * 0.25, y + height * 0.45)
+  // 腿
+  ctx.moveTo(centerX, y + height * 0.7)
+  ctx.lineTo(centerX - width * 0.2, y + height)
+  ctx.moveTo(centerX, y + height * 0.7)
+  ctx.lineTo(centerX + width * 0.2, y + height)
+  ctx.stroke()
+}
+
+/**
+ * 绘制数据库图标
+ */
+function drawDatabase(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  const centerX = x + width / 2
+  const topY = y + height * 0.2
+  const bottomY = y + height * 0.8
+  const rx = width * 0.4
+  const ry = height * 0.15
+
+  ctx.beginPath()
+  // 顶部椭圆
+  ctx.ellipse(centerX, topY, rx, ry, 0, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.stroke()
+  // 主体
+  ctx.beginPath()
+  ctx.moveTo(centerX - rx, topY)
+  ctx.lineTo(centerX - rx, bottomY - ry)
+  ctx.ellipse(centerX, bottomY - ry, rx, ry, 0, Math.PI, 0)
+  ctx.lineTo(centerX + rx, topY)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+}
+
+/**
+ * 绘制片段框
+ */
+function drawFragment(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  const headerHeight = Math.min(25, height * 0.15)
+  const cornerRadius = 4
+
+  ctx.beginPath()
+  // 外框
+  ctx.moveTo(x + cornerRadius, y)
+  ctx.lineTo(x + width - cornerRadius, y)
+  ctx.quadraticCurveTo(x + width, y, x + width, y + cornerRadius)
+  ctx.lineTo(x + width, y + height - cornerRadius)
+  ctx.quadraticCurveTo(x + width, y + height, x + width - cornerRadius, y + height)
+  ctx.lineTo(x + cornerRadius, y + height)
+  ctx.quadraticCurveTo(x, y + height, x, y + height - cornerRadius)
+  ctx.lineTo(x, y + cornerRadius)
+  ctx.quadraticCurveTo(x, y, x + cornerRadius, y)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+
+  // 标题栏虚线
+  ctx.beginPath()
+  ctx.setLineDash([4, 2])
+  ctx.moveTo(x, y + headerHeight)
+  ctx.lineTo(x + width, y + headerHeight)
+  ctx.stroke()
+  ctx.setLineDash([])
+}
+
+/**
+ * 绘制注释框
+ */
+function drawNote(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+): void {
+  const foldSize = Math.min(15, width * 0.15, height * 0.15)
+
+  ctx.beginPath()
+  ctx.moveTo(x, y)
+  ctx.lineTo(x + width - foldSize, y)
+  ctx.lineTo(x + width, y + foldSize)
+  ctx.lineTo(x + width, y + height)
+  ctx.lineTo(x, y + height)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
+
+  // 折叠角
+  ctx.beginPath()
+  ctx.moveTo(x + width - foldSize, y)
+  ctx.lineTo(x + width - foldSize, y + foldSize)
+  ctx.lineTo(x + width, y + foldSize)
+  ctx.closePath()
+  ctx.fill()
+  ctx.stroke()
 }
 
 /**
@@ -286,6 +453,11 @@ export function drawShape(
   offsetY: number,
   options: ShapeRenderOptions = {}
 ): void {
+  // 跳过辅助节点（锚点、标记等）
+  if (shouldSkipNode(shape.type)) {
+    return
+  }
+
   const x = shape.x * scale + offsetX
   const y = shape.y * scale + offsetY
   const width = (shape.width || 100) * scale
@@ -299,11 +471,22 @@ export function drawShape(
   ctx.strokeStyle = stroke
   ctx.lineWidth = strokeWidth
 
+  // 处理虚线样式（用于生命线）
+  const dashArray = (shape as any).dashArray
+  if (dashArray) {
+    ctx.setLineDash(dashArray.split(',').map(Number))
+  }
+
   // 绘制形状
   drawShapeByType(ctx, shape.type, x, y, width, height)
 
   ctx.fill()
   ctx.stroke()
+
+  // 重置虚线样式
+  if (dashArray) {
+    ctx.setLineDash([])
+  }
 
   // 绘制文本
   const text = options.text || shape.text

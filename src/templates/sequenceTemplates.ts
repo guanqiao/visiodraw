@@ -103,6 +103,32 @@ interface FragmentConfig {
 }
 
 /**
+ * 激活条配置
+ */
+interface ActivationConfig {
+  /** 参与者ID */
+  participantId: string
+  /** 起始消息索引 */
+  startMessageIndex: number
+  /** 结束消息索引 */
+  endMessageIndex: number
+}
+
+/**
+ * 注释配置
+ */
+interface NoteConfig {
+  /** 注释内容 */
+  text: string
+  /** 位置 */
+  position: 'left' | 'right' | 'over'
+  /** 目标参与者ID */
+  participantId: string
+  /** 消息索引（可选） */
+  messageIndex?: number
+}
+
+/**
  * 参与者布局信息
  */
 interface ParticipantLayout {
@@ -590,6 +616,8 @@ function generateBaseSequenceDiagram(
   participants: ParticipantConfig[],
   messages: MessageConfig[],
   fragments: FragmentConfig[] = [],
+  activations: ActivationConfig[] = [],
+  notes: NoteConfig[] = [],
   options: TemplateGenerateOptions = {}
 ): { nodes: TemplateNode[]; edges: TemplateEdge[] } {
   // 参数校验
@@ -634,6 +662,16 @@ function generateBaseSequenceDiagram(
     nodes.push(...createLifelineNodes(participant.id, layout, totalHeight))
   })
 
+  // 创建激活条
+  activations.forEach(activation => {
+    const layout = participantLayouts.get(activation.participantId)
+    if (layout) {
+      const startY = messageYPositions[activation.startMessageIndex]
+      const endY = messageYPositions[activation.endMessageIndex]
+      nodes.push(createActivationBar(activation.participantId, layout, startY, endY))
+    }
+  })
+
   // 创建消息
   messages.forEach((message, index) => {
     const fromLayout = participantLayouts.get(message.from)
@@ -666,6 +704,17 @@ function generateBaseSequenceDiagram(
     nodes.push(createFragmentNode(fragment, participantLayouts, messageYPositions))
   })
 
+  // 创建注释
+  notes.forEach(note => {
+    const layout = participantLayouts.get(note.participantId)
+    if (layout) {
+      const y = note.messageIndex !== undefined 
+        ? messageYPositions[note.messageIndex] 
+        : layout.bottomY + 50
+      nodes.push(createNoteNode(note.text, note.position, layout, y))
+    }
+  })
+
   return { nodes, edges }
 }
 
@@ -675,6 +724,7 @@ export const basicSequenceTemplate: DiagramTemplate = {
   id: 'basic-sequence',
   name: '基础序列图',
   description: '简单的请求-响应交互',
+  type: 'sequence',
   category: 'uml',
   tags: ['sequence', 'basic'],
 
@@ -689,7 +739,12 @@ export const basicSequenceTemplate: DiagramTemplate = {
       { from: 'server', to: 'client', label: 'response()', type: 'return' },
     ]
 
-    return generateBaseSequenceDiagram(participants, messages, [], options)
+    const activations: ActivationConfig[] = [
+      { participantId: 'client', startMessageIndex: 0, endMessageIndex: 1 },
+      { participantId: 'server', startMessageIndex: 0, endMessageIndex: 1 },
+    ]
+
+    return generateBaseSequenceDiagram(participants, messages, [], activations, [], options)
   },
 }
 
@@ -697,6 +752,7 @@ export const authSequenceTemplate: DiagramTemplate = {
   id: 'auth-sequence',
   name: '认证流程',
   description: '用户认证和授权流程',
+  type: 'sequence',
   category: 'uml',
   tags: ['sequence', 'auth', 'security'],
 
@@ -726,7 +782,7 @@ export const authSequenceTemplate: DiagramTemplate = {
       },
     ]
 
-    return generateBaseSequenceDiagram(participants, messages, fragments, options)
+    return generateBaseSequenceDiagram(participants, messages, fragments, [], [], options)
   },
 }
 
@@ -734,6 +790,7 @@ export const crudSequenceTemplate: DiagramTemplate = {
   id: 'crud-sequence',
   name: 'CRUD操作',
   description: '数据库CRUD操作流程',
+  type: 'sequence',
   category: 'uml',
   tags: ['sequence', 'crud', 'database'],
 
@@ -755,7 +812,7 @@ export const crudSequenceTemplate: DiagramTemplate = {
       { from: 'api', to: 'ui', label: 'data', type: 'return' },
     ]
 
-    return generateBaseSequenceDiagram(participants, messages, [], options)
+    return generateBaseSequenceDiagram(participants, messages, [], [], [], options)
   },
 }
 
@@ -763,6 +820,7 @@ export const loopSequenceTemplate: DiagramTemplate = {
   id: 'loop-sequence',
   name: '循环处理',
   description: '批量数据处理循环',
+  type: 'sequence',
   category: 'uml',
   tags: ['sequence', 'loop', 'batch'],
 
@@ -790,7 +848,7 @@ export const loopSequenceTemplate: DiagramTemplate = {
       },
     ]
 
-    return generateBaseSequenceDiagram(participants, messages, fragments, options)
+    return generateBaseSequenceDiagram(participants, messages, fragments, [], [], options)
   },
 }
 
@@ -798,6 +856,7 @@ export const errorHandlingTemplate: DiagramTemplate = {
   id: 'error-handling',
   name: '错误处理',
   description: '异常处理流程',
+  type: 'sequence',
   category: 'uml',
   tags: ['sequence', 'error', 'exception'],
 
@@ -824,7 +883,126 @@ export const errorHandlingTemplate: DiagramTemplate = {
       },
     ]
 
-    return generateBaseSequenceDiagram(participants, messages, fragments, options)
+    return generateBaseSequenceDiagram(participants, messages, fragments, [], [], options)
+  },
+}
+
+export const criticalSequenceTemplate: DiagramTemplate = {
+  id: 'critical-sequence',
+  name: '关键片段',
+  description: '原子操作场景',
+  type: 'sequence',
+  category: 'uml',
+  tags: ['sequence', 'critical', 'transaction'],
+
+  generate(options: TemplateGenerateOptions = {}) {
+    const participants: ParticipantConfig[] = [
+      { id: 'client', name: 'Client', type: 'participant' },
+      { id: 'service', name: 'Service', type: 'participant' },
+      { id: 'db', name: 'Database', type: 'database' },
+    ]
+
+    const messages: MessageConfig[] = [
+      { from: 'client', to: 'service', label: 'transfer()', type: 'sync' },
+      { from: 'service', to: 'db', label: 'debit()', type: 'sync' },
+      { from: 'db', to: 'service', label: 'ok', type: 'return' },
+      { from: 'service', to: 'db', label: 'credit()', type: 'sync' },
+      { from: 'db', to: 'service', label: 'ok', type: 'return' },
+      { from: 'service', to: 'client', label: 'success', type: 'return' },
+    ]
+
+    const fragments: FragmentConfig[] = [
+      {
+        type: 'critical',
+        startMessageIndex: 1,
+        endMessageIndex: 4,
+        condition: 'atomic',
+        participantIds: ['service', 'db'],
+      },
+    ]
+
+    const activations: ActivationConfig[] = [
+      { participantId: 'client', startMessageIndex: 0, endMessageIndex: 5 },
+      { participantId: 'service', startMessageIndex: 0, endMessageIndex: 5 },
+      { participantId: 'db', startMessageIndex: 1, endMessageIndex: 4 },
+    ]
+
+    return generateBaseSequenceDiagram(participants, messages, fragments, activations, [], options)
+  },
+}
+
+export const parSequenceTemplate: DiagramTemplate = {
+  id: 'par-sequence',
+  name: '并行处理',
+  description: '并行执行多个任务',
+  type: 'sequence',
+  category: 'uml',
+  tags: ['sequence', 'parallel', 'async'],
+
+  generate(options: TemplateGenerateOptions = {}) {
+    const participants: ParticipantConfig[] = [
+      { id: 'client', name: 'Client', type: 'participant' },
+      { id: 'service', name: 'Service', type: 'participant' },
+      { id: 'api1', name: 'API 1', type: 'participant' },
+      { id: 'api2', name: 'API 2', type: 'participant' },
+    ]
+
+    const messages: MessageConfig[] = [
+      { from: 'client', to: 'service', label: 'fetchData()', type: 'sync' },
+      { from: 'service', to: 'api1', label: 'getData()', type: 'async' },
+      { from: 'service', to: 'api2', label: 'getData()', type: 'async' },
+      { from: 'api1', to: 'service', label: 'data1', type: 'return' },
+      { from: 'api2', to: 'service', label: 'data2', type: 'return' },
+      { from: 'service', to: 'client', label: 'combined', type: 'return' },
+    ]
+
+    const fragments: FragmentConfig[] = [
+      {
+        type: 'par',
+        startMessageIndex: 1,
+        endMessageIndex: 4,
+        condition: 'parallel calls',
+      },
+    ]
+
+    const activations: ActivationConfig[] = [
+      { participantId: 'client', startMessageIndex: 0, endMessageIndex: 5 },
+      { participantId: 'service', startMessageIndex: 0, endMessageIndex: 5 },
+      { participantId: 'api1', startMessageIndex: 1, endMessageIndex: 3 },
+      { participantId: 'api2', startMessageIndex: 2, endMessageIndex: 4 },
+    ]
+
+    return generateBaseSequenceDiagram(participants, messages, fragments, activations, [], options)
+  },
+}
+
+export const selfCallSequenceTemplate: DiagramTemplate = {
+  id: 'self-call-sequence',
+  name: '自调用',
+  description: '对象内部方法调用',
+  type: 'sequence',
+  category: 'uml',
+  tags: ['sequence', 'self', 'recursion'],
+
+  generate(options: TemplateGenerateOptions = {}) {
+    const participants: ParticipantConfig[] = [
+      { id: 'client', name: 'Client', type: 'participant' },
+      { id: 'service', name: 'Service', type: 'participant' },
+    ]
+
+    const messages: MessageConfig[] = [
+      { from: 'client', to: 'service', label: 'process()', type: 'sync' },
+      { from: 'service', to: 'service', label: 'validate()', type: 'self' },
+      { from: 'service', to: 'service', label: 'transform()', type: 'self' },
+      { from: 'service', to: 'client', label: 'result', type: 'return' },
+    ]
+
+    const activations: ActivationConfig[] = [
+      { participantId: 'client', startMessageIndex: 0, endMessageIndex: 3 },
+      { participantId: 'service', startMessageIndex: 0, endMessageIndex: 3 },
+    ]
+
+    return generateBaseSequenceDiagram(participants, messages, [], activations, [], options)
   },
 }
 
@@ -836,6 +1014,16 @@ export const sequenceTemplates: DiagramTemplate[] = [
   crudSequenceTemplate,
   loopSequenceTemplate,
   errorHandlingTemplate,
+  criticalSequenceTemplate,
+  parSequenceTemplate,
+  selfCallSequenceTemplate,
 ]
+
+/**
+ * 获取序列图模板
+ */
+export function getSequenceTemplates(_options: TemplateGenerateOptions = {}): DiagramTemplate[] {
+  return sequenceTemplates
+}
 
 export default sequenceTemplates

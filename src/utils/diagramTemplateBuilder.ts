@@ -8,8 +8,24 @@ import type { ShapeData } from '../stores/x6GraphStore'
 import type { Connector, ConnectorEndStyle } from '../types/connection'
 import { getCurrentTheme } from './mermaidTheme'
 
+/**
+ * 检查是否为辅助节点（不应添加到主界面）
+ */
+function isAuxiliaryNode(type: string): boolean {
+  const auxiliaryTypes = [
+    'uml-anchor',
+    'uml-lifeline-marker',
+    'uml-lifeline-end',
+    'uml-message-marker',
+    'uml-destroy-marker',
+    'uml-create-marker',
+    'uml-create-label',
+  ]
+  return auxiliaryTypes.includes(type)
+}
+
 export function templateNodeToShapeData(node: TemplateNode): ShapeData {
-  return {
+  const shapeData: ShapeData = {
     id: node.id,
     type: node.type,
     x: node.x,
@@ -21,6 +37,22 @@ export function templateNodeToShapeData(node: TemplateNode): ShapeData {
     strokeWidth: node.strokeWidth || 2,
     text: node.text,
   }
+
+  // 添加可选属性
+  if (node.rx !== undefined) {
+    (shapeData as any).rx = node.rx
+  }
+  if (node.ry !== undefined) {
+    (shapeData as any).ry = node.ry
+  }
+  if ((node as any).dashArray !== undefined) {
+    (shapeData as any).dashArray = (node as any).dashArray
+  }
+  if ((node as any).fillOpacity !== undefined) {
+    (shapeData as any).fillOpacity = (node as any).fillOpacity
+  }
+
+  return shapeData
 }
 
 export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[]): Connector {
@@ -147,8 +179,27 @@ export function buildDiagramTemplate(template: DiagramTemplate): {
   nodes: ShapeData[]
   edges: Connector[]
 } {
-  const nodes = template.nodes.map(templateNodeToShapeData)
-  const edges = template.edges?.map(edge => templateEdgeToConnector(edge, template.nodes)) || []
+  // 如果模板有 generate 函数，先调用它生成 nodes 和 edges
+  let templateNodes = template.nodes
+  let templateEdges = template.edges
+
+  if (template.generate) {
+    const generated = template.generate()
+    templateNodes = generated.nodes
+    templateEdges = generated.edges
+  }
+
+  // 确保 nodes 不为空
+  if (!templateNodes || templateNodes.length === 0) {
+    return { nodes: [], edges: [] }
+  }
+
+  // 过滤掉辅助节点，转换为主界面可用的形状数据
+  const filteredNodes = templateNodes.filter(node => !isAuxiliaryNode(node.type))
+  const nodes = filteredNodes.map(templateNodeToShapeData)
+
+  // 使用过滤后的节点列表来转换边，确保边引用的节点存在
+  const edges = templateEdges?.map(edge => templateEdgeToConnector(edge, filteredNodes)) || []
 
   return { nodes, edges }
 }

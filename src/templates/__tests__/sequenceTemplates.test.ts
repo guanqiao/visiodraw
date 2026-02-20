@@ -15,6 +15,9 @@ import {
   crudSequenceTemplate,
   loopSequenceTemplate,
   errorHandlingTemplate,
+  criticalSequenceTemplate,
+  parSequenceTemplate,
+  selfCallSequenceTemplate,
   sequenceTemplates,
 } from '../sequenceTemplates'
 
@@ -177,12 +180,15 @@ describe('Sequence Templates', () => {
 
   describe('模板集合', () => {
     it('应该导出所有模板', () => {
-      expect(sequenceTemplates.length).toBe(5)
+      expect(sequenceTemplates.length).toBe(8)
       expect(sequenceTemplates).toContain(basicSequenceTemplate)
       expect(sequenceTemplates).toContain(authSequenceTemplate)
       expect(sequenceTemplates).toContain(crudSequenceTemplate)
       expect(sequenceTemplates).toContain(loopSequenceTemplate)
       expect(sequenceTemplates).toContain(errorHandlingTemplate)
+      expect(sequenceTemplates).toContain(criticalSequenceTemplate)
+      expect(sequenceTemplates).toContain(parSequenceTemplate)
+      expect(sequenceTemplates).toContain(selfCallSequenceTemplate)
     })
 
     it('每个模板应该有正确的元数据', () => {
