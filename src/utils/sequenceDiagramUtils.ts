@@ -450,16 +450,17 @@ export function createActivationNode(
   layout: ParticipantLayout,
   startY: number,
   endY: number,
-  styles: SequenceStyles = DEFAULT_STYLES
+  styles: SequenceStyles = DEFAULT_STYLES,
+  activationWidth: number = 14
 ): ShapeData {
   const height = Math.max(endY - startY + 12, 28)
 
   return {
     id: `activation-${id}`,
     type: 'uml-activation',
-    x: layout.centerX - styles.activation.cornerRadius / 2,
+    x: layout.centerX - activationWidth / 2,
     y: startY - 6,
-    width: styles.activation.cornerRadius,
+    width: activationWidth,
     height,
     text: '',
     fill: styles.activation.fill,
@@ -593,6 +594,85 @@ export function createCreateMarker(
   ]
 }
 
+/**
+ * 创建锚点节点
+ */
+export function createAnchorNode(
+  id: string,
+  x: number,
+  y: number
+): ShapeData {
+  return {
+    id,
+    type: 'uml-anchor',
+    x,
+    y,
+    width: 1,
+    height: 1,
+    text: '',
+    fill: 'transparent',
+    stroke: 'transparent',
+    strokeWidth: 0,
+    zIndex: 0,
+  }
+}
+
+/**
+ * 创建片段框节点
+ */
+export function createFragmentNode(
+  type: FragmentType,
+  startX: number,
+  startY: number,
+  width: number,
+  height: number,
+  condition?: string
+): ShapeData {
+  const fragmentStyle = FRAGMENT_TYPE_STYLES[type] || FRAGMENT_TYPE_STYLES.group
+  const label = condition ? `${type} [${condition}]` : type
+
+  return {
+    id: `fragment-${type}-${startY}`,
+    type: 'uml-fragment',
+    x: startX,
+    y: startY,
+    width,
+    height,
+    text: label,
+    fill: fragmentStyle.fill,
+    stroke: fragmentStyle.stroke,
+    strokeWidth: 1.5,
+    cornerRadius: 6,
+    zIndex: 1,
+  }
+}
+
+/**
+ * 创建注释节点
+ */
+export function createNoteNode(
+  id: string,
+  x: number,
+  y: number,
+  text: string,
+  styles: SequenceStyles = DEFAULT_STYLES
+): ShapeData {
+  return {
+    id: `note-${id}`,
+    type: 'uml-note',
+    x,
+    y,
+    width: 100,
+    height: 40,
+    text,
+    fill: styles.note.fill,
+    stroke: styles.note.stroke,
+    strokeWidth: styles.note.strokeWidth,
+    cornerRadius: styles.note.cornerRadius,
+    zIndex: 8,
+  }
+}
+
 // ==================== 创建边辅助函数 ====================
 
 /**
@@ -661,5 +741,8 @@ export default {
   createMessageMarkers,
   createDestroyMarker,
   createCreateMarker,
+  createAnchorNode,
+  createFragmentNode,
+  createNoteNode,
   createMessageEdge,
 }

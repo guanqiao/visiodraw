@@ -14,335 +14,37 @@
  * 设计原则：
  * 1. 使用 Crow's Foot 表示法清晰表达基数关系
  * 2. 实体采用专业配色方案区分类型
- * 3. 支持多种布局算法（层次、网格、力导向）
+ * 3. 支持多种布局算法（层次、网格、力导向、环形）
  * 4. 关系线带基数标记和参与度约束
  * 5. 自动生成准确的 Mermaid 代码
+ *
+ * 重构说明：
+ * 本文件使用 erDiagramUtils.ts 提供的共享工具函数
+ * 消除代码重复，提高可维护性
  */
 
-import type { DiagramTemplate, TemplateGenerateOptions, TemplateNode, TemplateEdge } from '../types/diagramTemplate'
+import type { DiagramTemplate, TemplateGenerateOptions } from '../types/diagramTemplate'
+import {
+  DEFAULT_ER_CONFIG,
+  ER_THEMES,
+  type ErTemplateConfig,
+  type EntityConfig,
+  type RelationshipConfig,
+  generateErTemplate,
+  getErTemplateMetadata,
+  validateErTemplateConfig,
+} from '../utils/erDiagramUtils'
 
-// ==================== 布局配置 ====================
-interface ErLayoutConfig {
-  startX: number
-  startY: number
-  entityWidth: number
-  entityHeight: number
-  entitySpacing: number
-  relationshipSpacing: number
-  attributeSpacing: number
-  layoutAlgorithm: 'hierarchical' | 'grid' | 'force' | 'circular'
-  direction: 'vertical' | 'horizontal'
-}
+// ==================== 基础模板配置 ====================
 
-const DEFAULT_CONFIG: ErLayoutConfig = {
-  startX: 80,
-  startY: 60,
-  entityWidth: 180,
-  entityHeight: 100,
-  entitySpacing: 240,
-  relationshipSpacing: 120,
-  attributeSpacing: 80,
-  layoutAlgorithm: 'hierarchical',
-  direction: 'horizontal',
-}
-
-// ==================== 样式配置 - 专业ER图配色 ====================
-const ER_STYLES = {
-  entity: {
-    fill: '#e6f7ff',
-    stroke: '#1890ff',
-    strokeWidth: 2,
-    headerFill: '#bae7ff',
-    headerStroke: '#1890ff',
-    fontSize: 14,
-    fontWeight: 600,
-    cornerRadius: 4,
-  },
-  weakEntity: {
-    fill: '#fff7e6',
-    stroke: '#fa8c16',
-    strokeWidth: 2.5,
-    headerFill: '#ffe7ba',
-    headerStroke: '#fa8c16',
-    fontSize: 14,
-    fontWeight: 600,
-    cornerRadius: 4,
-  },
-  associativeEntity: {
-    fill: '#f6ffed',
-    stroke: '#52c41a',
-    strokeWidth: 2,
-    headerFill: '#d9f7be',
-    headerStroke: '#52c41a',
-    fontSize: 14,
-    fontWeight: 600,
-    cornerRadius: 4,
-  },
-  relationship: {
-    stroke: '#595959',
-    strokeWidth: 1.5,
-    fontSize: 12,
-    fontWeight: 500,
-  },
-  attribute: {
-    fill: '#f0f0f0',
-    stroke: '#8c8c8c',
-    strokeWidth: 1,
-    fontSize: 11,
-  },
-  keyAttribute: {
-    fill: '#fff2e8',
-    stroke: '#fa541c',
-    strokeWidth: 1.5,
-    fontSize: 11,
-    fontWeight: 600,
-  },
-  crowsFoot: {
-    stroke: '#262626',
-    strokeWidth: 2,
-    size: 10,
-  },
-  participation: {
-    total: { strokeWidth: 3, stroke: '#262626' },
-    partial: { strokeWidth: 1.5, stroke: '#8c8c8c' },
-  },
-}
-
-// ==================== 类型定义 ====================
-type EntityType = 'strong' | 'weak' | 'associative'
-type CardinalityType = 'one' | 'many' | 'zero-or-one' | 'one-or-many' | 'zero-or-many'
-type ParticipationType = 'total' | 'partial'
-
-interface EntityConfig {
-  id: string
-  name: string
-  type?: EntityType
-  columns: ColumnConfig[]
-}
-
-interface ColumnConfig {
-  name: string
-  dataType: string
-  isPrimary?: boolean
-  isForeign?: boolean
-  isNullable?: boolean
-  isUnique?: boolean
-  defaultValue?: string
-  comment?: string
-}
-
-interface RelationshipConfig {
-  source: string
-  target: string
-  sourceCardinality: CardinalityType
-  targetCardinality: CardinalityType
-  sourceParticipation?: ParticipationType
-  targetParticipation?: ParticipationType
-  label?: string
-  isIdentifying?: boolean
-}
-
-// ==================== 工具函数 ====================
-
-/**
- * 计算实体布局
- */
-function calculateEntityLayout(
-  entities: EntityConfig[],
-  config: ErLayoutConfig
-): Map<string, { index: number; x: number; y: number; width: number; height: number; centerX: number; centerY: number }> {
-  const layouts = new Map()
-  const cols = Math.ceil(Math.sqrt(entities.length))
-
-  entities.forEach((entity, index) => {
-    let x: number
-    let y: number
-
-    switch (config.layoutAlgorithm) {
-      case 'grid':
-        const col = index % cols
-        const row = Math.floor(index / cols)
-        x = config.startX + col * config.entitySpacing
-        y = config.startY + row * (config.entityHeight + 80)
-        break
-      case 'hierarchical':
-        if (config.direction === 'horizontal') {
-          x = config.startX + index * config.entitySpacing
-          y = config.startY
-        } else {
-          x = config.startX
-          y = config.startY + index * (config.entityHeight + 80)
-        }
-        break
-      default:
-        x = config.startX + index * config.entitySpacing
-        y = config.startY
-    }
-
-    const height = Math.max(config.entityHeight, 60 + entity.columns.length * 22)
-
-    layouts.set(entity.id, {
-      index,
-      x,
-      y,
-      width: config.entityWidth,
-      height,
-      centerX: x + config.entityWidth / 2,
-      centerY: y + height / 2,
-    })
-  })
-
-  return layouts
-}
-
-/**
- * 格式化列定义文本
- */
-function formatColumnText(columns: ColumnConfig[]): string {
-  const lines = columns.map(col => {
-    const constraints: string[] = []
-    if (col.isPrimary) constraints.push('PK')
-    if (col.isForeign) constraints.push('FK')
-    if (col.isUnique && !col.isPrimary) constraints.push('UQ')
-    if (!col.isNullable) constraints.push('NN')
-
-    const constraintStr = constraints.length > 0 ? ` ${constraints.join(',')}` : ''
-    return `${col.name} ${col.dataType}${constraintStr}`
-  })
-
-  return lines.join('\n')
-}
-
-/**
- * 创建实体节点
- */
-function createEntityNode(
-  entity: EntityConfig,
-  layout: any,
-  config: ErLayoutConfig
-): TemplateNode {
-  let style = ER_STYLES.entity
-  let nodeType = 'er-table-entity-with-columns'
-
-  switch (entity.type) {
-    case 'weak':
-      style = ER_STYLES.weakEntity
-      nodeType = 'er-weak-entity'
-      break
-    case 'associative':
-      style = ER_STYLES.associativeEntity
-      break
-  }
-
-  const columnText = formatColumnText(entity.columns)
-  const fullText = `${entity.name}\n${columnText}`
-
-  return {
-    id: `entity-${entity.id}`,
-    type: nodeType,
-    x: layout.x,
-    y: layout.y,
-    width: layout.width,
-    height: layout.height,
-    text: fullText,
-    fill: style.fill,
-    stroke: style.stroke,
-    strokeWidth: style.strokeWidth,
-    data: {
-      entityType: entity.type || 'strong',
-      columns: entity.columns,
-    },
-  }
-}
-
-/**
- * 创建关系边
- */
-function createRelationshipEdge(
-  index: number,
-  rel: RelationshipConfig,
-  sourceLayout: any,
-  targetLayout: any
-): TemplateEdge {
-  return {
-    id: `rel-${index}`,
-    source: `entity-${rel.source}`,
-    target: `entity-${rel.target}`,
-    label: rel.label,
-    style: 'orthogonal',
-    lineStyle: rel.isIdentifying ? 'solid' : 'dashed',
-    data: {
-      sourceCardinality: rel.sourceCardinality,
-      targetCardinality: rel.targetCardinality,
-      sourceParticipation: rel.sourceParticipation || 'partial',
-      targetParticipation: rel.targetParticipation || 'partial',
-      isIdentifying: rel.isIdentifying,
-    },
-  }
-}
-
-/**
- * 生成 Mermaid ER 代码
- */
-function generateMermaidCode(
-  entities: EntityConfig[],
-  relationships: RelationshipConfig[]
-): string {
-  const entityLines = entities.map(entity => {
-    const colLines = entity.columns.map(col => {
-      const type = col.dataType.toLowerCase()
-      const pk = col.isPrimary ? ' PK' : ''
-      const fk = col.isForeign ? ' FK' : ''
-      return `        ${type} ${col.name}${pk}${fk}`
-    }).join('\n')
-
-    return `    ${entity.name} {
-${colLines}
-    }`
-  }).join('\n')
-
-  const relLines = relationships.map(rel => {
-    const sourceCard = cardinalityToMermaid(rel.sourceCardinality)
-    const targetCard = cardinalityToMermaid(rel.targetCardinality)
-    const label = rel.label ? ` : "${rel.label}"` : ''
-    return `    ${entities.find(e => e.id === rel.source)?.name} ${sourceCard}--${targetCard} ${entities.find(e => e.id === rel.target)?.name}${label}`
-  }).join('\n')
-
-  return `erDiagram
-${entityLines}
-${relLines ? '\n' + relLines : ''}`
-}
-
-/**
- * 基数转换为 Mermaid 符号
- */
-function cardinalityToMermaid(cardinality: CardinalityType): string {
-  switch (cardinality) {
-    case 'one':
-      return '||'
-    case 'many':
-      return '}o'
-    case 'zero-or-one':
-      return '|o'
-    case 'one-or-many':
-      return '}|'
-    case 'zero-or-many':
-      return 'o{'
-    default:
-      return '||'
-  }
-}
-
-// ==================== 模板生成函数 ====================
-
-/**
- * 简单ER图模板
- * 用户-订单-商品关系
- */
-export function createSimpleErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const simpleErConfig: ErTemplateConfig = {
+  id: 'er-simple',
+  name: '简单ER图',
+  description: '用户-订单-商品关系，展示基础的电商数据模型',
+  category: 'basic',
+  tags: ['er', 'ecommerce', 'basic', 'beginner'],
+  difficulty: 'beginner',
+  entities: [
     {
       id: 'user',
       name: 'USER',
@@ -389,63 +91,22 @@ export function createSimpleErTemplate(options: TemplateGenerateOptions = {}): D
         { name: 'unit_price', dataType: 'decimal(10,2)', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'user',
-      target: 'order',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'places',
-    },
-    {
-      source: 'order',
-      target: 'order_item',
-      sourceCardinality: 'one',
-      targetCardinality: 'one-or-many',
-      label: 'contains',
-    },
-    {
-      source: 'product',
-      target: 'order_item',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'included_in',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-simple',
-    name: '简单ER图',
-    description: '用户-订单-商品关系，展示基础的电商数据模型',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'user', target: 'order', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'places' },
+    { source: 'order', target: 'order_item', sourceCardinality: 'one', targetCardinality: 'one-or-many', label: 'contains' },
+    { source: 'product', target: 'order_item', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'included_in' },
+  ],
 }
 
-/**
- * 一对多关系模板
- * 部门与员工
- */
-export function createOneToManyErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const oneToManyErConfig: ErTemplateConfig = {
+  id: 'er-one-to-many',
+  name: '一对多关系',
+  description: '部门与员工的一对多关系，展示基础的组织架构模型',
+  category: 'basic',
+  tags: ['er', 'organization', 'one-to-many', 'beginner'],
+  difficulty: 'beginner',
+  entities: [
     {
       id: 'department',
       name: 'DEPARTMENT',
@@ -470,9 +131,8 @@ export function createOneToManyErTemplate(options: TemplateGenerateOptions = {})
         { name: 'salary', dataType: 'decimal(10,2)' },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
+  ],
+  relationships: [
     {
       source: 'department',
       target: 'employee',
@@ -482,39 +142,17 @@ export function createOneToManyErTemplate(options: TemplateGenerateOptions = {})
       targetParticipation: 'total',
       label: 'employs',
     },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-one-to-many',
-    name: '一对多关系',
-    description: '部门与员工的一对多关系，展示基础的组织架构模型',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
 }
 
-/**
- * 多对多关系模板
- * 学生与课程
- */
-export function createManyToManyErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const manyToManyErConfig: ErTemplateConfig = {
+  id: 'er-many-to-many',
+  name: '多对多关系',
+  description: '学生与课程的多对多关系，通过关联实体ENROLLMENT实现',
+  category: 'basic',
+  tags: ['er', 'education', 'many-to-many', 'intermediate'],
+  difficulty: 'intermediate',
+  entities: [
     {
       id: 'student',
       name: 'STUDENT',
@@ -551,56 +189,21 @@ export function createManyToManyErTemplate(options: TemplateGenerateOptions = {}
         { name: 'enrolled_at', dataType: 'timestamp', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'student',
-      target: 'enrollment',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'enrolls_in',
-    },
-    {
-      source: 'course',
-      target: 'enrollment',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'has_students',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-many-to-many',
-    name: '多对多关系',
-    description: '学生与课程的多对多关系，通过关联实体ENROLLMENT实现',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'student', target: 'enrollment', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'enrolls_in' },
+    { source: 'course', target: 'enrollment', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'has_students' },
+  ],
 }
 
-/**
- * 自引用关系模板
- * 员工上下级关系
- */
-export function createSelfReferenceErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const selfReferenceErConfig: ErTemplateConfig = {
+  id: 'er-self-reference',
+  name: '自引用关系',
+  description: '员工的上下级关系，展示递归关联模式',
+  category: 'basic',
+  tags: ['er', 'organization', 'self-reference', 'intermediate'],
+  difficulty: 'intermediate',
+  entities: [
     {
       id: 'employee',
       name: 'EMPLOYEE',
@@ -614,9 +217,8 @@ export function createSelfReferenceErTemplate(options: TemplateGenerateOptions =
         { name: 'hire_date', dataType: 'date', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
+  ],
+  relationships: [
     {
       source: 'employee',
       target: 'employee',
@@ -624,44 +226,19 @@ export function createSelfReferenceErTemplate(options: TemplateGenerateOptions =
       targetCardinality: 'zero-or-many',
       label: 'manages',
     },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) => ({
-    ...createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!),
-    isSelfLoop: true,
-    selfLoopConfig: {
-      direction: 'top',
-      radius: 50,
-    },
-  }))
-
-  return {
-    id: 'er-self-reference',
-    name: '自引用关系',
-    description: '员工的上下级关系，展示递归关联模式',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
 }
 
-/**
- * 电商系统ER图模板
- */
-export function createEcommerceErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-  config.layoutAlgorithm = 'hierarchical'
+// ==================== 业务系统模板配置 ====================
 
-  const entities: EntityConfig[] = [
+const ecommerceErConfig: ErTemplateConfig = {
+  id: 'er-ecommerce',
+  name: '电商系统ER图',
+  description: '完整的电商系统数据模型，包含客户、商品、订单、地址等实体',
+  category: 'business',
+  tags: ['er', 'ecommerce', 'business', 'advanced'],
+  difficulty: 'advanced',
+  entities: [
     {
       id: 'customer',
       name: 'CUSTOMER',
@@ -744,83 +321,25 @@ export function createEcommerceErTemplate(options: TemplateGenerateOptions = {})
         { name: 'subtotal', dataType: 'decimal(10,2)', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'customer',
-      target: 'address',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'has',
-    },
-    {
-      source: 'category',
-      target: 'product',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'contains',
-    },
-    {
-      source: 'customer',
-      target: 'order',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'places',
-    },
-    {
-      source: 'order',
-      target: 'order_item',
-      sourceCardinality: 'one',
-      targetCardinality: 'one-or-many',
-      label: 'includes',
-    },
-    {
-      source: 'product',
-      target: 'order_item',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'ordered_as',
-    },
-    {
-      source: 'address',
-      target: 'order',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'ships_to',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-ecommerce',
-    name: '电商系统ER图',
-    description: '完整的电商系统数据模型，包含客户、商品、订单、地址等实体',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'customer', target: 'address', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'has' },
+    { source: 'category', target: 'product', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'contains' },
+    { source: 'customer', target: 'order', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'places' },
+    { source: 'order', target: 'order_item', sourceCardinality: 'one', targetCardinality: 'one-or-many', label: 'includes' },
+    { source: 'product', target: 'order_item', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'ordered_as' },
+    { source: 'address', target: 'order', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'ships_to' },
+  ],
 }
 
-/**
- * 博客系统ER图模板
- */
-export function createBlogErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const blogErConfig: ErTemplateConfig = {
+  id: 'er-blog',
+  name: '博客系统ER图',
+  description: '博客文章、评论、标签、分类系统，支持多对多标签关联',
+  category: 'business',
+  tags: ['er', 'blog', 'cms', 'intermediate'],
+  difficulty: 'intermediate',
+  entities: [
     {
       id: 'user',
       name: 'USER',
@@ -893,83 +412,25 @@ export function createBlogErTemplate(options: TemplateGenerateOptions = {}): Dia
         { name: 'created_at', dataType: 'timestamp', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'user',
-      target: 'post',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'writes',
-    },
-    {
-      source: 'category',
-      target: 'post',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'contains',
-    },
-    {
-      source: 'post',
-      target: 'post_tag',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'tagged_with',
-    },
-    {
-      source: 'tag',
-      target: 'post_tag',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'used_in',
-    },
-    {
-      source: 'post',
-      target: 'comment',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'has',
-    },
-    {
-      source: 'user',
-      target: 'comment',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'writes',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-blog',
-    name: '博客系统ER图',
-    description: '博客文章、评论、标签、分类系统，支持多对多标签关联',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'user', target: 'post', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'writes' },
+    { source: 'category', target: 'post', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'contains' },
+    { source: 'post', target: 'post_tag', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'tagged_with' },
+    { source: 'tag', target: 'post_tag', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'used_in' },
+    { source: 'post', target: 'comment', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'has' },
+    { source: 'user', target: 'comment', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'writes' },
+  ],
 }
 
-/**
- * 社交网络ER图模板
- */
-export function createSocialNetworkErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const socialNetworkErConfig: ErTemplateConfig = {
+  id: 'er-social-network',
+  name: '社交网络ER图',
+  description: '用户、帖子、关注、点赞、消息、通知系统',
+  category: 'business',
+  tags: ['er', 'social', 'network', 'advanced'],
+  difficulty: 'advanced',
+  entities: [
     {
       id: 'user',
       name: 'USER',
@@ -1044,83 +505,25 @@ export function createSocialNetworkErTemplate(options: TemplateGenerateOptions =
         { name: 'created_at', dataType: 'timestamp', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'user',
-      target: 'post',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'creates',
-    },
-    {
-      source: 'user',
-      target: 'follow',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'follows',
-    },
-    {
-      source: 'user',
-      target: 'like',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'gives',
-    },
-    {
-      source: 'post',
-      target: 'like',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'receives',
-    },
-    {
-      source: 'user',
-      target: 'message',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'sends',
-    },
-    {
-      source: 'user',
-      target: 'notification',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'receives',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-social-network',
-    name: '社交网络ER图',
-    description: '用户、帖子、关注、点赞、消息、通知系统',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'user', target: 'post', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'creates' },
+    { source: 'user', target: 'follow', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'follows' },
+    { source: 'user', target: 'like', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'gives' },
+    { source: 'post', target: 'like', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'receives' },
+    { source: 'user', target: 'message', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'sends' },
+    { source: 'user', target: 'notification', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'receives' },
+  ],
 }
 
-/**
- * 库存管理系统ER图模板
- */
-export function createInventoryErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const inventoryErConfig: ErTemplateConfig = {
+  id: 'er-inventory',
+  name: '库存管理系统ER图',
+  description: '产品、仓库、库存、供应商、采购订单系统',
+  category: 'business',
+  tags: ['er', 'inventory', 'warehouse', 'advanced'],
+  difficulty: 'advanced',
+  entities: [
     {
       id: 'product',
       name: 'PRODUCT',
@@ -1200,76 +603,24 @@ export function createInventoryErTemplate(options: TemplateGenerateOptions = {})
         { name: 'received_qty', dataType: 'int', defaultValue: '0' },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'product',
-      target: 'inventory',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'stored_in',
-    },
-    {
-      source: 'warehouse',
-      target: 'inventory',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'contains',
-    },
-    {
-      source: 'supplier',
-      target: 'purchase_order',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'receives',
-    },
-    {
-      source: 'purchase_order',
-      target: 'purchase_item',
-      sourceCardinality: 'one',
-      targetCardinality: 'one-or-many',
-      label: 'includes',
-    },
-    {
-      source: 'product',
-      target: 'purchase_item',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'ordered_as',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-inventory',
-    name: '库存管理系统ER图',
-    description: '产品、仓库、库存、供应商、采购订单系统',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'product', target: 'inventory', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'stored_in' },
+    { source: 'warehouse', target: 'inventory', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'contains' },
+    { source: 'supplier', target: 'purchase_order', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'receives' },
+    { source: 'purchase_order', target: 'purchase_item', sourceCardinality: 'one', targetCardinality: 'one-or-many', label: 'includes' },
+    { source: 'product', target: 'purchase_item', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'ordered_as' },
+  ],
 }
 
-/**
- * 图书馆管理系统ER图模板
- */
-export function createLibraryErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const libraryErConfig: ErTemplateConfig = {
+  id: 'er-library',
+  name: '图书馆管理系统ER图',
+  description: '会员、图书、借阅、预约、罚款系统',
+  category: 'business',
+  tags: ['er', 'library', 'education', 'intermediate'],
+  difficulty: 'intermediate',
+  entities: [
     {
       id: 'member',
       name: 'MEMBER',
@@ -1341,76 +692,24 @@ export function createLibraryErTemplate(options: TemplateGenerateOptions = {}): 
         { name: 'paid_date', dataType: 'date' },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'member',
-      target: 'loan',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'borrows',
-    },
-    {
-      source: 'book',
-      target: 'loan',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'lent_to',
-    },
-    {
-      source: 'member',
-      target: 'reservation',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'reserves',
-    },
-    {
-      source: 'book',
-      target: 'reservation',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'reserved_by',
-    },
-    {
-      source: 'loan',
-      target: 'fine',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-one',
-      label: 'incurs',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-library',
-    name: '图书馆管理系统ER图',
-    description: '会员、图书、借阅、预约、罚款系统',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'member', target: 'loan', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'borrows' },
+    { source: 'book', target: 'loan', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'lent_to' },
+    { source: 'member', target: 'reservation', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'reserves' },
+    { source: 'book', target: 'reservation', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'reserved_by' },
+    { source: 'loan', target: 'fine', sourceCardinality: 'one', targetCardinality: 'zero-or-one', label: 'incurs' },
+  ],
 }
 
-/**
- * HR人力资源管理系统ER图模板
- */
-export function createHrErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const hrErConfig: ErTemplateConfig = {
+  id: 'er-hr',
+  name: 'HR人力资源ER图',
+  description: '部门、员工、职位、薪资、考勤、请假系统',
+  category: 'business',
+  tags: ['er', 'hr', 'enterprise', 'advanced'],
+  difficulty: 'advanced',
+  entities: [
     {
       id: 'department',
       name: 'DEPARTMENT',
@@ -1502,90 +801,28 @@ export function createHrErTemplate(options: TemplateGenerateOptions = {}): Diagr
         { name: 'status', dataType: 'varchar(20)', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'department',
-      target: 'employee',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'employs',
-    },
-    {
-      source: 'employee',
-      target: 'employee',
-      sourceCardinality: 'zero-or-one',
-      targetCardinality: 'zero-or-many',
-      label: 'manages',
-    },
-    {
-      source: 'employee',
-      target: 'employee_position',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'holds',
-    },
-    {
-      source: 'position',
-      target: 'employee_position',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'assigned_to',
-    },
-    {
-      source: 'employee',
-      target: 'salary',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'earns',
-    },
-    {
-      source: 'employee',
-      target: 'attendance',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'records',
-    },
-    {
-      source: 'employee',
-      target: 'leave',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'requests',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-hr',
-    name: 'HR人力资源ER图',
-    description: '部门、员工、职位、薪资、考勤、请假系统',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'department', target: 'employee', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'employs' },
+    { source: 'employee', target: 'employee', sourceCardinality: 'zero-or-one', targetCardinality: 'zero-or-many', label: 'manages' },
+    { source: 'employee', target: 'employee_position', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'holds' },
+    { source: 'position', target: 'employee_position', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'assigned_to' },
+    { source: 'employee', target: 'salary', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'earns' },
+    { source: 'employee', target: 'attendance', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'records' },
+    { source: 'employee', target: 'leave', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'requests' },
+  ],
 }
 
-/**
- * 权限管理系统ER图模板（RBAC）
- */
-export function createRbacErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
+// ==================== 系统模板配置 ====================
 
-  const entities: EntityConfig[] = [
+const rbacErConfig: ErTemplateConfig = {
+  id: 'er-rbac',
+  name: '权限管理系统ER图（RBAC）',
+  description: '基于角色的访问控制模型，用户-角色-权限多对多关系',
+  category: 'system',
+  tags: ['er', 'rbac', 'security', 'intermediate'],
+  difficulty: 'intermediate',
+  entities: [
     {
       id: 'user',
       name: 'USER',
@@ -1643,69 +880,23 @@ export function createRbacErTemplate(options: TemplateGenerateOptions = {}): Dia
         { name: 'granted_at', dataType: 'timestamp', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'user',
-      target: 'user_role',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'has',
-    },
-    {
-      source: 'role',
-      target: 'user_role',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'assigned_to',
-    },
-    {
-      source: 'role',
-      target: 'role_permission',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'grants',
-    },
-    {
-      source: 'permission',
-      target: 'role_permission',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'belongs_to',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-rbac',
-    name: '权限管理系统ER图（RBAC）',
-    description: '基于角色的访问控制模型，用户-角色-权限多对多关系',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'user', target: 'user_role', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'has' },
+    { source: 'role', target: 'user_role', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'assigned_to' },
+    { source: 'role', target: 'role_permission', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'grants' },
+    { source: 'permission', target: 'role_permission', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'belongs_to' },
+  ],
 }
 
-/**
- * 内容管理系统ER图模板（CMS）
- */
-export function createCmsErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const cmsErConfig: ErTemplateConfig = {
+  id: 'er-cms',
+  name: '内容管理系统ER图（CMS）',
+  description: '站点、内容类型、内容、媒体、菜单系统',
+  category: 'system',
+  tags: ['er', 'cms', 'content', 'intermediate'],
+  difficulty: 'intermediate',
+  entities: [
     {
       id: 'site',
       name: 'SITE',
@@ -1782,83 +973,25 @@ export function createCmsErTemplate(options: TemplateGenerateOptions = {}): Diag
         { name: 'sort_order', dataType: 'int', defaultValue: '0' },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'site',
-      target: 'content',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'has',
-    },
-    {
-      source: 'content_type',
-      target: 'content',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'defines',
-    },
-    {
-      source: 'site',
-      target: 'media',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'stores',
-    },
-    {
-      source: 'content',
-      target: 'content_media',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'uses',
-    },
-    {
-      source: 'media',
-      target: 'content_media',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'attached_to',
-    },
-    {
-      source: 'site',
-      target: 'menu',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'navigates',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-cms',
-    name: '内容管理系统ER图（CMS）',
-    description: '站点、内容类型、内容、媒体、菜单系统',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'site', target: 'content', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'has' },
+    { source: 'content_type', target: 'content', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'defines' },
+    { source: 'site', target: 'media', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'stores' },
+    { source: 'content', target: 'content_media', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'uses' },
+    { source: 'media', target: 'content_media', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'attached_to' },
+    { source: 'site', target: 'menu', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'navigates' },
+  ],
 }
 
-/**
- * 工作流系统ER图模板
- */
-export function createWorkflowErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const workflowErConfig: ErTemplateConfig = {
+  id: 'er-workflow',
+  name: '工作流系统ER图',
+  description: '工作流定义、步骤、实例、任务、转换系统',
+  category: 'system',
+  tags: ['er', 'workflow', 'bpm', 'advanced'],
+  difficulty: 'advanced',
+  entities: [
     {
       id: 'workflow',
       name: 'WORKFLOW',
@@ -1926,76 +1059,24 @@ export function createWorkflowErTemplate(options: TemplateGenerateOptions = {}):
         { name: 'is_default', dataType: 'boolean', defaultValue: 'false' },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'workflow',
-      target: 'workflow_step',
-      sourceCardinality: 'one',
-      targetCardinality: 'one-or-many',
-      label: 'contains',
-    },
-    {
-      source: 'workflow',
-      target: 'workflow_instance',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'instantiates',
-    },
-    {
-      source: 'workflow_instance',
-      target: 'workflow_task',
-      sourceCardinality: 'one',
-      targetCardinality: 'one-or-many',
-      label: 'generates',
-    },
-    {
-      source: 'workflow_step',
-      target: 'workflow_task',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'creates',
-    },
-    {
-      source: 'workflow_step',
-      target: 'workflow_transition',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'transitions_from',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-workflow',
-    name: '工作流系统ER图',
-    description: '工作流定义、步骤、实例、任务、转换系统',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'workflow', target: 'workflow_step', sourceCardinality: 'one', targetCardinality: 'one-or-many', label: 'contains' },
+    { source: 'workflow', target: 'workflow_instance', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'instantiates' },
+    { source: 'workflow_instance', target: 'workflow_task', sourceCardinality: 'one', targetCardinality: 'one-or-many', label: 'generates' },
+    { source: 'workflow_step', target: 'workflow_task', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'creates' },
+    { source: 'workflow_step', target: 'workflow_transition', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'transitions_from' },
+  ],
 }
 
-/**
- * 消息通知系统ER图模板
- */
-export function createNotificationErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const notificationErConfig: ErTemplateConfig = {
+  id: 'er-notification',
+  name: '消息通知系统ER图',
+  description: '用户、通知模板、通知、日志、订阅系统',
+  category: 'system',
+  tags: ['er', 'notification', 'message', 'intermediate'],
+  difficulty: 'intermediate',
+  entities: [
     {
       id: 'user',
       name: 'USER',
@@ -2064,69 +1145,23 @@ export function createNotificationErTemplate(options: TemplateGenerateOptions = 
         { name: 'subscribed_at', dataType: 'timestamp', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'user',
-      target: 'notification',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'receives',
-    },
-    {
-      source: 'notification_template',
-      target: 'notification',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'generates',
-    },
-    {
-      source: 'notification',
-      target: 'notification_log',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'logs',
-    },
-    {
-      source: 'user',
-      target: 'subscription',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'subscribes',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-notification',
-    name: '消息通知系统ER图',
-    description: '用户、通知模板、通知、日志、订阅系统',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'user', target: 'notification', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'receives' },
+    { source: 'notification_template', target: 'notification', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'generates' },
+    { source: 'notification', target: 'notification_log', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'logs' },
+    { source: 'user', target: 'subscription', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'subscribes' },
+  ],
 }
 
-/**
- * 文件存储系统ER图模板
- */
-export function createFileStorageErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
-  const config = { ...DEFAULT_CONFIG, ...options }
-
-  const entities: EntityConfig[] = [
+const fileStorageErConfig: ErTemplateConfig = {
+  id: 'er-file-storage',
+  name: '文件存储系统ER图',
+  description: '存储桶、文件夹、文件、版本、元数据、分享系统',
+  category: 'system',
+  tags: ['er', 'storage', 'file', 'advanced'],
+  difficulty: 'advanced',
+  entities: [
     {
       id: 'storage_bucket',
       name: 'STORAGE_BUCKET',
@@ -2210,95 +1245,243 @@ export function createFileStorageErTemplate(options: TemplateGenerateOptions = {
         { name: 'permission', dataType: 'varchar(20)', isNullable: false },
       ],
     },
-  ]
-
-  const relationships: RelationshipConfig[] = [
-    {
-      source: 'storage_bucket',
-      target: 'folder',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'contains',
-    },
-    {
-      source: 'storage_bucket',
-      target: 'file',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'stores',
-    },
-    {
-      source: 'folder',
-      target: 'file',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'organizes',
-    },
-    {
-      source: 'file',
-      target: 'file_version',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'has',
-    },
-    {
-      source: 'file',
-      target: 'file_metadata',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'described_by',
-    },
-    {
-      source: 'file',
-      target: 'file_share',
-      sourceCardinality: 'one',
-      targetCardinality: 'zero-or-many',
-      label: 'shared_via',
-    },
-  ]
-
-  const layouts = calculateEntityLayout(entities, config)
-
-  const nodes: TemplateNode[] = entities.map(e => createEntityNode(e, layouts.get(e.id)!, config))
-
-  const edges: TemplateEdge[] = relationships.map((rel, index) =>
-    createRelationshipEdge(index, rel, layouts.get(rel.source)!, layouts.get(rel.target)!)
-  )
-
-  return {
-    id: 'er-file-storage',
-    name: '文件存储系统ER图',
-    description: '存储桶、文件夹、文件、版本、元数据、分享系统',
-    type: 'er',
-    nodes,
-    edges,
-    layout: {
-      direction: config.direction,
-      spacing: config.entitySpacing,
-    },
-    mermaidCode: generateMermaidCode(entities, relationships),
-  }
+  ],
+  relationships: [
+    { source: 'storage_bucket', target: 'folder', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'contains' },
+    { source: 'storage_bucket', target: 'file', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'stores' },
+    { source: 'folder', target: 'file', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'organizes' },
+    { source: 'file', target: 'file_version', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'has' },
+    { source: 'file', target: 'file_metadata', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'described_by' },
+    { source: 'file', target: 'file_share', sourceCardinality: 'one', targetCardinality: 'zero-or-many', label: 'shared_via' },
+  ],
 }
+
+// ==================== 模板配置数组 ====================
+
+const allErConfigs: ErTemplateConfig[] = [
+  simpleErConfig,
+  oneToManyErConfig,
+  manyToManyErConfig,
+  selfReferenceErConfig,
+  ecommerceErConfig,
+  blogErConfig,
+  socialNetworkErConfig,
+  inventoryErConfig,
+  libraryErConfig,
+  hrErConfig,
+  rbacErConfig,
+  cmsErConfig,
+  workflowErConfig,
+  notificationErConfig,
+  fileStorageErConfig,
+]
+
+// ==================== 模板生成函数 ====================
+
+/**
+ * 简单ER图模板
+ */
+export function createSimpleErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(simpleErConfig, options)
+}
+
+/**
+ * 一对多关系模板
+ */
+export function createOneToManyErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(oneToManyErConfig, options)
+}
+
+/**
+ * 多对多关系模板
+ */
+export function createManyToManyErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(manyToManyErConfig, options)
+}
+
+/**
+ * 自引用关系模板
+ */
+export function createSelfReferenceErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(selfReferenceErConfig, options)
+}
+
+/**
+ * 电商系统ER图模板
+ */
+export function createEcommerceErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(ecommerceErConfig, options)
+}
+
+/**
+ * 博客系统ER图模板
+ */
+export function createBlogErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(blogErConfig, options)
+}
+
+/**
+ * 社交网络ER图模板
+ */
+export function createSocialNetworkErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(socialNetworkErConfig, options)
+}
+
+/**
+ * 库存管理系统ER图模板
+ */
+export function createInventoryErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(inventoryErConfig, options)
+}
+
+/**
+ * 图书馆管理系统ER图模板
+ */
+export function createLibraryErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(libraryErConfig, options)
+}
+
+/**
+ * HR人力资源管理系统ER图模板
+ */
+export function createHrErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(hrErConfig, options)
+}
+
+/**
+ * 权限管理系统ER图模板（RBAC）
+ */
+export function createRbacErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(rbacErConfig, options)
+}
+
+/**
+ * 内容管理系统ER图模板（CMS）
+ */
+export function createCmsErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(cmsErConfig, options)
+}
+
+/**
+ * 工作流系统ER图模板
+ */
+export function createWorkflowErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(workflowErConfig, options)
+}
+
+/**
+ * 消息通知系统ER图模板
+ */
+export function createNotificationErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(notificationErConfig, options)
+}
+
+/**
+ * 文件存储系统ER图模板
+ */
+export function createFileStorageErTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  return generateErTemplate(fileStorageErConfig, options)
+}
+
+// ==================== 模板集合函数 ====================
 
 /**
  * 获取所有ER图模板
  */
 export function getErTemplates(options: TemplateGenerateOptions = {}): DiagramTemplate[] {
-  return [
-    createSimpleErTemplate(options),
-    createOneToManyErTemplate(options),
-    createManyToManyErTemplate(options),
-    createSelfReferenceErTemplate(options),
-    createEcommerceErTemplate(options),
-    createBlogErTemplate(options),
-    createSocialNetworkErTemplate(options),
-    createInventoryErTemplate(options),
-    createLibraryErTemplate(options),
-    createHrErTemplate(options),
-    createRbacErTemplate(options),
-    createCmsErTemplate(options),
-    createWorkflowErTemplate(options),
-    createNotificationErTemplate(options),
-    createFileStorageErTemplate(options),
-  ]
+  return allErConfigs.map(config => generateErTemplate(config, options))
+}
+
+/**
+ * 根据分类获取ER图模板
+ */
+export function getErTemplatesByCategory(
+  category: ErTemplateConfig['category'],
+  options: TemplateGenerateOptions = {}
+): DiagramTemplate[] {
+  return allErConfigs
+    .filter(config => config.category === category)
+    .map(config => generateErTemplate(config, options))
+}
+
+/**
+ * 根据难度获取ER图模板
+ */
+export function getErTemplatesByDifficulty(
+  difficulty: ErTemplateConfig['difficulty'],
+  options: TemplateGenerateOptions = {}
+): DiagramTemplate[] {
+  return allErConfigs
+    .filter(config => config.difficulty === difficulty)
+    .map(config => generateErTemplate(config, options))
+}
+
+/**
+ * 根据标签搜索ER图模板
+ */
+export function searchErTemplatesByTag(
+  tag: string,
+  options: TemplateGenerateOptions = {}
+): DiagramTemplate[] {
+  return allErConfigs
+    .filter(config => config.tags.some(t => t.toLowerCase().includes(tag.toLowerCase())))
+    .map(config => generateErTemplate(config, options))
+}
+
+/**
+ * 获取所有模板元数据（不包含生成的图表数据）
+ */
+export function getErTemplatesMetadata() {
+  return allErConfigs.map(getErTemplateMetadata)
+}
+
+/**
+ * 验证所有模板配置的有效性
+ */
+export function validateAllErTemplates(): { valid: boolean; errors: Record<string, string[]> } {
+  const errors: Record<string, string[]> = {}
+
+  allErConfigs.forEach(config => {
+    const result = validateErTemplateConfig(config)
+    if (!result.valid) {
+      errors[config.id] = result.errors
+    }
+  })
+
+  return {
+    valid: Object.keys(errors).length === 0,
+    errors,
+  }
+}
+
+// ==================== 导出配置和工具 ====================
+
+export {
+  DEFAULT_ER_CONFIG,
+  ER_THEMES,
+  allErConfigs,
+  simpleErConfig,
+  oneToManyErConfig,
+  manyToManyErConfig,
+  selfReferenceErConfig,
+  ecommerceErConfig,
+  blogErConfig,
+  socialNetworkErConfig,
+  inventoryErConfig,
+  libraryErConfig,
+  hrErConfig,
+  rbacErConfig,
+  cmsErConfig,
+  workflowErConfig,
+  notificationErConfig,
+  fileStorageErConfig,
+}
+
+// 重新导出工具函数类型
+export type {
+  ErTemplateConfig,
+  EntityConfig,
+  RelationshipConfig,
+  EntityLayout,
+  ErTheme,
 }

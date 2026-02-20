@@ -27,6 +27,67 @@ const LAYOUT_CONSTANTS = {
   LABEL_HEIGHT: 20,            // 标签高度
   LABEL_X: 10,                 // 标签x位置
   PROGRESS_BAR_Y_OFFSET: 4,    // 进度条y偏移
+  // 新增：图例相关常量
+  LEGEND_X_PADDING: 20,         // 图例x偏移
+  LEGEND_TITLE_WIDTH: 120,      // 图例标题宽度
+  LEGEND_TITLE_HEIGHT: 20,       // 图例标题高度
+  LEGEND_TITLE_Y_OFFSET: 30,    // 图例标题y偏移
+  LEGEND_ITEM_WIDTH: 16,        // 图例项宽度
+  LEGEND_ITEM_HEIGHT: 16,       // 图例项高度
+  LEGEND_ITEM_SPACING: 25,       // 图例项间距
+  LEGEND_LABEL_SPACING: 24,      // 图例标签间距
+  LEGEND_TEXT_WIDTH: 100,       // 图例文本宽度
+  LEGEND_ITEM_CORNER_RADIUS: 2, // 图例项圆角
+  LEGEND_STROKE_WIDTH: 1,        // 图例边框宽度
+  // 新增：其他常量
+  TASK_LABEL_PADDING: 20,        // 任务标签内边距
+  PROGRESS_BAR_CORNER_RADIUS: 2, // 进度条圆角
+  HIGHLIGHT_STROKE_WIDTH: 3,      // 高亮边框宽度
+  // 新增：浮动时间标签常量
+  FLOAT_LABEL_X_PADDING: 5,        // 浮动时间x偏移
+  FLOAT_LABEL_WIDTH: 60,            // 浮动时间标签宽度
+  FLOAT_LABEL_HEIGHT: 16,           // 浮动时间标签高度
+  // 新增：zIndex 层级常量
+  Z_INDEX_TASK: 10,
+  Z_INDEX_PROGRESS: 11,
+  Z_INDEX_LABEL: 10,
+  Z_INDEX_MILESTONE: 10,
+  Z_INDEX_DEPENDENCY_CRITICAL: 9,
+  Z_INDEX_DEPENDENCY_NORMAL: 8,
+  Z_INDEX_HIGHLIGHT: 12,
+  Z_INDEX_FLOAT_LABEL: 15,
+  // 新增：时间轴刻度常量
+  TIMELINE_TICK_HEIGHT_SHORT: 5,
+  TIMELINE_TICK_HEIGHT_MEDIUM: 8,
+  TIMELINE_TICK_HEIGHT_LONG: 10,
+  TIMELINE_TICK_Y_OFFSET: 5,
+  TIMELINE_LABEL_WIDTH: 40,
+  TIMELINE_LABEL_HEIGHT: 20,
+  TIMELINE_LABEL_Y_OFFSET: 5,
+  // 新增：标题常量
+  TITLE_X: 20,
+  TITLE_Y: 20,
+  TITLE_WIDTH: 300,
+  TITLE_HEIGHT: 30,
+  TITLE_FONT_SIZE: 18,
+  // 新增：分组常量
+  SECTION_HEADER_X: 10,
+  SECTION_HEADER_WIDTH_OFFSET: 20,
+  SECTION_Z_INDEX: 5,
+  // 新增：标签字体大小
+  LABEL_FONT_SIZE: 12,
+  // 新增：关键路径信息标签常量
+  CRITICAL_INFO_X: 200,
+  CRITICAL_INFO_Y: 20,
+  CRITICAL_INFO_WIDTH: 300,
+  CRITICAL_INFO_HEIGHT: 24,
+  CRITICAL_INFO_FONT_SIZE: 12,
+  // 新增：背景层zIndex
+  Z_INDEX_BACKGROUND: 0,
+  Z_INDEX_GRID: 0,
+  Z_INDEX_TIMELINE: 1,
+  Z_INDEX_TIMELINE_TICK: 2,
+  Z_INDEX_TIMELINE_LABEL: 2,
 } as const
 
 export type TaskStatus = 'done' | 'active' | 'crit' | 'default'
@@ -231,6 +292,55 @@ export class GanttDiagramGenerator {
   }
 
   /**
+   * 获取里程碑样式（带缓存）
+   */
+  private getMilestoneStyle(status: TaskStatus): any {
+    const cached = this.milestoneStyleCache.get(status)
+    if (cached) return cached
+    const style = status === 'done' ? this.styles.milestone.done : this.styles.milestone.default
+    this.milestoneStyleCache.set(status, style)
+    return style
+  }
+
+  /**
+   * 通用标签生成方法
+   */
+  private createLabelNode(
+    id: string,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    text: string,
+    options?: {
+      fill?: string
+      stroke?: string
+      fontSize?: number
+      fontWeight?: number
+      color?: string
+      textAlign?: 'left' | 'center' | 'right'
+      zIndex?: number
+    }
+  ): ShapeData {
+    return {
+      id,
+      type: 'uml-label',
+      x,
+      y,
+      width,
+      height,
+      text,
+      fill: options?.fill ?? 'transparent',
+      stroke: options?.stroke ?? 'transparent',
+      fontSize: options?.fontSize ?? LAYOUT_CONSTANTS.LABEL_FONT_SIZE,
+      fontWeight: options?.fontWeight,
+      color: options?.color ?? '#262626',
+      textAlign: options?.textAlign ?? 'left',
+      zIndex: options?.zIndex ?? LAYOUT_CONSTANTS.Z_INDEX_LABEL,
+    }
+  }
+
+  /**
    * 释放资源，防止内存泄漏
    * 在组件卸载或重新生成前调用
    */
@@ -307,6 +417,10 @@ export class GanttDiagramGenerator {
   }
 
   generate(data: ParsedGanttDiagram): GeneratedGanttDiagram {
+    // 清理本次渲染的缓存
+    this.cachedSectionMap = null
+    this.cachedTotalHeight = null
+
     // 检查缓存
     const cacheKey = this.generateCacheKey(data)
     const cached = this.getCachedResult(cacheKey)
@@ -450,7 +564,7 @@ export class GanttDiagramGenerator {
       fill: this.styles.timeline.fill,
       stroke: this.styles.timeline.stroke,
       strokeWidth: this.styles.timeline.strokeWidth,
-      zIndex: 1,
+      zIndex: LAYOUT_CONSTANTS.Z_INDEX_TIMELINE,
     })
 
     // 左侧分组列背景
@@ -465,7 +579,7 @@ export class GanttDiagramGenerator {
       fill: '#fafafa',
       stroke: '#e8e8e8',
       strokeWidth: 1,
-      zIndex: 1,
+      zIndex: LAYOUT_CONSTANTS.Z_INDEX_TIMELINE,
     })
   }
 
@@ -490,31 +604,32 @@ export class GanttDiagramGenerator {
           id: `timeline-tick-${i}`,
           type: 'uml-line',
           x: x,
-          y: this.config.startY + this.config.timelineHeight - 5,
+          y: this.config.startY + this.config.timelineHeight - LAYOUT_CONSTANTS.TIMELINE_TICK_Y_OFFSET,
           width: 1,
-          height: isFirstDayOfMonth ? 10 : (isFirstDayOfWeek ? 8 : 5),
+          height: isFirstDayOfMonth ? LAYOUT_CONSTANTS.TIMELINE_TICK_HEIGHT_LONG : (isFirstDayOfWeek ? LAYOUT_CONSTANTS.TIMELINE_TICK_HEIGHT_MEDIUM : LAYOUT_CONSTANTS.TIMELINE_TICK_HEIGHT_SHORT),
           text: '',
           stroke: isWeekend ? '#ff4d4f' : '#bfbfbf',
           strokeWidth: 1,
-          zIndex: 2,
+          zIndex: LAYOUT_CONSTANTS.Z_INDEX_TIMELINE_TICK,
         })
 
         // 日期标签
         if (shouldShowLabel) {
-          nodes.push({
-            id: `timeline-label-${i}`,
-            type: 'uml-label',
-            x: x - 20,
-            y: this.config.startY + 5,
-            width: 40,
-            height: 20,
-            text: dateFormat(date),
-            fill: 'transparent',
-            stroke: 'transparent',
-            fontSize: this.styles.timeline.fontSize,
-            color: isWeekend ? '#ff4d4f' : this.styles.timeline.color,
-            zIndex: 2,
-          })
+          nodes.push(
+            this.createLabelNode(
+              `timeline-label-${i}`,
+              x - LAYOUT_CONSTANTS.TIMELINE_LABEL_WIDTH / 2,
+              this.config.startY + LAYOUT_CONSTANTS.TIMELINE_LABEL_Y_OFFSET,
+              LAYOUT_CONSTANTS.TIMELINE_LABEL_WIDTH,
+              LAYOUT_CONSTANTS.TIMELINE_LABEL_HEIGHT,
+              dateFormat(date),
+              {
+                fontSize: this.styles.timeline.fontSize,
+                color: isWeekend ? '#ff4d4f' : this.styles.timeline.color,
+                zIndex: LAYOUT_CONSTANTS.Z_INDEX_TIMELINE_LABEL,
+              }
+            )
+          )
         }
       }
 
@@ -533,7 +648,7 @@ export class GanttDiagramGenerator {
             fill: '#fff2f0',
             fillOpacity: 0.3,
             stroke: 'transparent',
-            zIndex: 0,
+            zIndex: LAYOUT_CONSTANTS.Z_INDEX_BACKGROUND,
           })
         }
       }
@@ -558,7 +673,7 @@ export class GanttDiagramGenerator {
         stroke: this.styles.grid.stroke,
         strokeWidth: this.styles.grid.strokeWidth,
         dashArray: '3,3',
-        zIndex: 0,
+        zIndex: LAYOUT_CONSTANTS.Z_INDEX_GRID,
       })
     }
   }
@@ -594,21 +709,20 @@ export class GanttDiagramGenerator {
   }
 
   private generateTitle(title: string, nodes: ShapeData[]): void {
-    nodes.push({
-      id: 'gantt-title',
-      type: 'uml-label',
-      x: 20,
-      y: 20,
-      width: 300,
-      height: 30,
-      text: title,
-      fill: 'transparent',
-      stroke: 'transparent',
-      fontSize: 18,
-      fontWeight: 600,
-      color: '#262626',
-      zIndex: 10,
-    })
+    nodes.push(
+      this.createLabelNode(
+        'gantt-title',
+        LAYOUT_CONSTANTS.TITLE_X,
+        LAYOUT_CONSTANTS.TITLE_Y,
+        LAYOUT_CONSTANTS.TITLE_WIDTH,
+        LAYOUT_CONSTANTS.TITLE_HEIGHT,
+        title,
+        {
+          fontSize: LAYOUT_CONSTANTS.TITLE_FONT_SIZE,
+          fontWeight: 600,
+        }
+      )
+    )
   }
 
   private generateSectionsAndTasks(data: ParsedGanttDiagram, nodes: ShapeData[]): void {
@@ -639,9 +753,9 @@ export class GanttDiagramGenerator {
       nodes.push({
         id: `section-${section.id}`,
         type: 'uml-section-header',
-        x: 10,
+        x: LAYOUT_CONSTANTS.SECTION_HEADER_X,
         y: currentY,
-        width: this.config.startX - 20,
+        width: this.config.startX - LAYOUT_CONSTANTS.SECTION_HEADER_WIDTH_OFFSET,
         height: sectionHeight - this.config.sectionSpacing,
         text: section.name,
         fill: this.styles.section.fill,
@@ -650,7 +764,7 @@ export class GanttDiagramGenerator {
         fontSize: this.styles.section.fontSize,
         fontWeight: this.styles.section.fontWeight,
         color: this.styles.section.color,
-        zIndex: 5,
+        zIndex: LAYOUT_CONSTANTS.SECTION_Z_INDEX,
       })
 
       // 生成分组任务
@@ -693,7 +807,7 @@ export class GanttDiagramGenerator {
       fontSize: style.fontSize,
       color: style.color,
       cornerRadius: LAYOUT_CONSTANTS.CORNER_RADIUS,
-      zIndex: 10,
+      zIndex: LAYOUT_CONSTANTS.Z_INDEX_TASK,
     })
 
     // 进度条（如果有进度）
@@ -709,8 +823,8 @@ export class GanttDiagramGenerator {
         text: '',
         fill: this.getProgressColor(task.status),
         stroke: 'transparent',
-        cornerRadius: 2,
-        zIndex: 11,
+        cornerRadius: LAYOUT_CONSTANTS.PROGRESS_BAR_CORNER_RADIUS,
+        zIndex: LAYOUT_CONSTANTS.Z_INDEX_PROGRESS,
       })
     }
 
@@ -723,21 +837,16 @@ export class GanttDiagramGenerator {
       labelText += ` [${task.tags.join(', ')}]`
     }
 
-    nodes.push({
-      id: `task-label-${task.id}`,
-      type: 'uml-label',
-      x: LAYOUT_CONSTANTS.LABEL_X,
-      y: layout.y + LAYOUT_CONSTANTS.LABEL_Y_OFFSET,
-      width: this.config.startX - 20,
-      height: LAYOUT_CONSTANTS.LABEL_HEIGHT,
-      text: labelText,
-      fill: 'transparent',
-      stroke: 'transparent',
-      fontSize: 12,
-      color: '#262626',
-      textAlign: 'left',
-      zIndex: 10,
-    })
+    nodes.push(
+      this.createLabelNode(
+        `task-label-${task.id}`,
+        LAYOUT_CONSTANTS.LABEL_X,
+        layout.y + LAYOUT_CONSTANTS.LABEL_Y_OFFSET,
+        this.config.startX - LAYOUT_CONSTANTS.TASK_LABEL_PADDING,
+        LAYOUT_CONSTANTS.LABEL_HEIGHT,
+        labelText
+      )
+    )
   }
 
   private getProgressColor(status: TaskStatus): string {
@@ -754,29 +863,28 @@ export class GanttDiagramGenerator {
   }
 
   private generateProjectLegend(projects: GanttProject[], nodes: ShapeData[]): void {
-    const legendX = this.config.startX + this.totalDays * this.config.dayWidth + 20
+    const legendX = this.config.startX + this.totalDays * this.config.dayWidth + LAYOUT_CONSTANTS.LEGEND_X_PADDING
     const legendY = this.config.startY
 
     // 图例标题
-    nodes.push({
-      id: 'project-legend-title',
-      type: 'uml-label',
-      x: legendX,
-      y: legendY,
-      width: 120,
-      height: 20,
-      text: '项目图例',
-      fill: 'transparent',
-      stroke: 'transparent',
-      fontSize: 14,
-      fontWeight: 600,
-      color: '#262626',
-      zIndex: 10,
-    })
+    nodes.push(
+      this.createLabelNode(
+        'project-legend-title',
+        legendX,
+        legendY,
+        LAYOUT_CONSTANTS.LEGEND_TITLE_WIDTH,
+        LAYOUT_CONSTANTS.LEGEND_TITLE_HEIGHT,
+        '项目图例',
+        {
+          fontSize: 14,
+          fontWeight: 600,
+        }
+      )
+    )
 
     // 图例项
     projects.forEach((project, index) => {
-      const itemY = legendY + 30 + index * 25
+      const itemY = legendY + LAYOUT_CONSTANTS.LEGEND_TITLE_Y_OFFSET + index * LAYOUT_CONSTANTS.LEGEND_ITEM_SPACING
 
       // 颜色块
       nodes.push({
@@ -784,36 +892,35 @@ export class GanttDiagramGenerator {
         type: 'uml-rect',
         x: legendX,
         y: itemY,
-        width: 16,
-        height: 16,
+        width: LAYOUT_CONSTANTS.LEGEND_ITEM_WIDTH,
+        height: LAYOUT_CONSTANTS.LEGEND_ITEM_HEIGHT,
         text: '',
         fill: project.color,
         stroke: project.color,
-        strokeWidth: 1,
-        cornerRadius: 2,
-        zIndex: 10,
+        strokeWidth: LAYOUT_CONSTANTS.LEGEND_STROKE_WIDTH,
+        cornerRadius: LAYOUT_CONSTANTS.LEGEND_ITEM_CORNER_RADIUS,
+        zIndex: LAYOUT_CONSTANTS.Z_INDEX_LABEL,
       })
 
       // 项目名称
-      nodes.push({
-        id: `legend-text-${project.id}`,
-        type: 'uml-label',
-        x: legendX + 24,
-        y: itemY,
-        width: 100,
-        height: 16,
-        text: project.name,
-        fill: 'transparent',
-        stroke: 'transparent',
-        fontSize: 12,
-        color: '#595959',
-        zIndex: 10,
-      })
+      nodes.push(
+        this.createLabelNode(
+          `legend-text-${project.id}`,
+          legendX + LAYOUT_CONSTANTS.LEGEND_LABEL_SPACING,
+          itemY,
+          LAYOUT_CONSTANTS.LEGEND_TEXT_WIDTH,
+          LAYOUT_CONSTANTS.LEGEND_ITEM_HEIGHT,
+          project.name,
+          {
+            color: '#595959',
+          }
+        )
+      )
     })
   }
 
   private generateMilestone(task: GanttTask, layout: TaskLayout, nodes: ShapeData[]): void {
-    const style = task.status === 'done' ? this.styles.milestone.done : this.styles.milestone.default
+    const style = this.getMilestoneStyle(task.status)
     const size = this.config.milestoneSize
 
     nodes.push({
@@ -827,44 +934,45 @@ export class GanttDiagramGenerator {
       fill: style.fill,
       stroke: style.stroke,
       strokeWidth: style.strokeWidth,
-      zIndex: 10,
+      zIndex: LAYOUT_CONSTANTS.Z_INDEX_MILESTONE,
     })
 
     // 里程碑名称标签
-    nodes.push({
-      id: `milestone-label-${task.id}`,
-      type: 'uml-label',
-      x: LAYOUT_CONSTANTS.LABEL_X,
-      y: layout.y + LAYOUT_CONSTANTS.LABEL_Y_OFFSET,
-      width: this.config.startX - 20,
-      height: LAYOUT_CONSTANTS.LABEL_HEIGHT,
-      text: `◆ ${task.name}`,
-      fill: 'transparent',
-      stroke: 'transparent',
-      fontSize: 12,
-      color: style.stroke,
-      textAlign: 'left',
-      zIndex: 10,
-    })
+    nodes.push(
+      this.createLabelNode(
+        `milestone-label-${task.id}`,
+        LAYOUT_CONSTANTS.LABEL_X,
+        layout.y + LAYOUT_CONSTANTS.LABEL_Y_OFFSET,
+        this.config.startX - LAYOUT_CONSTANTS.TASK_LABEL_PADDING,
+        LAYOUT_CONSTANTS.LABEL_HEIGHT,
+        `◆ ${task.name}`,
+        {
+          color: style.stroke,
+        }
+      )
+    )
   }
 
   private generateDependencies(data: ParsedGanttDiagram, edges: Connector[]): void {
-    data.tasks.forEach(task => {
-      task.dependencies.forEach(depId => {
-        const sourceLayout = this.taskLayouts.get(depId)
-        const targetLayout = this.taskLayouts.get(task.id)
+    // 提前获取所有数据，避免重复查询
+    const layouts = new Map(this.taskLayouts)
+    const criticalData = new Map(this.criticalPathData)
 
+    data.tasks.forEach(task => {
+      const targetLayout = layouts.get(task.id)
+      const targetCritical = criticalData.get(task.id)?.isCritical
+
+      task.dependencies.forEach(depId => {
+        const sourceLayout = layouts.get(depId)
         if (!sourceLayout || !targetLayout) return
+
+        const sourceCritical = criticalData.get(depId)?.isCritical
+        const isCriticalDep = sourceCritical && targetCritical
 
         const sourceX = sourceLayout.x + sourceLayout.width
         const sourceY = sourceLayout.y + sourceLayout.height / 2
         const targetX = targetLayout.x
         const targetY = targetLayout.y + targetLayout.height / 2
-
-        // 检查是否为关键路径上的依赖
-        const sourceCritical = this.criticalPathData.get(depId)?.isCritical
-        const targetCritical = this.criticalPathData.get(task.id)?.isCritical
-        const isCriticalDep = sourceCritical && targetCritical
 
         // 创建依赖连线
         edges.push({
@@ -879,7 +987,7 @@ export class GanttDiagramGenerator {
           startStyle: 'none',
           endStyle: 'arrow',
           style: 'orthogonal',
-          zIndex: isCriticalDep ? 9 : 8,
+          zIndex: isCriticalDep ? LAYOUT_CONSTANTS.Z_INDEX_DEPENDENCY_CRITICAL : LAYOUT_CONSTANTS.Z_INDEX_DEPENDENCY_NORMAL,
         })
       })
     })
@@ -911,27 +1019,30 @@ export class GanttDiagramGenerator {
           text: '',
           fill: 'transparent',
           stroke: '#f5222d',
-          strokeWidth: 3,
+          strokeWidth: LAYOUT_CONSTANTS.HIGHLIGHT_STROKE_WIDTH,
           dashArray: '5,3',
-          zIndex: 12,
+          zIndex: LAYOUT_CONSTANTS.Z_INDEX_HIGHLIGHT,
         })
 
         // 添加浮动时间标签（如果有）
         if (taskTimeData.totalFloat > 0) {
-          nodes.push({
-            id: `float-label-${task.id}`,
-            type: 'uml-label',
-            x: layout.x + layout.width + 5,
-            y: layout.y,
-            width: 60,
-            height: 16,
-            text: `+${taskTimeData.totalFloat}d`,
-            fill: '#fff2f0',
-            stroke: '#ff4d4f',
-            fontSize: 10,
-            color: '#cf1322',
-            zIndex: 13,
-          })
+          nodes.push(
+            this.createLabelNode(
+              `float-label-${task.id}`,
+              layout.x + layout.width + LAYOUT_CONSTANTS.FLOAT_LABEL_X_PADDING,
+              layout.y,
+              LAYOUT_CONSTANTS.FLOAT_LABEL_WIDTH,
+              LAYOUT_CONSTANTS.FLOAT_LABEL_HEIGHT,
+              `+${taskTimeData.totalFloat}d`,
+              {
+                fill: '#fff2f0',
+                stroke: '#ff4d4f',
+                fontSize: 10,
+                color: '#cf1322',
+                zIndex: LAYOUT_CONSTANTS.Z_INDEX_FLOAT_LABEL,
+              }
+            )
+          )
         }
       }
     })
@@ -940,24 +1051,32 @@ export class GanttDiagramGenerator {
     const criticalTaskCount = Array.from(this.criticalPathData.values()).filter(t => t.isCritical).length
     const projectDuration = Math.max(...Array.from(this.criticalPathData.values()).map(t => t.earliestFinish))
 
-    nodes.push({
-      id: 'critical-path-info',
-      type: 'uml-label',
-      x: this.config.startX,
-      y: 20,
-      width: 300,
-      height: 24,
-      text: `关键路径: ${criticalTaskCount}个任务, 总工期: ${projectDuration}天`,
-      fill: '#fff2f0',
-      stroke: '#ff4d4f',
-      fontSize: 12,
-      fontWeight: 600,
-      color: '#cf1322',
-      zIndex: 15,
-    })
+    nodes.push(
+      this.createLabelNode(
+        'critical-path-info',
+        LAYOUT_CONSTANTS.CRITICAL_INFO_X,
+        LAYOUT_CONSTANTS.CRITICAL_INFO_Y,
+        LAYOUT_CONSTANTS.CRITICAL_INFO_WIDTH,
+        LAYOUT_CONSTANTS.CRITICAL_INFO_HEIGHT,
+        `关键路径: ${criticalTaskCount}个任务, 总工期: ${projectDuration}天`,
+        {
+          fill: '#fff2f0',
+          stroke: '#ff4d4f',
+          fontSize: LAYOUT_CONSTANTS.CRITICAL_INFO_FONT_SIZE,
+          fontWeight: 600,
+          color: '#cf1322',
+          zIndex: LAYOUT_CONSTANTS.Z_INDEX_FLOAT_LABEL,
+        }
+      )
+    )
   }
 
   private calculateTotalHeight(data: ParsedGanttDiagram): number {
+    // 检查缓存
+    if (this.cachedTotalHeight !== null) {
+      return this.cachedTotalHeight
+    }
+
     const sectionMap = new Map<string, number>()
     data.tasks.forEach(task => {
       const section = task.section || 'default'
@@ -967,9 +1086,13 @@ export class GanttDiagramGenerator {
     const totalTasks = data.tasks.length
     const totalSections = data.sections.length
 
-    return this.config.startY + this.config.timelineHeight +
+    const result = this.config.startY + this.config.timelineHeight +
       totalTasks * (this.config.taskHeight + this.config.taskSpacing) +
       totalSections * this.config.sectionSpacing + 50
+
+    // 保存到缓存
+    this.cachedTotalHeight = result
+    return result
   }
 
   private getDateFormat(format: string): (date: Date) => string {

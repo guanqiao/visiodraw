@@ -5,7 +5,7 @@ export {
   defaultLayoutConfig,
   type LayoutConfig,
   type LayoutDirection,
-} from './layout/coreLayout'
+} from './coreLayout'
 
 export {
   calculateSequenceLayout,
@@ -14,7 +14,7 @@ export {
   calculateStateLayout,
   calculateClassHeight,
   calculateEREntityHeight,
-} from './layout/diagramLayout'
+} from './diagramLayout'
 
 export {
   calculateSwimlaneLayout,
@@ -22,9 +22,9 @@ export {
   calculateSwimlaneBounds,
   defaultSwimlaneConfig,
   type SwimlaneConfig,
-} from './layout/swimlaneLayout'
+} from './swimlaneLayout'
 
 export {
   calculateNodeSize,
   type NodeSizeConfig,
-} from './layout/nodeSizeCalculator'
+} from './nodeSizeCalculator'
