@@ -20,6 +20,13 @@ export interface ErColumn {
   comment?: string
   length?: number
   nullable?: boolean
+  precision?: number
+  scale?: number
+  charset?: string
+  collation?: string
+  enumValues?: string[]
+  unsigned?: boolean
+  zerofill?: boolean
 }
 
 export interface ErColumnRenderInfo {

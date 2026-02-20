@@ -208,6 +208,11 @@ export class GanttDiagramGenerator {
   // 样式缓存
   private styleCache = new Map<string, any>()
 
+  // 新增：缓存 sectionMap 和 calculateTotalHeight
+  private cachedSectionMap: Map<string, GanttTask[]> | null = null
+  private cachedTotalHeight: number | null = null
+  private milestoneStyleCache = new Map<string, any>()
+
   /**
    * 获取任务样式（带缓存）
    */
@@ -237,6 +242,10 @@ export class GanttDiagramGenerator {
     this.currentView = 'day'
     this.layoutCache.clear()
     this.styleCache.clear()
+    // 新增：清理新缓存
+    this.cachedSectionMap = null
+    this.cachedTotalHeight = null
+    this.milestoneStyleCache.clear()
   }
 
   /**
@@ -393,6 +402,9 @@ export class GanttDiagramGenerator {
       }
       sectionMap.get(section)!.push(task)
     })
+
+    // 保存到缓存
+    this.cachedSectionMap = sectionMap
 
     // 计算每个任务的布局
     data.sections.forEach(section => {
@@ -600,14 +612,19 @@ export class GanttDiagramGenerator {
   }
 
   private generateSectionsAndTasks(data: ParsedGanttDiagram, nodes: ShapeData[]): void {
-    const sectionMap = new Map<string, GanttTask[]>()
-    data.tasks.forEach(task => {
-      const section = task.section || 'default'
-      if (!sectionMap.has(section)) {
-        sectionMap.set(section, [])
-      }
-      sectionMap.get(section)!.push(task)
-    })
+    // 使用缓存的 sectionMap，避免重复创建
+    const sectionMap = this.cachedSectionMap || new Map()
+    
+    // 如果没有缓存，创建一个
+    if (sectionMap.size === 0) {
+      data.tasks.forEach(task => {
+        const section = task.section || 'default'
+        if (!sectionMap.has(section)) {
+          sectionMap.set(section, [])
+        }
+        sectionMap.get(section)!.push(task)
+      })
+    }
 
     let currentY = this.config.startY + this.config.timelineHeight
 
