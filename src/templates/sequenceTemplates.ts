@@ -393,14 +393,12 @@ function createMessage(
     markers,
     edge: {
       id: edge.id,
-      source: edge.sourceShapeId,
-      target: edge.targetShapeId,
+      source: edge.sourceShapeId!,
+      target: edge.targetShapeId!,
       label: edge.labels?.[0]?.text || label,
       style: edge.style,
       lineStyle: edge.lineStyle,
       endMarker: edge.endStyle,
-      labelPosition: edge.labels?.[0]?.position,
-      labelOffsetY: edge.labels?.[0]?.offsetY,
     },
   }
 }

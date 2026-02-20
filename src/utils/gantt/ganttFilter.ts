@@ -99,8 +99,8 @@ export class GanttFilter {
    */
   filterByResource(tasks: GanttTask[], resourceIds: string[]): GanttTask[] {
     return tasks.filter(task => {
-      if (!task.assignees) return false
-      return task.assignees.some(assignee => resourceIds.includes(assignee))
+      if (!task.assignee) return false
+      return resourceIds.includes(task.assignee)
     })
   }
 
@@ -108,7 +108,7 @@ export class GanttFilter {
    * 根据分组筛选
    */
   filterBySection(tasks: GanttTask[], sectionIds: string[]): GanttTask[] {
-    return tasks.filter(task => sectionIds.includes(task.sectionId || ''))
+    return tasks.filter(task => sectionIds.includes(task.section || ''))
   }
 
   /**

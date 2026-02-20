@@ -23,7 +23,7 @@ export interface ProgressBarOptions {
 
 export class ProgressRenderer {
   private graph: Graph | null = null
-  private options: ProgressBarOptions
+  private options: Required<ProgressBarOptions>
 
   constructor(options: ProgressBarOptions = {}) {
     this.options = {

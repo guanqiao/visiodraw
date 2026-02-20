@@ -8,6 +8,7 @@ export interface Template {
   shapes: any[]
   connectors?: any[]
   thumbnail?: string
+  tags?: string[]
   createdAt?: number
   updatedAt?: number
 }

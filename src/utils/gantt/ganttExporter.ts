@@ -53,7 +53,7 @@ export class GanttExporter {
    */
   exportToExcel(data: ParsedGanttDiagram): string {
     const rows: ExcelRow[] = data.tasks.map(task => {
-      const section = data.sections.find(s => s.id === task.sectionId)
+      const section = data.sections.find(s => s.id === task.section)
 
       return {
         任务ID: task.id,
@@ -128,7 +128,7 @@ export class GanttExporter {
           .split(',')
           .filter(Boolean),
         order: i - 1,
-        sectionId,
+        section: sectionId,
       }
 
       tasks.push(task)
@@ -252,7 +252,7 @@ export class GanttExporter {
 
 ## 分组信息
 ${data.sections.map(section => {
-  const sectionTasks = data.tasks.filter(t => t.sectionId === section.id)
+  const sectionTasks = data.tasks.filter(t => t.section === section.id)
   return `- ${section.name}: ${sectionTasks.length} 个任务`
 }).join('\n')}
 

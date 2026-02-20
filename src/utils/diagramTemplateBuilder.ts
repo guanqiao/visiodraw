@@ -159,6 +159,7 @@ export function getDefaultGenerateOptions(): Required<TemplateGenerateOptions> {
     startY: 100,
     spacing: 120,
     direction: 'vertical',
+    autoNumber: false,
   }
 }
 

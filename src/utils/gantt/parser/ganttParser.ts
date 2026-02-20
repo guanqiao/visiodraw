@@ -55,7 +55,7 @@ export class GanttParser {
     }
 
     let title: string | undefined
-    let dateFormat = DefaultConfig.DATE_FORMAT
+    let dateFormat: string = DefaultConfig.DATE_FORMAT
     const sections: GanttSection[] = []
     const rawTasks: Array<{ section: string | undefined; definition: RawTaskDefinition; line: number }> = []
     let currentSection: string | undefined

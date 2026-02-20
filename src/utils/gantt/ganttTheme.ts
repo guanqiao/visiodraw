@@ -381,6 +381,3 @@ export class GanttThemeManager {
 // 导出单例
 export const ganttThemeManager = new GanttThemeManager()
 export default ganttThemeManager
-
-// 导出主题常量
-export { defaultTheme, modernTheme, darkTheme, professionalTheme, themes }

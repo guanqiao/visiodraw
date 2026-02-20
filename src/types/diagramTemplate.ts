@@ -40,6 +40,11 @@ export interface TemplateNode {
   stroke?: string
   /** 边框宽度（可选） */
   strokeWidth?: number
+  /** 节点数据（可选） */
+  data?: {
+    entityType?: string
+    [key: string]: any
+  }
   /** 其他自定义属性 */
   [key: string]: any
 }
@@ -65,6 +70,14 @@ export interface TemplateEdge {
   startMarker?: string
   /** 终点标记样式（可选） */
   endMarker?: string
+  /** 是否自环（可选） */
+  isSelfLoop?: boolean
+  /** 边数据（可选） */
+  data?: {
+    sourceCardinality?: string
+    targetCardinality?: string
+    [key: string]: any
+  }
   /** 其他自定义属性 */
   [key: string]: any
 }

@@ -5,9 +5,9 @@ import { calculateNodeSize } from '../layoutEngine'
 import { cleanLines, createNode } from './baseParser'
 
 export function parseStateDiagram(code: string): MermaidParseResult {
-  const nodes: MermaidParseResult['nodes'] = []
-  const edges: MermaidParseResult['edges'] = []
-  const nodeMap = new Map<string, MermaidParseResult['nodes'][0]>()
+  const nodes: NonNullable<MermaidParseResult['nodes']> = []
+  const edges: NonNullable<MermaidParseResult['edges']> = []
+  const nodeMap = new Map<string, NonNullable<MermaidParseResult['nodes']>[0]>()
 
   const lines = cleanLines(code)
 

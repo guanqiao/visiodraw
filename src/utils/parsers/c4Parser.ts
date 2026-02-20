@@ -2,12 +2,12 @@ import type { MermaidParseResult } from '../../types/diagramTemplate'
 import { cleanLines } from './baseParser'
 
 export function parseC4Diagram(code: string): MermaidParseResult {
-  const nodes: MermaidParseResult['nodes'] = []
-  const edges: MermaidParseResult['edges'] = []
+  const nodes: NonNullable<MermaidParseResult['nodes']> = []
+  const edges: NonNullable<MermaidParseResult['edges']> = []
 
   const lines = cleanLines(code)
 
-  const elementMap = new Map<string, MermaidParseResult['nodes'][0]>()
+  const elementMap = new Map<string, NonNullable<MermaidParseResult['nodes']>[0]>()
   let yOffset = 100
   let xOffset = 100
 

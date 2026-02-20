@@ -139,6 +139,8 @@ export interface RawTaskDefinition {
   id?: string
   /** 开始日期 */
   startDate?: Date
+  /** 结束日期 */
+  endDate?: Date
   /** 持续时间 */
   duration?: number
   /** 依赖任务 */

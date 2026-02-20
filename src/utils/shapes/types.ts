@@ -25,6 +25,7 @@ export interface ShapeRenderConfig {
   fontSize?: number
   fontWeight?: number | string
   color?: string
+  dashArray?: string
 }
 
 export interface PortGroup {

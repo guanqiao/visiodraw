@@ -461,4 +461,185 @@ describe('erDiagramStore', () => {
       expect(useErDiagramStore.getState().selectedTableIds.length).toBe(0)
     })
   })
+
+  describe('Undo/Redo', () => {
+    it('should undo add table', () => {
+      const { addTable, undo, canUndo } = useErDiagramStore.getState()
+      
+      addTable({
+        name: 'users',
+        columns: [{ name: 'id', type: 'int', constraints: ['pk'] }],
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+      })
+      
+      expect(useErDiagramStore.getState().tables.length).toBe(1)
+      expect(canUndo()).toBe(true)
+      
+      undo()
+      
+      expect(useErDiagramStore.getState().tables.length).toBe(0)
+    })
+
+    it('should redo add table', () => {
+      const { addTable, undo, redo, canRedo } = useErDiagramStore.getState()
+      
+      addTable({
+        name: 'users',
+        columns: [{ name: 'id', type: 'int', constraints: ['pk'] }],
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+      })
+      
+      undo()
+      expect(useErDiagramStore.getState().tables.length).toBe(0)
+      expect(canRedo()).toBe(true)
+      
+      redo()
+      
+      expect(useErDiagramStore.getState().tables.length).toBe(1)
+      expect(useErDiagramStore.getState().tables[0].name).toBe('users')
+    })
+
+    it('should undo delete table', () => {
+      const { addTable, deleteTable, undo } = useErDiagramStore.getState()
+      
+      const id = addTable({
+        name: 'users',
+        columns: [{ name: 'id', type: 'int', constraints: ['pk'] }],
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+      })
+      
+      deleteTable(id)
+      expect(useErDiagramStore.getState().tables.length).toBe(0)
+      
+      undo()
+      
+      expect(useErDiagramStore.getState().tables.length).toBe(1)
+      expect(useErDiagramStore.getState().tables[0].name).toBe('users')
+    })
+
+    it('should undo update table', () => {
+      const { addTable, updateTable, undo } = useErDiagramStore.getState()
+      
+      const id = addTable({
+        name: 'users',
+        columns: [],
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+      })
+      
+      updateTable(id, { name: 'customers' })
+      expect(useErDiagramStore.getState().tables[0].name).toBe('customers')
+      
+      undo()
+      
+      expect(useErDiagramStore.getState().tables[0].name).toBe('users')
+    })
+
+    it('should undo add column', () => {
+      const { addTable, addColumn, undo } = useErDiagramStore.getState()
+      
+      const tableId = addTable({
+        name: 'users',
+        columns: [],
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+      })
+      
+      addColumn(tableId, { name: 'email', type: 'varchar', constraints: [] })
+      expect(useErDiagramStore.getState().tables[0].columns.length).toBe(1)
+      
+      undo()
+      
+      expect(useErDiagramStore.getState().tables[0].columns.length).toBe(0)
+    })
+
+    it('should undo add relation', () => {
+      const { addTable, addRelation, undo } = useErDiagramStore.getState()
+      
+      const table1 = addTable({
+        name: 'users',
+        columns: [{ name: 'id', type: 'int', constraints: ['pk'] }],
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+      })
+      
+      const table2 = addTable({
+        name: 'orders',
+        columns: [{ name: 'id', type: 'int', constraints: ['pk'] }],
+        x: 400,
+        y: 100,
+        width: 200,
+        height: 100,
+      })
+      
+      addRelation({
+        sourceTableId: table1,
+        targetTableId: table2,
+        sourceColumn: 'id',
+        targetColumn: 'user_id',
+        type: 'one-to-many',
+        relationType: 'er-one-to-many',
+      })
+      
+      expect(useErDiagramStore.getState().relations.length).toBe(1)
+      
+      undo()
+      
+      expect(useErDiagramStore.getState().relations.length).toBe(0)
+    })
+
+    it('should clear history', () => {
+      const { addTable, clearHistory, canUndo, canRedo } = useErDiagramStore.getState()
+      
+      addTable({
+        name: 'users',
+        columns: [],
+        x: 100,
+        y: 100,
+        width: 200,
+        height: 100,
+      })
+      
+      expect(canUndo()).toBe(true)
+      
+      clearHistory()
+      
+      expect(canUndo()).toBe(false)
+      expect(canRedo()).toBe(false)
+    })
+
+    it('should limit history size', () => {
+      const { addTable, clearHistory } = useErDiagramStore.getState()
+      
+      clearHistory()
+      
+      for (let i = 0; i < 60; i++) {
+        addTable({
+          name: `table_${i}`,
+          columns: [],
+          x: 0,
+          y: 0,
+          width: 200,
+          height: 100,
+        })
+      }
+      
+      expect(useErDiagramStore.getState().past.length).toBeLessThanOrEqual(50)
+    })
+  })
 })

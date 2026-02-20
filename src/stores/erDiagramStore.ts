@@ -7,7 +7,7 @@ export interface ErTable {
   id: string
   name: string
   columns: ErColumn[]
-  foreignKeys?: { column: string; refTable: string; refColumn: string }[]
+  foreignKeys?: { column: string; refTable: string; refColumn: string; onDelete?: string; onUpdate?: string }[]
   indexes?: { name: string; columns: string[]; isUnique: boolean }[]
   comment?: string
   x: number
@@ -28,6 +28,13 @@ export interface ErRelation {
   label?: string
 }
 
+interface ErDiagramSnapshot {
+  tables: ErTable[]
+  relations: ErRelation[]
+}
+
+const MAX_HISTORY_SIZE = 50
+
 export interface ErDiagramState {
   tables: ErTable[]
   relations: ErRelation[]
@@ -36,8 +43,17 @@ export interface ErDiagramState {
   mode: 'select' | 'create-table' | 'create-relation'
   zoom: number
   panOffset: { x: number; y: number }
+  
+  past: ErDiagramSnapshot[]
+  future: ErDiagramSnapshot[]
 
-  // Table operations
+  pushHistory: () => void
+  undo: () => void
+  redo: () => void
+  canUndo: () => boolean
+  canRedo: () => boolean
+  clearHistory: () => void
+
   addTable: (table: Omit<ErTable, 'id'>) => string
   updateTable: (id: string, updates: Partial<ErTable>) => void
   deleteTable: (id: string) => void
@@ -47,30 +63,24 @@ export interface ErDiagramState {
   toggleTableSelection: (id: string) => void
   clearSelection: () => void
 
-  // Column operations
   addColumn: (tableId: string, column: ErColumn) => void
   updateColumn: (tableId: string, columnName: string, updates: Partial<ErColumn>) => void
   deleteColumn: (tableId: string, columnName: string) => void
   reorderColumns: (tableId: string, fromIndex: number, toIndex: number) => void
 
-  // Relation operations
   addRelation: (relation: Omit<ErRelation, 'id'>) => string
   updateRelation: (id: string, updates: Partial<ErRelation>) => void
   deleteRelation: (id: string) => void
   selectRelation: (id: string | null) => void
 
-  // Layout operations
   setTablePosition: (id: string, x: number, y: number) => void
   autoLayout: (algorithm: 'grid' | 'hierarchical' | 'force' | 'smart') => void
 
-  // Mode operations
   setMode: (mode: 'select' | 'create-table' | 'create-relation') => void
 
-  // Zoom and pan
   setZoom: (zoom: number) => void
   setPanOffset: (offset: { x: number; y: number }) => void
 
-  // Import/Export
   importFromJson: (json: string) => void
   exportToJson: () => string
   clearDiagram: () => void
@@ -88,9 +98,79 @@ export const useErDiagramStore = create<ErDiagramState>()(
       mode: 'select',
       zoom: 1,
       panOffset: { x: 0, y: 0 },
+      past: [],
+      future: [],
 
-      // Table operations
+      pushHistory: () => {
+        const { tables, relations } = get()
+        const snapshot: ErDiagramSnapshot = {
+          tables: JSON.parse(JSON.stringify(tables)),
+          relations: JSON.parse(JSON.stringify(relations)),
+        }
+        set((state) => {
+          const newPast = [...state.past, snapshot]
+          if (newPast.length > MAX_HISTORY_SIZE) {
+            return { past: newPast.slice(-MAX_HISTORY_SIZE), future: [] }
+          }
+          return { past: newPast, future: [] }
+        })
+      },
+
+      undo: () => {
+        const { past, future, tables, relations } = get()
+        
+        if (past.length === 0) return
+        
+        const currentSnapshot: ErDiagramSnapshot = {
+          tables: JSON.parse(JSON.stringify(tables)),
+          relations: JSON.parse(JSON.stringify(relations)),
+        }
+        
+        const previous = past[past.length - 1]
+        const newPast = past.slice(0, -1)
+        
+        set({
+          past: newPast,
+          future: [currentSnapshot, ...future],
+          tables: JSON.parse(JSON.stringify(previous.tables)),
+          relations: JSON.parse(JSON.stringify(previous.relations)),
+          selectedTableIds: [],
+          selectedRelationId: null,
+        })
+      },
+
+      redo: () => {
+        const { past, future, tables, relations } = get()
+        
+        if (future.length === 0) return
+        
+        const currentSnapshot: ErDiagramSnapshot = {
+          tables: JSON.parse(JSON.stringify(tables)),
+          relations: JSON.parse(JSON.stringify(relations)),
+        }
+        
+        const next = future[0]
+        const newFuture = future.slice(1)
+        
+        set({
+          past: [...past, currentSnapshot],
+          future: newFuture,
+          tables: JSON.parse(JSON.stringify(next.tables)),
+          relations: JSON.parse(JSON.stringify(next.relations)),
+          selectedTableIds: [],
+          selectedRelationId: null,
+        })
+      },
+
+      canUndo: () => get().past.length > 0,
+      canRedo: () => get().future.length > 0,
+
+      clearHistory: () => {
+        set({ past: [], future: [] })
+      },
+
       addTable: (table) => {
+        get().pushHistory()
         const id = generateId()
         set((state) => ({
           tables: [...state.tables, { ...table, id }],
@@ -99,6 +179,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       updateTable: (id, updates) => {
+        get().pushHistory()
         set((state) => ({
           tables: state.tables.map((t) =>
             t.id === id ? { ...t, ...updates } : t
@@ -107,6 +188,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       deleteTable: (id) => {
+        get().pushHistory()
         set((state) => ({
           tables: state.tables.filter((t) => t.id !== id),
           relations: state.relations.filter(
@@ -117,6 +199,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       deleteTables: (ids) => {
+        get().pushHistory()
         const idSet = new Set(ids)
         set((state) => ({
           tables: state.tables.filter((t) => !idSet.has(t.id)),
@@ -163,6 +246,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
 
       // Column operations
       addColumn: (tableId, column) => {
+        get().pushHistory()
         set((state) => ({
           tables: state.tables.map((t) =>
             t.id === tableId
@@ -173,6 +257,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       updateColumn: (tableId, columnName, updates) => {
+        get().pushHistory()
         set((state) => ({
           tables: state.tables.map((t) =>
             t.id === tableId
@@ -188,6 +273,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       deleteColumn: (tableId, columnName) => {
+        get().pushHistory()
         set((state) => ({
           tables: state.tables.map((t) =>
             t.id === tableId
@@ -204,6 +290,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       reorderColumns: (tableId, fromIndex, toIndex) => {
+        get().pushHistory()
         set((state) => ({
           tables: state.tables.map((t) => {
             if (t.id !== tableId) return t
@@ -217,6 +304,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
 
       // Relation operations
       addRelation: (relation) => {
+        get().pushHistory()
         const id = generateId()
         set((state) => ({
           relations: [...state.relations, { ...relation, id }],
@@ -225,6 +313,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       updateRelation: (id, updates) => {
+        get().pushHistory()
         set((state) => ({
           relations: state.relations.map((r) =>
             r.id === id ? { ...r, ...updates } : r
@@ -233,6 +322,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       deleteRelation: (id) => {
+        get().pushHistory()
         set((state) => ({
           relations: state.relations.filter((r) => r.id !== id),
           selectedRelationId:
@@ -257,6 +347,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       autoLayout: (algorithm) => {
+        get().pushHistory()
         const { tables, relations } = get()
         if (tables.length === 0) return
 
@@ -546,6 +637,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
 
       // Import/Export
       importFromJson: (json) => {
+        get().pushHistory()
         try {
           const data = JSON.parse(json)
           set({
@@ -565,6 +657,7 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       clearDiagram: () => {
+        get().pushHistory()
         set({
           tables: [],
           relations: [],

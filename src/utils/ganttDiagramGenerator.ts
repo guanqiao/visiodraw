@@ -405,7 +405,9 @@ export class GanttDiagramGenerator {
     // 如果缓存已满，删除最旧的
     if (this.layoutCache.size >= this.CACHE_MAX_SIZE) {
       const oldestKey = this.layoutCache.keys().next().value
-      this.layoutCache.delete(oldestKey)
+      if (oldestKey) {
+        this.layoutCache.delete(oldestKey)
+      }
     }
 
     // 保存新缓存
@@ -768,7 +770,7 @@ export class GanttDiagramGenerator {
       })
 
       // 生成分组任务
-      sectionTasks.forEach(task => {
+      sectionTasks.forEach((task: GanttTask) => {
         const layout = this.taskLayouts.get(task.id)
         if (!layout) return
 

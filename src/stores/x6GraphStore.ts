@@ -14,9 +14,9 @@ export interface ShapeData {
   y: number
   width: number
   height: number
-  fill: string
-  stroke: string
-  strokeWidth: number
+  fill?: string
+  stroke?: string
+  strokeWidth?: number
   text?: string
   angle?: number
   connectionPoints?: ConnectionPoint[]
