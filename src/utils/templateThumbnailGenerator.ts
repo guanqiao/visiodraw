@@ -38,19 +38,38 @@ function drawTemplateToCanvas(
   // 绘制网格背景
   drawGrid(ctx, width, height)
 
-  // 计算边界框和变换
+  // 计算边界框和变换（包含所有节点，包括锚点）
   const bbox = calculateBoundingBox(nodes)
   const { scale, offsetX, offsetY } = calculateTransform(bbox, width, height, padding)
 
-  // 绘制连线
+  // 绘制连线（需要所有节点包括锚点来定位）
   edges.forEach((edge) => {
     drawConnector(ctx, edge as any, nodes as any, scale, offsetX, offsetY)
   })
 
-  // 绘制节点
+  // 绘制节点（过滤掉辅助节点）
   nodes.forEach((node) => {
-    drawShape(ctx, node as any, scale, offsetX, offsetY)
+    // 跳过辅助节点（锚点、标记等）
+    if (!shouldSkipNodeInThumbnail(node.type)) {
+      drawShape(ctx, node as any, scale, offsetX, offsetY)
+    }
   })
+}
+
+/**
+ * 检查是否在缩略图中跳过该节点
+ */
+function shouldSkipNodeInThumbnail(type: string): boolean {
+  const skipTypes = [
+    'uml-anchor',
+    'uml-lifeline-marker',
+    'uml-lifeline-end',
+    'uml-message-marker',
+    'uml-destroy-marker',
+    'uml-create-marker',
+    'uml-create-label',
+  ]
+  return skipTypes.includes(type)
 }
 
 /**
@@ -111,10 +130,17 @@ export function generateDiagramTemplateThumbnail(
   ctx.fillStyle = opts.backgroundColor
   ctx.fillRect(0, 0, opts.width, opts.height)
 
-  // 绘制模板
-  const nodes = template.nodes || []
-  const edges = template.edges || []
+  // 如果模板有 generate 函数，先调用它生成 nodes 和 edges
+  let nodes = template.nodes || []
+  let edges = template.edges || []
 
+  if (template.generate) {
+    const generated = template.generate()
+    nodes = generated.nodes
+    edges = generated.edges
+  }
+
+  // 绘制模板
   drawTemplateToCanvas(ctx, nodes, edges, opts.width, opts.height, opts.padding)
 
   return canvas.toDataURL('image/png', opts.quality)

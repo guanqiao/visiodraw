@@ -552,17 +552,35 @@ export function drawConnector(
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
 
+  // 处理虚线样式
+  const dashArray = (connector as any).dashArray || (connector as any).lineDash
+  if (dashArray) {
+    ctx.setLineDash(dashArray.split(',').map(Number))
+  }
+
   // 绘制连线
   ctx.beginPath()
   ctx.moveTo(sourceX, sourceY)
 
-  // 正交连线
-  const midX = (sourceX + targetX) / 2
-  ctx.lineTo(midX, sourceY)
-  ctx.lineTo(midX, targetY)
-  ctx.lineTo(targetX, targetY)
+  // 判断连线样式
+  const style = (connector as any).style || connector.style
+  if (style === 'straight') {
+    // 直线连接（用于序列图消息）
+    ctx.lineTo(targetX, targetY)
+  } else {
+    // 正交连线（默认）
+    const midX = (sourceX + targetX) / 2
+    ctx.lineTo(midX, sourceY)
+    ctx.lineTo(midX, targetY)
+    ctx.lineTo(targetX, targetY)
+  }
 
   ctx.stroke()
+
+  // 重置虚线样式
+  if (dashArray) {
+    ctx.setLineDash([])
+  }
 
   // 绘制箭头
   if (options.showArrow !== false) {
