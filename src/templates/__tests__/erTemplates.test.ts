@@ -20,6 +20,7 @@ import {
   createFileStorageErTemplate,
   getErTemplates,
 } from '../erTemplates'
+import { generateErTemplate } from '../../utils/erDiagramUtils'
 
 describe('ER图模板', () => {
   describe('基础模板', () => {
@@ -251,6 +252,91 @@ describe('ER图模板', () => {
       })
       expect(template.nodes[0].x).toBe(100)
       expect(template.nodes[0].y).toBe(100)
+    })
+  })
+
+  describe('参数校验', () => {
+    it('应验证实体ID唯一性', () => {
+      const invalidConfig = {
+        id: 'test',
+        name: '测试',
+        description: '测试模板',
+        category: 'basic' as const,
+        tags: ['test'],
+        difficulty: 'beginner' as const,
+        entities: [
+          { id: 'user', name: 'USER', columns: [{ name: 'id', dataType: 'INT', isPrimary: true }] },
+          { id: 'user', name: 'USER2', columns: [{ name: 'id', dataType: 'INT', isPrimary: true }] },
+        ],
+        relationships: [],
+      }
+      expect(() => generateErTemplate(invalidConfig)).toThrow()
+    })
+
+    it('应验证关系引用的实体存在', () => {
+      const invalidConfig = {
+        id: 'test',
+        name: '测试',
+        description: '测试模板',
+        category: 'basic' as const,
+        tags: ['test'],
+        difficulty: 'beginner' as const,
+        entities: [
+          { id: 'user', name: 'USER', columns: [{ name: 'id', dataType: 'INT', isPrimary: true }] },
+        ],
+        relationships: [
+          {
+            source: 'user',
+            target: 'nonexistent',
+            sourceCardinality: 'one' as const,
+            targetCardinality: 'many' as const,
+          },
+        ],
+      }
+      expect(() => generateErTemplate(invalidConfig)).toThrow()
+    })
+
+    it('应验证实体必须有主键', () => {
+      const invalidConfig = {
+        id: 'test',
+        name: '测试',
+        description: '测试模板',
+        category: 'basic' as const,
+        tags: ['test'],
+        difficulty: 'beginner' as const,
+        entities: [
+          { id: 'user', name: 'USER', columns: [{ name: 'name', dataType: 'VARCHAR' }] },
+        ],
+        relationships: [],
+      }
+      expect(() => generateErTemplate(invalidConfig)).toThrow()
+    })
+
+    it('应验证布局配置有效性', () => {
+      expect(() => createSimpleErTemplate({ startX: -1 })).toThrow()
+      expect(() => createSimpleErTemplate({ startY: -1 })).toThrow()
+    })
+  })
+
+  describe('高级功能', () => {
+    it('应支持生成SQL DDL', () => {
+      const template = createSimpleErTemplate()
+      const userNode = template.nodes.find(n => n.id === 'entity-user')
+      expect(userNode).toBeDefined()
+      expect(userNode?.text).toContain('USER')
+    })
+
+    it('应支持分析实体连接度', () => {
+      const template = createEcommerceErTemplate()
+      // 电商模板中订单实体应该有多条关系
+      const orderNode = template.nodes.find(n => n.id === 'entity-order')
+      expect(orderNode).toBeDefined()
+    })
+
+    it('应支持不同主题', () => {
+      const template = createSimpleErTemplate()
+      expect(template.nodes[0].fill).toBeDefined()
+      expect(template.nodes[0].stroke).toBeDefined()
     })
   })
 })

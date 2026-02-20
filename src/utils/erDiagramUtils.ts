@@ -645,6 +645,14 @@ export function generateErTemplate(
   options: TemplateGenerateOptions = {},
   theme: ErTheme = ER_THEMES.default
 ): DiagramTemplate {
+  // 参数校验
+  if (!templateConfig.entities || !Array.isArray(templateConfig.entities)) {
+    throw new Error('Template must have a valid entities array')
+  }
+  if (!templateConfig.relationships || !Array.isArray(templateConfig.relationships)) {
+    throw new Error('Template must have a valid relationships array')
+  }
+
   const config: ErLayoutConfig = {
     ...DEFAULT_ER_CONFIG,
     startX: options.startX ?? DEFAULT_ER_CONFIG.startX,
@@ -653,7 +661,24 @@ export function generateErTemplate(
     direction: options.direction ?? DEFAULT_ER_CONFIG.direction,
   }
 
+  // 验证布局配置
+  validateLayoutConfig(config)
+
   const { entities, relationships } = templateConfig
+
+  // 验证实体ID唯一性
+  const entityIdList = entities.map(e => e.id)
+  const duplicateIds = entityIdList.filter((id, index) => entityIdList.indexOf(id) !== index)
+  if (duplicateIds.length > 0) {
+    throw new Error(`Duplicate entity IDs: ${duplicateIds.join(', ')}`)
+  }
+
+  // 验证实体配置
+  entities.forEach(validateEntityConfig)
+
+  // 验证关系配置
+  const entityIds = new Set(entityIdList)
+  relationships.forEach(rel => validateRelationshipConfig(rel, entityIds))
 
   // 计算布局
   const layouts = calculateEntityLayouts(entities, config)
@@ -754,4 +779,309 @@ export function validateErTemplateConfig(config: ErTemplateConfig): {
     valid: errors.length === 0,
     errors,
   }
+}
+
+// ==================== 实体适配器 ====================
+
+/**
+ * 实体布局适配器
+ * 将内部布局格式转换为模板使用的格式
+ */
+export function adaptEntityLayout(layout: EntityLayout): {
+  index: number
+  x: number
+  y: number
+  width: number
+  height: number
+  centerX: number
+  centerY: number
+} {
+  return {
+    index: layout.index,
+    x: layout.x,
+    y: layout.y,
+    width: layout.width,
+    height: layout.height,
+    centerX: layout.centerX,
+    centerY: layout.centerY,
+  }
+}
+
+/**
+ * 批量适配实体布局
+ */
+export function adaptEntityLayouts(layouts: Map<string, EntityLayout>): Map<string, ReturnType<typeof adaptEntityLayout>> {
+  const result = new Map<string, ReturnType<typeof adaptEntityLayout>>()
+  layouts.forEach((layout, id) => {
+    result.set(id, adaptEntityLayout(layout))
+  })
+  return result
+}
+
+/**
+ * 将共享库的节点转换为 TemplateNode
+ * 自动提取所有非 undefined 属性
+ */
+export function adaptNodeToTemplate<T extends Record<string, any>>(node: T): TemplateNode {
+  const result: Record<string, any> = {}
+
+  // 提取所有非 undefined 的属性
+  for (const [key, value] of Object.entries(node)) {
+    if (value !== undefined) {
+      result[key] = value
+    }
+  }
+
+  return result as TemplateNode
+}
+
+/**
+ * 批量转换节点数组
+ */
+export function adaptNodesToTemplate<T extends Record<string, any>>(nodes: T[]): TemplateNode[] {
+  return nodes.map(adaptNodeToTemplate)
+}
+
+// ==================== 参数校验 ====================
+
+/**
+ * 验证实体配置
+ */
+export function validateEntityConfig(config: EntityConfig): void {
+  if (!config.id || typeof config.id !== 'string') {
+    throw new Error('Entity must have a valid id')
+  }
+  if (!config.name || typeof config.name !== 'string') {
+    throw new Error('Entity must have a valid name')
+  }
+  if (!Array.isArray(config.columns) || config.columns.length === 0) {
+    throw new Error(`Entity "${config.name}" must have at least one column`)
+  }
+
+  // 验证列配置
+  const columnNames = new Set<string>()
+  config.columns.forEach((col, index) => {
+    if (!col.name || typeof col.name !== 'string') {
+      throw new Error(`Entity "${config.name}" column ${index} must have a valid name`)
+    }
+    if (columnNames.has(col.name)) {
+      throw new Error(`Entity "${config.name}" has duplicate column name: ${col.name}`)
+    }
+    columnNames.add(col.name)
+  })
+
+  // 验证每个实体至少有一个主键
+  const hasPrimaryKey = config.columns.some(col => col.isPrimary)
+  if (!hasPrimaryKey) {
+    throw new Error(`Entity "${config.name}" must have at least one primary key`)
+  }
+}
+
+/**
+ * 验证关系配置
+ */
+export function validateRelationshipConfig(config: RelationshipConfig, entityIds: Set<string>): void {
+  if (!config.source || typeof config.source !== 'string') {
+    throw new Error('Relationship must have a valid source entity')
+  }
+  if (!config.target || typeof config.target !== 'string') {
+    throw new Error('Relationship must have a valid target entity')
+  }
+  if (!entityIds.has(config.source)) {
+    throw new Error(`Relationship source entity "${config.source}" not found`)
+  }
+  if (!entityIds.has(config.target)) {
+    throw new Error(`Relationship target entity "${config.target}" not found`)
+  }
+
+  // 验证基数类型
+  const validCardinalities: CardinalityType[] = ['one', 'many', 'zero-or-one', 'one-or-many', 'zero-or-many']
+  if (!validCardinalities.includes(config.sourceCardinality)) {
+    throw new Error(`Invalid source cardinality: ${config.sourceCardinality}`)
+  }
+  if (!validCardinalities.includes(config.targetCardinality)) {
+    throw new Error(`Invalid target cardinality: ${config.targetCardinality}`)
+  }
+}
+
+/**
+ * 验证布局配置
+ */
+export function validateLayoutConfig(config: ErLayoutConfig): void {
+  if (config.startX < 0) {
+    throw new Error('startX must be non-negative')
+  }
+  if (config.startY < 0) {
+    throw new Error('startY must be non-negative')
+  }
+  if (config.entityWidth < 50) {
+    throw new Error('entityWidth must be at least 50')
+  }
+  if (config.entityHeight < 50) {
+    throw new Error('entityHeight must be at least 50')
+  }
+  if (config.entitySpacing < config.entityWidth) {
+    throw new Error('entitySpacing must be at least entityWidth')
+  }
+
+  const validAlgorithms: LayoutAlgorithm[] = ['hierarchical', 'grid', 'force', 'circular']
+  if (!validAlgorithms.includes(config.layoutAlgorithm)) {
+    throw new Error(`Invalid layout algorithm: ${config.layoutAlgorithm}`)
+  }
+}
+
+// ==================== 高级工具函数 ====================
+
+/**
+ * 获取实体之间的关系路径
+ * 用于分析实体间的依赖关系
+ */
+export function getRelationshipPaths(
+  entities: EntityConfig[],
+  relationships: RelationshipConfig[],
+  startEntityId: string
+): { entityId: string; path: string[]; depth: number }[] {
+  const paths: { entityId: string; path: string[]; depth: number }[] = []
+  const visited = new Set<string>()
+
+  function traverse(currentId: string, currentPath: string[], depth: number) {
+    if (visited.has(currentId)) return
+    visited.add(currentId)
+
+    paths.push({
+      entityId: currentId,
+      path: [...currentPath],
+      depth,
+    })
+
+    // 查找与当前实体相关的所有关系
+    const relatedRels = relationships.filter(
+      rel => rel.source === currentId || rel.target === currentId
+    )
+
+    relatedRels.forEach(rel => {
+      const nextId = rel.source === currentId ? rel.target : rel.source
+      if (!visited.has(nextId)) {
+        traverse(nextId, [...currentPath, currentId], depth + 1)
+      }
+    })
+  }
+
+  traverse(startEntityId, [], 0)
+  return paths
+}
+
+/**
+ * 分析实体的连接度（关联的实体数量）
+ */
+export function analyzeEntityConnectivity(
+  entities: EntityConfig[],
+  relationships: RelationshipConfig[]
+): Map<string, { incoming: number; outgoing: number; total: number }> {
+  const connectivity = new Map<string, { incoming: number; outgoing: number; total: number }>()
+
+  entities.forEach(entity => {
+    const incoming = relationships.filter(rel => rel.target === entity.id).length
+    const outgoing = relationships.filter(rel => rel.source === entity.id).length
+    connectivity.set(entity.id, {
+      incoming,
+      outgoing,
+      total: incoming + outgoing,
+    })
+  })
+
+  return connectivity
+}
+
+/**
+ * 根据连接度排序实体（用于优化布局）
+ */
+export function sortEntitiesByConnectivity(
+  entities: EntityConfig[],
+  relationships: RelationshipConfig[]
+): EntityConfig[] {
+  const connectivity = analyzeEntityConnectivity(entities, relationships)
+
+  return [...entities].sort((a, b) => {
+    const connA = connectivity.get(a.id) || { total: 0 }
+    const connB = connectivity.get(b.id) || { total: 0 }
+    return connB.total - connA.total // 降序排列
+  })
+}
+
+/**
+ * 生成数据库表创建SQL
+ */
+export function generateCreateTableSQL(entity: EntityConfig): string {
+  const columns: string[] = entity.columns.map(col => {
+    let def = `  ${col.name} ${col.dataType}`
+    if (col.isPrimary) {
+      def += ' PRIMARY KEY'
+    }
+    if (!col.isNullable) {
+      def += ' NOT NULL'
+    }
+    if (col.isUnique) {
+      def += ' UNIQUE'
+    }
+    if (col.defaultValue !== undefined) {
+      def += ` DEFAULT ${col.defaultValue}`
+    }
+    return def
+  })
+
+  return `CREATE TABLE ${entity.name} (
+${columns.join(',\n')}
+);`
+}
+
+/**
+ * 生成所有实体的SQL DDL
+ */
+export function generateAllTablesSQL(entities: EntityConfig[]): string {
+  return entities.map(generateCreateTableSQL).join('\n\n')
+}
+
+/**
+ * 生成外键约束SQL
+ */
+export function generateForeignKeySQL(
+  relationship: RelationshipConfig,
+  entities: EntityConfig[]
+): string | null {
+  const sourceEntity = entities.find(e => e.id === relationship.source)
+  const targetEntity = entities.find(e => e.id === relationship.target)
+
+  if (!sourceEntity || !targetEntity) return null
+
+  // 查找外键列（通常是目标实体的主键）
+  const targetPrimaryKey = targetEntity.columns.find(col => col.isPrimary)
+  if (!targetPrimaryKey) return null
+
+  return `ALTER TABLE ${sourceEntity.name}
+ADD CONSTRAINT fk_${relationship.source}_${relationship.target}
+FOREIGN KEY (${targetPrimaryKey.name}_id) REFERENCES ${targetEntity.name}(${targetPrimaryKey.name});`
+}
+
+/**
+ * 生成索引创建SQL
+ */
+export function generateIndexSQL(entity: EntityConfig): string[] {
+  const indexes: string[] = []
+
+  // 为外键列创建索引
+  entity.columns.forEach(col => {
+    if (col.isForeign) {
+      indexes.push(`CREATE INDEX idx_${entity.name}_${col.name} ON ${entity.name}(${col.name});`)
+    }
+  })
+
+  // 为唯一约束创建索引
+  entity.columns.forEach(col => {
+    if (col.isUnique && !col.isPrimary) {
+      indexes.push(`CREATE UNIQUE INDEX idx_${entity.name}_${col.name}_unique ON ${entity.name}(${col.name});`)
+    }
+  })
+
+  return indexes
 }
