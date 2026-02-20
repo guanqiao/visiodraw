@@ -26,19 +26,24 @@ export function templateNodeToShapeData(node: TemplateNode): ShapeData {
 export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[]): Connector {
   const sourceNode = nodes.find(n => n.id === edge.source)
   const targetNode = nodes.find(n => n.id === edge.target)
-  
+
   const { sourcePointId, targetPointId } = calculateConnectionPoints(
     sourceNode,
     targetNode,
     edge.style
   )
-  
+
   const startMarker = edge.startMarker || 'none'
   const endMarker = edge.endMarker || 'arrow'
-  
+
   const theme = getCurrentTheme()
-  
-  return {
+
+  // 获取标签位置信息
+  const labelPosition = (edge.labelPosition as number) ?? 0.5
+  const labelOffsetY = (edge.labelOffsetY as number) ?? -10
+
+  // 构建基础连接器配置
+  const connector: Connector = {
     id: edge.id,
     sourceShapeId: edge.source,
     sourcePointId,
@@ -50,15 +55,37 @@ export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[
     endStyle: (endMarker === 'arrow' ? 'classic' : endMarker) as ConnectorEndStyle,
     stroke: theme.lineColor || '#666',
     strokeWidth: 2,
-    labels: edge.label ? [{ 
-      id: `${edge.id}-label`, 
-      text: edge.label, 
-      position: 0.5,
+    labels: edge.label ? [{
+      id: `${edge.id}-label`,
+      text: edge.label,
+      position: labelPosition,
+      offsetY: labelOffsetY,
       fontSize: 12,
       color: theme.textColor || '#333',
       backgroundColor: theme.edgeLabelBackground || '#fff',
     }] : undefined,
   }
+
+  // 对于 straight 样式的序列图边，添加水平路由约束
+  if (edge.style === 'straight') {
+    connector.routingConstraint = 'horizontal'
+    
+    // 如果有 yPosition 数据，使用 pathPoints 控制消息位置
+    const yPosition = edge.data?.yPosition as number | undefined
+    if (yPosition !== undefined && sourceNode && targetNode) {
+      const sourceX = sourceNode.x + (sourceNode.width || 1) / 2
+      const targetX = targetNode.x + (targetNode.width || 1) / 2
+      const messageY = sourceNode.y + yPosition
+      
+      // 使用 pathPoints 定义直线路径
+      connector.pathPoints = [
+        { x: sourceX, y: messageY },
+        { x: targetX, y: messageY },
+      ]
+    }
+  }
+
+  return connector
 }
 
 function calculateConnectionPoints(
@@ -69,15 +96,38 @@ function calculateConnectionPoints(
   if (!sourceNode || !targetNode) {
     return { sourcePointId: 'bottom', targetPointId: 'top' }
   }
-  
+
+  // 对于锚点节点，使用中心端口
+  if (sourceNode.type === 'uml-anchor' && targetNode.type === 'uml-anchor') {
+    return { sourcePointId: 'center', targetPointId: 'center' }
+  }
+  if (sourceNode.type === 'uml-anchor') {
+    return { sourcePointId: 'center', targetPointId: 'center' }
+  }
+  if (targetNode.type === 'uml-anchor') {
+    return { sourcePointId: 'center', targetPointId: 'center' }
+  }
+
+  // 对于 straight 样式的边（如序列图消息），强制使用水平连接点
+  if (style === 'straight') {
+    const sourceCenterX = sourceNode.x + (sourceNode.width || 100) / 2
+    const targetCenterX = targetNode.x + (targetNode.width || 100) / 2
+
+    if (targetCenterX > sourceCenterX) {
+      return { sourcePointId: 'right', targetPointId: 'left' }
+    } else {
+      return { sourcePointId: 'left', targetPointId: 'right' }
+    }
+  }
+
   const sourceCenterX = sourceNode.x + (sourceNode.width || 100) / 2
   const sourceCenterY = sourceNode.y + (sourceNode.height || 60) / 2
   const targetCenterX = targetNode.x + (targetNode.width || 100) / 2
   const targetCenterY = targetNode.y + (targetNode.height || 60) / 2
-  
+
   const dx = targetCenterX - sourceCenterX
   const dy = targetCenterY - sourceCenterY
-  
+
   if (Math.abs(dx) > Math.abs(dy)) {
     if (dx > 0) {
       return { sourcePointId: 'right', targetPointId: 'left' }
@@ -180,13 +230,31 @@ export function createTemplateNode(
         stroke: '#722ed1',
         strokeWidth: 4,
       }
+    case 'uml-participant':
+      return {
+        ...baseNode,
+        width: 100,
+        height: 40,
+        fill: '#f0f5ff',
+        stroke: '#2f54eb',
+        strokeWidth: 2,
+      }
+    case 'uml-lifeline-line':
+      return {
+        ...baseNode,
+        width: 1,
+        height: 250,
+        fill: 'transparent',
+        stroke: '#8c8c8c',
+        strokeWidth: 1,
+      }
     case 'uml-lifeline':
       return {
         ...baseNode,
-        width: 60,
-        height: 300,
-        fill: theme.actorBkg,
-        stroke: theme.actorBorder,
+        width: 120,
+        height: 60,
+        fill: theme.actorBkg || '#f0f5ff',
+        stroke: theme.actorBorder || '#2f54eb',
         strokeWidth: 2,
       }
     case 'uml-state':

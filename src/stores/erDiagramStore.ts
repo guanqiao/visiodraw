@@ -61,7 +61,7 @@ export interface ErDiagramState {
 
   // Layout operations
   setTablePosition: (id: string, x: number, y: number) => void
-  autoLayout: (algorithm: 'grid' | 'hierarchical' | 'force') => void
+  autoLayout: (algorithm: 'grid' | 'hierarchical' | 'force' | 'smart') => void
 
   // Mode operations
   setMode: (mode: 'select' | 'create-table' | 'create-relation') => void
@@ -257,26 +257,50 @@ export const useErDiagramStore = create<ErDiagramState>()(
       },
 
       autoLayout: (algorithm) => {
-        const { tables } = get()
+        const { tables, relations } = get()
+        if (tables.length === 0) return
+
         const updatedTables = [...tables]
+        const tableMap = new Map<string, typeof tables[0]>()
+        updatedTables.forEach((t) => tableMap.set(t.id, t))
+
+        const calculateTableSize = (table: typeof tables[0]) => {
+          const columnCount = table.columns.length
+          const width = Math.max(180, 200)
+          const height = Math.max(100, 50 + columnCount * 28)
+          return { width, height }
+        }
 
         switch (algorithm) {
-          case 'grid':
+          case 'grid': {
+            const cols = Math.ceil(Math.sqrt(tables.length))
+            const maxColumns = Math.max(3, cols)
+            
             updatedTables.forEach((table, index) => {
-              const row = Math.floor(index / 3)
-              const col = index % 3
-              table.x = 100 + col * 280
-              table.y = 100 + row * 350
+              const row = Math.floor(index / maxColumns)
+              const col = index % maxColumns
+              const size = calculateTableSize(table)
+              const spacingX = 280 + size.width * 0.2
+              const spacingY = 350 + size.height * 0.2
+              table.x = 100 + col * spacingX
+              table.y = 100 + row * spacingY
             })
             break
+          }
 
-          case 'hierarchical':
-            const relations = get().relations
+          case 'hierarchical': {
             const inDegree = new Map<string, number>()
-            tables.forEach((t) => inDegree.set(t.id, 0))
+            const outDegree = new Map<string, number>()
+            tables.forEach((t) => {
+              inDegree.set(t.id, 0)
+              outDegree.set(t.id, 0)
+            })
+            
             relations.forEach((r) => {
-              const current = inDegree.get(r.sourceTableId) || 0
-              inDegree.set(r.sourceTableId, current + 1)
+              const currentIn = inDegree.get(r.sourceTableId) || 0
+              const currentOut = outDegree.get(r.targetTableId) || 0
+              inDegree.set(r.sourceTableId, currentIn + 1)
+              outDegree.set(r.targetTableId, currentOut + 1)
             })
 
             const levels: string[][] = []
@@ -285,21 +309,30 @@ export const useErDiagramStore = create<ErDiagramState>()(
             const rootTables = tables.filter(
               (t) => (inDegree.get(t.id) || 0) === 0
             )
+            
             if (rootTables.length > 0) {
               levels.push(rootTables.map((t) => t.id))
               rootTables.forEach((t) => assigned.add(t.id))
             }
 
-            while (assigned.size < tables.length) {
+            let maxIterations = tables.length * 2
+            let iterations = 0
+            while (assigned.size < tables.length && iterations < maxIterations) {
               const nextLevel: string[] = []
+              
               for (const tableId of Array.from(assigned)) {
                 for (const r of relations) {
                   if (r.targetTableId === tableId && !assigned.has(r.sourceTableId)) {
                     nextLevel.push(r.sourceTableId)
                     assigned.add(r.sourceTableId)
                   }
+                  if (r.sourceTableId === tableId && !assigned.has(r.targetTableId)) {
+                    nextLevel.push(r.targetTableId)
+                    assigned.add(r.targetTableId)
+                  }
                 }
               }
+              
               if (nextLevel.length === 0) {
                 const remaining = tables.filter((t) => !assigned.has(t.id))
                 if (remaining.length > 0) {
@@ -308,30 +341,190 @@ export const useErDiagramStore = create<ErDiagramState>()(
                 }
                 break
               }
-              levels.push(nextLevel)
+              levels.push([...new Set(nextLevel)])
+              iterations++
             }
 
+            let maxWidth = 0
+            levels.forEach((level) => {
+              const levelWidth = level.length * 300
+              maxWidth = Math.max(maxWidth, levelWidth)
+            })
+
             levels.forEach((level, levelIndex) => {
+              const levelWidth = level.length * 300
+              const startX = 100 + (maxWidth - levelWidth) / 2
+              
               level.forEach((tableId, colIndex) => {
                 const table = updatedTables.find((t) => t.id === tableId)
                 if (table) {
-                  table.x = 100 + colIndex * 280
-                  table.y = 100 + levelIndex * 350
+                  const size = calculateTableSize(table)
+                  table.x = startX + colIndex * 300
+                  table.y = 100 + levelIndex * (350 + size.height * 0.3)
                 }
               })
             })
             break
+          }
 
-          case 'force':
-            const centerX = 400
-            const centerY = 300
+          case 'force': {
+            const canvasWidth = Math.max(800, tables.length * 250)
+            const canvasHeight = Math.max(600, Math.ceil(tables.length / 3) * 350)
+            const centerX = canvasWidth / 2
+            const centerY = canvasHeight / 2
+            const radius = Math.min(canvasWidth, canvasHeight) * 0.35
+
             updatedTables.forEach((table, index) => {
               const angle = (2 * Math.PI * index) / tables.length
-              const radius = 200
               table.x = centerX + radius * Math.cos(angle)
               table.y = centerY + radius * Math.sin(angle)
             })
+
+            const iterations = 100
+            const k = Math.sqrt((canvasWidth * canvasHeight) / tables.length) * 0.5
+            const positions = updatedTables.map((t) => ({ x: t.x, y: t.y }))
+
+            for (let iter = 0; iter < iterations; iter++) {
+              const displacements = positions.map(() => ({ x: 0, y: 0 }))
+              const temperature = Math.max(0.1, 1 - iter / iterations)
+
+              for (let i = 0; i < positions.length; i++) {
+                for (let j = i + 1; j < positions.length; j++) {
+                  const dx = positions[j].x - positions[i].x
+                  const dy = positions[j].y - positions[i].y
+                  const distance = Math.sqrt(dx * dx + dy * dy) || 1
+
+                  const repulsiveForce = (k * k) / distance
+                  const fx = (dx / distance) * repulsiveForce * 0.5
+                  const fy = (dy / distance) * repulsiveForce * 0.5
+
+                  displacements[i].x -= fx
+                  displacements[i].y -= fy
+                  displacements[j].x += fx
+                  displacements[j].y += fy
+                }
+              }
+
+              for (const relation of relations) {
+                const sourceIndex = updatedTables.findIndex((t) => t.id === relation.sourceTableId)
+                const targetIndex = updatedTables.findIndex((t) => t.id === relation.targetTableId)
+
+                if (sourceIndex !== -1 && targetIndex !== -1) {
+                  const dx = positions[targetIndex].x - positions[sourceIndex].x
+                  const dy = positions[targetIndex].y - positions[sourceIndex].y
+                  const distance = Math.sqrt(dx * dx + dy * dy) || 1
+
+                  const attractiveForce = (distance * distance) / k
+                  const fx = (dx / distance) * attractiveForce * 0.1
+                  const fy = (dy / distance) * attractiveForce * 0.1
+
+                  displacements[sourceIndex].x += fx
+                  displacements[sourceIndex].y += fy
+                  displacements[targetIndex].x -= fx
+                  displacements[targetIndex].y -= fy
+                }
+              }
+
+              for (let i = 0; i < positions.length; i++) {
+                const disp = displacements[i]
+                const dispLength = Math.sqrt(disp.x * disp.x + disp.y * disp.y) || 1
+                const limitedDisp = Math.min(dispLength, temperature * 150)
+
+                positions[i].x += (disp.x / dispLength) * limitedDisp
+                positions[i].y += (disp.y / dispLength) * limitedDisp
+
+                positions[i].x = Math.max(50, Math.min(canvasWidth - 50, positions[i].x))
+                positions[i].y = Math.max(50, Math.min(canvasHeight - 50, positions[i].y))
+              }
+            }
+
+            updatedTables.forEach((table, index) => {
+              table.x = positions[index].x
+              table.y = positions[index].y
+            })
             break
+          }
+
+          case 'smart': {
+            const adjacencyList = new Map<string, Set<string>>()
+            tables.forEach((t) => adjacencyList.set(t.id, new Set()))
+            
+            relations.forEach((r) => {
+              adjacencyList.get(r.sourceTableId)?.add(r.targetTableId)
+              adjacencyList.get(r.targetTableId)?.add(r.sourceTableId)
+            })
+
+            const clusters: string[][] = []
+            const visited = new Set<string>()
+
+            for (const table of tables) {
+              if (!visited.has(table.id)) {
+                const cluster: string[] = []
+                const queue = [table.id]
+                
+                while (queue.length > 0) {
+                  const current = queue.shift()!
+                  if (visited.has(current)) continue
+                  visited.add(current)
+                  cluster.push(current)
+                  
+                  const neighbors = adjacencyList.get(current) || new Set()
+                  for (const neighbor of neighbors) {
+                    if (!visited.has(neighbor)) {
+                      queue.push(neighbor)
+                    }
+                  }
+                }
+                
+                if (cluster.length > 0) {
+                  clusters.push(cluster)
+                }
+              }
+            }
+
+            clusters.sort((a, b) => b.length - a.length)
+
+            let globalX = 100
+            let globalY = 100
+            const clusterSpacingX = 400
+            const clusterSpacingY = 450
+
+            for (const cluster of clusters) {
+              const clusterTables = cluster.map((id) => tableMap.get(id)!).filter(Boolean)
+              
+              if (clusterTables.length === 1) {
+                const table = clusterTables[0]
+                table.x = globalX
+                table.y = globalY
+                globalX += clusterSpacingX
+              } else {
+                const clusterInDegree = new Map<string, number>()
+                clusterTables.forEach((t) => clusterInDegree.set(t.id, 0))
+                
+                for (const r of relations) {
+                  if (cluster.includes(r.sourceTableId)) {
+                    const current = clusterInDegree.get(r.sourceTableId) || 0
+                    clusterInDegree.set(r.sourceTableId, current + 1)
+                  }
+                }
+
+                const sortedTables = [...clusterTables].sort(
+                  (a, b) => (clusterInDegree.get(a.id) || 0) - (clusterInDegree.get(b.id) || 0)
+                )
+
+                const cols = Math.ceil(Math.sqrt(clusterTables.length))
+                sortedTables.forEach((table, index) => {
+                  const row = Math.floor(index / cols)
+                  const col = index % cols
+                  table.x = globalX + col * 300
+                  table.y = globalY + row * 350
+                })
+
+                globalY += Math.ceil(clusterTables.length / cols) * 350 + 100
+              }
+            }
+            break
+          }
         }
 
         set({ tables: updatedTables })

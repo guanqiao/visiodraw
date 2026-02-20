@@ -19,7 +19,7 @@ import { SmartRouter } from '@utils/rendering/SmartRouter'
 import { ParallelEdgeHandler } from '@utils/parallelEdgeHandler'
 import { v4 as uuidv4 } from 'uuid'
 import { parseDragData } from '../types/dragDrop'
-import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVisibility, isNearNodeEdge, getEdgePointFromMouse, addCustomPort, createCustomConnectionPoint, removeCustomPort, updateCustomPortPosition } from '@utils/connectionPoints'
+import { generateDefaultConnectionPoints, showPortsDebounced, clearPendingPortVisibility, isNearNodeEdge, getEdgePointFromMouse, addCustomPort, createCustomConnectionPoint, removeCustomPort, updateCustomPortPosition, isMaxConnectionPointsReached, removeAllCustomPorts, snapToEdge, isValidConnectionPointPosition, checkAlignment, distributeConnectionPointsOnEdge } from '@utils/connectionPoints'
 import { ConnectorRenderer } from '@utils/connectorRenderer'
 import { renderShape } from '@utils/shapeRenderers'
 import ERRelationQuickSelector, { isErTableNode, getErNodeName } from '@components/ERRelationQuickSelector'
@@ -101,7 +101,12 @@ const X6Canvas: React.FC = () => {
 
   // Ctrl key state for custom connection point
   const [ctrlPressed, setCtrlPressed] = useState(false)
-  const [hoveredEdgePoint, setHoveredEdgePoint] = useState<{ x: number; y: number } | null>(null)
+  const [hoveredEdgePoint, setHoveredEdgePoint] = useState<{ x: number; y: number; edge?: string } | null>(null)
+  const [hoveredPort, setHoveredPort] = useState<{ nodeId: string; portId: string; x: number; y: number } | null>(null)
+  const [alignmentGuides, setAlignmentGuides] = useState<{
+    horizontal?: { y: number; x1: number; x2: number }
+    vertical?: { x: number; y1: number; y2: number }
+  } | null>(null)
   const indicatorRef = useRef<HTMLDivElement>(null)
 
   // Edge context menu state
@@ -351,6 +356,7 @@ const X6Canvas: React.FC = () => {
 
     // Ctrl+Click to add custom connection point anywhere on node
     // Click on existing custom connection point to delete it
+    // Shift+Click to clear all custom connection points
     graph.on('node:click', ({ node, e }: { node: Node; e: any }) => {
       if (!e.ctrlKey && !e.metaKey && currentTool !== 'connection-point') return
 
@@ -383,23 +389,68 @@ const X6Canvas: React.FC = () => {
         }
       }
 
-      // Add new connection point
-      const relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
-      const relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
+      // Shift+Click to clear all custom connection points
+      if (e.shiftKey) {
+        const removedCount = removeAllCustomPorts(node)
+        // Also remove from store
+        const allCustomPorts = ports.filter((p: any) => p.id?.startsWith('custom-'))
+        allCustomPorts.forEach((port: any) => {
+          removeConnectionPoint(node.id, port.id)
+        })
+        message.success(`已清除 ${removedCount} 个连接点`)
+        return
+      }
 
-      const portInfo = addCustomPort(node, relativeX, relativeY)
+      // Add new connection point with smart edge snapping
+      let relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
+      let relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
 
-      const connectionPoint = createCustomConnectionPoint(relativeX, relativeY)
+      // Use smart edge snapping (unless Ctrl+Alt is pressed for free placement)
+      const snapEnabled = !(e.ctrlKey && e.altKey)
+      if (snapEnabled) {
+        const snapped = snapToEdge(relativeX, relativeY, 0.2)
+        relativeX = snapped.x
+        relativeY = snapped.y
+      }
+
+      // Check if position is valid (not duplicate, within limits)
+      const validation = isValidConnectionPointPosition(node, relativeX, relativeY, {
+        maxCount: 16,
+        duplicateThreshold: 0.05,
+      })
+
+      if (!validation.valid) {
+        switch (validation.reason) {
+          case 'max_reached':
+            message.warning('每个图形最多只能添加16个自定义连接点')
+            break
+          case 'duplicate':
+            message.warning('该位置已存在连接点')
+            break
+          case 'invalid_position':
+            message.error('连接点位置无效')
+            break
+        }
+        return
+      }
+
+      const portInfo = addCustomPort(node, relativeX, relativeY, {
+        snapToEdge: false, // Already snapped above
+        edgeThreshold: 0.2,
+      })
+
+      const connectionPoint = createCustomConnectionPoint(portInfo.x, portInfo.y)
       connectionPoint.id = portInfo.id
 
       addConnectionPoint(node.id, connectionPoint)
 
-      message.success('已添加连接点')
+      const edgeText = portInfo.edge !== 'none' ? ` (${portInfo.edge})` : ''
+      message.success(`已添加连接点${edgeText}`)
     })
 
-    // Drag to move custom connection point
+    // Drag to move custom connection point with smart edge snapping
     let draggingPort: { nodeId: string; portId: string } | null = null
-    
+
     graph.on('port:mousedown', ({ node, port, e }: { node: Node; port: any; e: any }) => {
       if (port.id?.startsWith('custom-')) {
         draggingPort = { nodeId: node.id, portId: port.id }
@@ -409,20 +460,51 @@ const X6Canvas: React.FC = () => {
 
     graph.on('port:mousemove', ({ node, port, e }: { node: Node; port: any; e: any }) => {
       if (!draggingPort || draggingPort.portId !== port.id) return
-      
+
       const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
       const position = node.getPosition()
       const size = node.getSize()
-      
-      const relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
-      const relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
-      
+
+      let relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
+      let relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
+
+      // Apply smart edge snapping during drag (unless Shift is pressed)
+      if (!e.shiftKey) {
+        const snapped = snapToEdge(relativeX, relativeY, 0.2)
+        relativeX = snapped.x
+        relativeY = snapped.y
+      }
+
       updateCustomPortPosition(node, port.id, relativeX, relativeY)
       updateConnectionPoint(node.id, port.id, { x: relativeX, y: relativeY })
     })
 
     graph.on('port:mouseup', () => {
       draggingPort = null
+    })
+
+    // Port hover for showing tooltip
+    graph.on('port:mouseenter', ({ node, port }: { node: Node; port: any }) => {
+      if (port.id?.startsWith('custom-')) {
+        const portArgs = (port as any).args
+        if (portArgs) {
+          const position = node.getPosition()
+          const clientPoint = graph.localToClient(
+            position.x + (portArgs.x || 0),
+            position.y + (portArgs.y || 0)
+          )
+          setHoveredPort({
+            nodeId: node.id,
+            portId: port.id,
+            x: clientPoint.x,
+            y: clientPoint.y,
+          })
+        }
+      }
+    })
+
+    graph.on('port:mouseleave', () => {
+      setHoveredPort(null)
     })
 
     // Right-click on custom port to remove it
@@ -1169,7 +1251,7 @@ const X6Canvas: React.FC = () => {
     }
   }, [])
 
-  // Handle mouse move for edge point indicator
+  // Handle mouse move for edge point indicator with smart snapping preview and alignment guides
   useEffect(() => {
     const graph = graphRef.current
     if (!graph) return
@@ -1177,25 +1259,59 @@ const X6Canvas: React.FC = () => {
     const handleNodeMouseMove = ({ node, e }: { node: Node; e: any }) => {
       if (!ctrlPressed && currentTool !== 'connection-point') {
         setHoveredEdgePoint(null)
+        setAlignmentGuides(null)
         return
       }
 
       const localPoint = graph.clientToLocal({ x: e.clientX, y: e.clientY })
       const position = node.getPosition()
       const size = node.getSize()
-      
+
       const relativeX = Math.max(0, Math.min(1, (localPoint.x - position.x) / size.width))
       const relativeY = Math.max(0, Math.min(1, (localPoint.y - position.y) / size.height))
-      
+
+      // Apply smart edge snapping for preview
+      const snapEnabled = !(e.ctrlKey && e.altKey)
+      const snapped = snapToEdge(relativeX, relativeY, snapEnabled ? 0.2 : 0)
+
       const clientPoint = graph.localToClient(
-        position.x + relativeX * size.width,
-        position.y + relativeY * size.height
+        position.x + snapped.x * size.width,
+        position.y + snapped.y * size.height
       )
-      setHoveredEdgePoint({ x: clientPoint.x, y: clientPoint.y })
+      setHoveredEdgePoint({ x: clientPoint.x, y: clientPoint.y, edge: snapped.edge })
+
+      // Check alignment with existing connection points
+      const alignment = checkAlignment(node, snapped.x, snapped.y, 0.03)
+      const guides: typeof alignmentGuides = {}
+
+      if (alignment.horizontal && alignment.alignY !== undefined) {
+        const guideY = position.y + alignment.alignY * size.height
+        const clientStart = graph.localToClient(position.x, guideY)
+        const clientEnd = graph.localToClient(position.x + size.width, guideY)
+        guides.horizontal = {
+          y: clientStart.y,
+          x1: clientStart.x,
+          x2: clientEnd.x,
+        }
+      }
+
+      if (alignment.vertical && alignment.alignX !== undefined) {
+        const guideX = position.x + alignment.alignX * size.width
+        const clientStart = graph.localToClient(guideX, position.y)
+        const clientEnd = graph.localToClient(guideX, position.y + size.height)
+        guides.vertical = {
+          x: clientStart.x,
+          y1: clientStart.y,
+          y2: clientEnd.y,
+        }
+      }
+
+      setAlignmentGuides(Object.keys(guides).length > 0 ? guides : null)
     }
 
     const handleBlankMouseMove = () => {
       setHoveredEdgePoint(null)
+      setAlignmentGuides(null)
     }
 
     graph.on('node:mousemove', handleNodeMouseMove)
@@ -1539,14 +1655,85 @@ const X6Canvas: React.FC = () => {
             width: 12,
             height: 12,
             borderRadius: '50%',
-            border: '2px solid #1890ff',
-            backgroundColor: 'rgba(24, 144, 255, 0.2)',
+            border: hoveredEdgePoint.edge && hoveredEdgePoint.edge !== 'none'
+              ? '3px solid #52c41a'
+              : '2px solid #1890ff',
+            backgroundColor: hoveredEdgePoint.edge && hoveredEdgePoint.edge !== 'none'
+              ? 'rgba(82, 196, 26, 0.3)'
+              : 'rgba(24, 144, 255, 0.2)',
             pointerEvents: 'none',
             zIndex: 9999,
-            boxShadow: '0 0 6px rgba(24, 144, 255, 0.4)',
-            transition: 'transform 0.1s ease-out',
+            boxShadow: hoveredEdgePoint.edge && hoveredEdgePoint.edge !== 'none'
+              ? '0 0 8px rgba(82, 196, 26, 0.6)'
+              : '0 0 6px rgba(24, 144, 255, 0.4)',
+            transition: 'all 0.15s ease-out',
+            transform: hoveredEdgePoint.edge && hoveredEdgePoint.edge !== 'none'
+              ? 'scale(1.2)'
+              : 'scale(1)',
           }}
         />
+      )}
+
+      {/* Alignment guides */}
+      {alignmentGuides && (
+        <>
+          {alignmentGuides.horizontal && (
+            <div
+              style={{
+                position: 'fixed',
+                left: alignmentGuides.horizontal.x1,
+                top: alignmentGuides.horizontal.y - 1,
+                width: alignmentGuides.horizontal.x2 - alignmentGuides.horizontal.x1,
+                height: 2,
+                backgroundColor: '#fa8c16',
+                pointerEvents: 'none',
+                zIndex: 9998,
+                opacity: 0.8,
+              }}
+            />
+          )}
+          {alignmentGuides.vertical && (
+            <div
+              style={{
+                position: 'fixed',
+                left: alignmentGuides.vertical.x - 1,
+                top: alignmentGuides.vertical.y1,
+                width: 2,
+                height: alignmentGuides.vertical.y2 - alignmentGuides.vertical.y1,
+                backgroundColor: '#fa8c16',
+                pointerEvents: 'none',
+                zIndex: 9998,
+                opacity: 0.8,
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {/* Connection Point Tooltip */}
+      {hoveredPort && (
+        <div
+          style={{
+            position: 'fixed',
+            left: hoveredPort.x + 12,
+            top: hoveredPort.y - 30,
+            backgroundColor: isDark ? 'rgba(0, 0, 0, 0.85)' : 'rgba(255, 255, 255, 0.95)',
+            color: isDark ? '#e0e0e0' : '#333333',
+            padding: '6px 10px',
+            borderRadius: '4px',
+            fontSize: '12px',
+            pointerEvents: 'none',
+            zIndex: 10000,
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+            border: `1px solid ${isDark ? '#444' : '#e0e0e0'}`,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <div style={{ fontWeight: 500 }}>连接点</div>
+          <div style={{ fontSize: '11px', opacity: 0.8, marginTop: '2px' }}>
+            拖拽移动 · 点击删除
+          </div>
+        </div>
       )}
 
       {/* Edge Context Menu */}

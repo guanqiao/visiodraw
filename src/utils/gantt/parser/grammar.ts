@@ -97,6 +97,18 @@ export const DefaultConfig = {
   PROGRESS: 0,
 } as const
 
+/** 限制常量 */
+export const Limits = {
+  /** 最大工期（天）- 100年 */
+  MAX_DURATION: 365 * 100,
+  /** 最大行长度（字符） */
+  MAX_LINE_LENGTH: 10000,
+  /** 最大任务数 */
+  MAX_TASKS: 10000,
+  /** 最大分组数 */
+  MAX_SECTIONS: 100,
+} as const
+
 /** 语法帮助文本 */
 export const SyntaxHelp = {
   title: '语法说明',
@@ -212,12 +224,14 @@ export function parseDependency(value: string): string[] | null {
 /**
  * 解析持续时间
  * @param value 持续时间字符串（如 "7d"）
- * @returns 天数
+ * @returns 天数（限制在 MAX_DURATION 内）
  */
 export function parseDuration(value: string): number | null {
   const match = value.match(Patterns.DURATION)
   if (match) {
-    return parseInt(match[1], 10)
+    const duration = parseInt(match[1], 10)
+    // 限制最大工期
+    return Math.min(duration, Limits.MAX_DURATION)
   }
   return null
 }

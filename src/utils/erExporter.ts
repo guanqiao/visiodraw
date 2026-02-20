@@ -214,16 +214,10 @@ export function parseErTableText(text: string): { name: string; columns: ErColum
 export interface ParsedSqlTable {
   name: string
   columns: ErColumn[]
-  foreignKeys: {
-    column: string
-    refTable: string
-    refColumn: string
-  }[]
-  indexes: {
-    name: string
-    columns: string[]
-    isUnique: boolean
-  }[]
+  foreignKeys?: { column: string; refTable: string; refColumn: string; onDelete?: string; onUpdate?: string }[]
+  indexes?: { name: string; columns: string[]; isUnique: boolean; type?: string }[]
+  checks?: { name?: string; condition: string }[]
+  triggers?: { name: string; timing: string; event: string; body: string }[]
   comment?: string
 }
 
@@ -300,6 +294,7 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
     const columns: ErColumn[] = []
     const foreignKeys: ParsedSqlTable['foreignKeys'] = []
     const indexes: ParsedSqlTable['indexes'] = []
+    const checks: ParsedSqlTable['checks'] = []
     
     const parts = tableBody.split(',').map(p => p.trim()).filter(p => p)
     
@@ -328,7 +323,17 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
           if (refMatch) {
             const refTable = refMatch[1].replace(/[`"[\]]/g, '')
             const refColumn = refMatch[2].replace(/[`"[\]]/g, '').trim()
-            foreignKeys.push({ column: fkColumn, refTable, refColumn })
+            
+            const onDeleteMatch = part.match(/ON\s+DELETE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)/i)
+            const onUpdateMatch = part.match(/ON\s+UPDATE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)/i)
+            
+            foreignKeys.push({ 
+              column: fkColumn, 
+              refTable, 
+              refColumn,
+              onDelete: onDeleteMatch?.[1]?.toUpperCase(),
+              onUpdate: onUpdateMatch?.[1]?.toUpperCase(),
+            })
             
             const colIndex = columns.findIndex(c => c.name.toLowerCase() === fkColumn.toLowerCase())
             if (colIndex !== -1 && !columns[colIndex].constraints.includes('fk')) {
@@ -339,13 +344,16 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
         continue
       }
       
-      if (upperPart.startsWith('INDEX') || upperPart.startsWith('KEY')) {
-        const indexMatch = part.match(/(?:UNIQUE\s+)?(?:INDEX|KEY)\s+(?:[`"]?(\w+)[`"]?\s*)?\(([^)]+)\)/i)
+      if (upperPart.startsWith('INDEX') || upperPart.startsWith('KEY') || upperPart.startsWith('FULLTEXT') || upperPart.startsWith('SPATIAL')) {
+        const indexTypeMatch = part.match(/(FULLTEXT|SPATIAL)\s+/i)
+        const indexType = indexTypeMatch ? indexTypeMatch[1].toUpperCase() : undefined
+        
+        const indexMatch = part.match(/(?:FULLTEXT\s+|SPATIAL\s+)?(?:UNIQUE\s+)?(?:INDEX|KEY)\s+(?:[`"]?(\w+)[`"]?\s*)?\(([^)]+)\)/i)
         if (indexMatch) {
           const indexName = indexMatch[1] || `idx_${tableName}_${indexes.length}`
           const indexColumns = indexMatch[2].split(',').map(c => c.trim().replace(/[`"[\]]/g, ''))
           const isUnique = /UNIQUE/i.test(part)
-          indexes.push({ name: indexName, columns: indexColumns, isUnique })
+          indexes.push({ name: indexName, columns: indexColumns, isUnique, type: indexType })
         }
         continue
       }
@@ -377,7 +385,17 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
               if (refMatch) {
                 const refTable = refMatch[1].replace(/[`"[\]]/g, '')
                 const refColumn = refMatch[2].replace(/[`"[\]]/g, '').trim()
-                foreignKeys.push({ column: fkColumn, refTable, refColumn })
+                
+                const onDeleteMatch = constraintBody.match(/ON\s+DELETE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)/i)
+                const onUpdateMatch = constraintBody.match(/ON\s+UPDATE\s+(CASCADE|SET\s+NULL|SET\s+DEFAULT|RESTRICT|NO\s+ACTION)/i)
+                
+                foreignKeys.push({ 
+                  column: fkColumn, 
+                  refTable, 
+                  refColumn,
+                  onDelete: onDeleteMatch?.[1]?.toUpperCase(),
+                  onUpdate: onUpdateMatch?.[1]?.toUpperCase(),
+                })
                 
                 const colIndex = columns.findIndex(c => c.name.toLowerCase() === fkColumn.toLowerCase())
                 if (colIndex !== -1 && !columns[colIndex].constraints.includes('fk')) {
@@ -396,14 +414,25 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
               })
             }
           } else if (constraintUpper.startsWith('CHECK')) {
-            warnings.push(`CHECK约束已跳过: ${constraintNameMatch[1]}`)
+            const checkMatch = constraintBody.match(/CHECK\s*\((.+)\)/i)
+            if (checkMatch) {
+              checks.push({
+                name: constraintNameMatch[1],
+                condition: checkMatch[1].trim(),
+              })
+            }
           }
         }
         continue
       }
       
       if (upperPart.startsWith('CHECK')) {
-        warnings.push('CHECK约束已跳过')
+        const checkMatch = part.match(/CHECK\s*\((.+)\)/i)
+        if (checkMatch) {
+          checks.push({
+            condition: checkMatch[1].trim(),
+          })
+        }
         continue
       }
       
@@ -501,6 +530,7 @@ export function parseCreateTableSQL(sql: string): SqlParseResult {
         columns, 
         foreignKeys,
         indexes,
+        checks,
         comment: tableComment,
       })
     }

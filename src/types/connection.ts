@@ -246,6 +246,7 @@ export const defaultConnectionPointsConfig: Record<string, ConnectionPointPositi
   // 新增序列图元素
   'uml-participant': ['top', 'bottom', 'left', 'right'],
   'uml-lifeline-line': ['top', 'bottom'],
+  'uml-anchor': ['center'],
   // Legacy UML types (for backward compatibility)
   'uml-lifeline': ['top', 'bottom', 'left', 'right'],
   'uml-object': ['top', 'bottom', 'left', 'right'],

@@ -17,6 +17,7 @@ import type {
 import {
   GrammarRules,
   DefaultConfig,
+  Limits,
   StatusMap,
   TypeMap,
   ExtendedTags,
@@ -70,6 +71,12 @@ export class GanttParser {
       this.lineNumber = i + 1
       const line = lines[i]
 
+      // 检查行长度限制
+      if (line.length > Limits.MAX_LINE_LENGTH) {
+        this.addError(`行长度超过限制(${Limits.MAX_LINE_LENGTH}字符): ${line.length}字符`, i + 1)
+        continue
+      }
+
       // 解析标题
       const titleMatch = line.match(GrammarRules.TITLE)
       if (titleMatch) {
@@ -87,6 +94,11 @@ export class GanttParser {
       // 解析分组
       const sectionMatch = line.match(GrammarRules.SECTION)
       if (sectionMatch) {
+        // 检查分组数限制
+        if (sections.length >= Limits.MAX_SECTIONS) {
+          this.addError(`分组数超过最大限制(${Limits.MAX_SECTIONS})`, i + 1)
+          continue
+        }
         currentSection = sectionMatch[1].trim()
         sections.push({
           id: `section-${sectionOrder}`,
@@ -99,6 +111,12 @@ export class GanttParser {
       // 解析任务
       const taskMatch = line.match(GrammarRules.TASK)
       if (taskMatch) {
+        // 检查任务数限制
+        if (rawTasks.length >= Limits.MAX_TASKS) {
+          this.addError(`任务数超过最大限制(${Limits.MAX_TASKS})`, i + 1)
+          continue
+        }
+
         const taskName = taskMatch[1].trim()
         const taskDef = taskMatch[2].trim()
 
@@ -292,25 +310,31 @@ export class GanttParser {
   ): GanttTask[] {
     const tasks: GanttTask[] = []
     const taskMap = new Map<string, GanttTask>()
+    const existingIds = new Set<string>()
 
     for (let i = 0; i < rawTasks.length; i++) {
       const { section, definition: raw, line } = rawTasks[i]
 
-      // 检查任务ID是否重复
-      if (taskMap.has(raw.id!)) {
-        this.addError(`任务ID重复: ${raw.id}`, line)
-        continue
+      // 检查任务ID是否重复，自动重命名
+      let taskId = raw.id!
+      if (existingIds.has(taskId)) {
+        const originalId = taskId
+        taskId = this.generateUniqueId(taskId, existingIds)
+        this.addError(`任务ID重复: ${originalId}，已自动重命名为: ${taskId}`, line, 'warning')
       }
+      raw.id = taskId
+      existingIds.add(taskId)
 
       // 解析标签
       const status = this.parseStatus(raw.tags)
       const type = this.parseType(raw.tags)
       const tags = raw.tags.filter(t => !isStatusTag(t) && !isTypeTag(t))
 
-      // 计算结束日期
+      // 计算结束日期（使用日期对象操作，避免夏令时问题）
       const startDate = raw.startDate!
       const duration = raw.duration!
-      const endDate = new Date(startDate.getTime() + duration * 24 * 60 * 60 * 1000)
+      const endDate = new Date(startDate)
+      endDate.setDate(endDate.getDate() + duration)
 
       const task: GanttTask = {
         id: raw.id!,
@@ -395,9 +419,11 @@ export class GanttParser {
     defaultDate: Date
   ): { startDate: Date; endDate: Date } {
     if (tasks.length === 0) {
+      const endDate = new Date(defaultDate)
+      endDate.setDate(endDate.getDate() + 30)
       return {
         startDate: defaultDate,
-        endDate: new Date(defaultDate.getTime() + 30 * 24 * 60 * 60 * 1000),
+        endDate,
       }
     }
 
@@ -411,13 +437,30 @@ export class GanttParser {
   }
 
   /**
+   * 生成唯一ID
+   * @param baseId 基础ID
+   * @param existingIds 已存在的ID集合
+   * @returns 唯一ID
+   */
+  private generateUniqueId(baseId: string, existingIds: Set<string>): string {
+    let counter = 1
+    let newId = `${baseId}-${counter}`
+    while (existingIds.has(newId)) {
+      counter++
+      newId = `${baseId}-${counter}`
+    }
+    return newId
+  }
+
+  /**
    * 添加错误信息
    * @param message 错误消息
    * @param line 行号（可选）
+   * @param severity 严重程度（可选，默认为'error'）
    */
-  private addError(message: string, line?: number): void {
+  private addError(message: string, line?: number, severity: 'error' | 'warning' = 'error'): void {
     this.errors.push({
-      type: 'syntax',
+      type: severity === 'error' ? 'syntax' : 'semantic',
       message,
       line: line || this.lineNumber,
     })

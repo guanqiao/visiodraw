@@ -889,8 +889,59 @@ function createX6Edge(edge: Connector): Edge {
                  edge.style === 'curved' ? 'er' :
                  edge.style === 'straight' ? null : 'normal'
 
-  // 对于 straight 样式，不使用 connector（避免圆角）
   const connector = edge.style === 'straight' ? null : { name: 'rounded' }
+
+  // 处理线型样式
+  const strokeDasharray = edge.lineStyle === 'dashed' ? '6,4' :
+                          edge.lineStyle === 'dotted' ? '2,2' : undefined
+
+  // 处理箭头样式
+  const getMarker = (style: string): { name: string; size?: number } | null => {
+    switch (style) {
+      case 'arrow':
+      case 'classic':
+        return { name: 'classic', size: 10 }
+      case 'open-arrow':
+      case 'open':
+        return { name: 'open', size: 10 }
+      case 'diamond':
+        return { name: 'diamond', size: 10 }
+      case 'circle':
+      case 'dot':
+        return { name: 'circle', size: 6 }
+      case 'triangle':
+      case 'block':
+        return { name: 'block', size: 10 }
+      default:
+        return null
+    }
+  }
+
+  // 处理边标签
+  const labels = edge.labels?.map(label => ({
+    id: label.id,
+    attrs: {
+      text: {
+        text: label.text,
+        fontSize: label.fontSize || 12,
+        fill: label.color || '#333333',
+      },
+      rect: {
+        fill: label.backgroundColor || '#ffffff',
+        stroke: '#e8e8e8',
+        strokeWidth: 1,
+        rx: 4,
+        ry: 4,
+      },
+    },
+    position: {
+      distance: label.position ?? 0.5,
+      offset: { x: label.offsetX ?? 0, y: label.offsetY ?? -10 },
+    },
+  }))
+
+  // 处理路径点
+  const vertices = edge.pathPoints?.map(p => ({ x: p.x, y: p.y }))
 
   return new Shape.Edge({
     id: edge.id,
@@ -898,18 +949,15 @@ function createX6Edge(edge: Connector): Edge {
     target: { cell: edge.targetShapeId, port: edge.targetPointId },
     router: router ? { name: router } : null,
     connector,
+    vertices,
+    labels,
     attrs: {
       line: {
         stroke: edge.stroke || '#333333',
         strokeWidth: edge.strokeWidth || 2,
-        targetMarker: edge.endStyle === 'arrow' ? {
-          name: 'classic',
-          size: 10,
-        } : null,
-        sourceMarker: edge.startStyle === 'arrow' ? {
-          name: 'classic',
-          size: 10,
-        } : null,
+        strokeDasharray,
+        targetMarker: getMarker(edge.endStyle),
+        sourceMarker: getMarker(edge.startStyle),
       },
     },
   })

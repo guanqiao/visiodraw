@@ -356,6 +356,40 @@ export function getX6PortGroups() {
         },
       },
     },
+    'custom-outward': {
+      position: {
+        name: 'absolute',
+        args: { x: 0.5, y: 0 },
+      },
+      attrs: {
+        circle: {
+          r: 5,
+          magnet: true,
+          stroke: '#fa8c16',
+          strokeWidth: 1.5,
+          fill: '#ffffff',
+          opacity: 1,
+          cursor: 'crosshair',
+        },
+      },
+    },
+    'custom-bidirectional': {
+      position: {
+        name: 'absolute',
+        args: { x: 0.5, y: 0 },
+      },
+      attrs: {
+        circle: {
+          r: 5,
+          magnet: true,
+          stroke: '#52c41a',
+          strokeWidth: 1.5,
+          fill: '#ffffff',
+          opacity: 1,
+          cursor: 'crosshair',
+        },
+      },
+    },
   }
 }
 
@@ -520,21 +554,83 @@ export function calculateDirectionVector(
 }
 
 /**
+ * 将点吸附到图形边缘
+ * 根据鼠标位置计算最近的边缘位置
+ */
+export function snapToEdge(
+  relativeX: number,
+  relativeY: number,
+  threshold: number = 0.15
+): { x: number; y: number; edge: 'top' | 'bottom' | 'left' | 'right' | 'none' } {
+  // 计算到各边缘的距离
+  const distances = [
+    { edge: 'top' as const, distance: relativeY },
+    { edge: 'bottom' as const, distance: 1 - relativeY },
+    { edge: 'left' as const, distance: relativeX },
+    { edge: 'right' as const, distance: 1 - relativeX },
+  ]
+
+  // 找到最近的边缘
+  const nearest = distances.reduce((min, current) =>
+    current.distance < min.distance ? current : min
+  )
+
+  // 如果距离在阈值内，吸附到边缘
+  if (nearest.distance <= threshold) {
+    switch (nearest.edge) {
+      case 'top':
+        return { x: relativeX, y: 0, edge: 'top' }
+      case 'bottom':
+        return { x: relativeX, y: 1, edge: 'bottom' }
+      case 'left':
+        return { x: 0, y: relativeY, edge: 'left' }
+      case 'right':
+        return { x: 1, y: relativeY, edge: 'right' }
+    }
+  }
+
+  // 不在阈值内，保持原位置
+  return { x: relativeX, y: relativeY, edge: 'none' }
+}
+
+/**
  * 动态添加自定义 Port 到节点
  * 使用绝对位置配置，确保连接点显示为小圆点
+ * 支持智能边缘吸附
  */
 export function addCustomPort(
   node: any,
   relativeX: number,
-  relativeY: number
-): { id: string; x: number; y: number; dirX: number; dirY: number } {
+  relativeY: number,
+  options?: {
+    snapToEdge?: boolean
+    edgeThreshold?: number
+    type?: 'inward' | 'outward' | 'inward-outward'
+  }
+): { id: string; x: number; y: number; dirX: number; dirY: number; edge: string } {
   const portId = `custom-${uuidv4()}`
   const size = node.getSize()
 
-  const absoluteX = relativeX * size.width
-  const absoluteY = relativeY * size.height
+  // 智能边缘吸附
+  let finalX = relativeX
+  let finalY = relativeY
+  let edge: 'top' | 'bottom' | 'left' | 'right' | 'none' = 'none'
 
-  const { dirX, dirY } = calculateDirectionVector(relativeX, relativeY)
+  if (options?.snapToEdge !== false) {
+    const snapped = snapToEdge(relativeX, relativeY, options?.edgeThreshold)
+    finalX = snapped.x
+    finalY = snapped.y
+    edge = snapped.edge
+  }
+
+  const absoluteX = finalX * size.width
+  const absoluteY = finalY * size.height
+
+  const { dirX, dirY } = calculateDirectionVector(finalX, finalY)
+
+  // 根据类型选择颜色
+  const type = options?.type || 'inward'
+  const strokeColor = type === 'outward' ? '#fa8c16' : type === 'inward-outward' ? '#52c41a' : '#1890ff'
 
   // 使用绝对位置配置，确保连接点精确定位并显示为小圆点
   node.addPort({
@@ -548,7 +644,7 @@ export function addCustomPort(
       circle: {
         r: 5,
         magnet: true,
-        stroke: '#1890ff',
+        stroke: strokeColor,
         strokeWidth: 1.5,
         fill: '#ffffff',
         opacity: 1,
@@ -559,11 +655,104 @@ export function addCustomPort(
 
   return {
     id: portId,
-    x: relativeX,
-    y: relativeY,
+    x: finalX,
+    y: finalY,
     dirX,
     dirY,
+    edge,
   }
+}
+
+/**
+ * 获取自定义连接点数量
+ */
+export function getCustomPortCount(node: any): number {
+  const ports = node.getPorts()
+  return ports.filter((p: any) => p.id?.startsWith('custom-')).length
+}
+
+/**
+ * 检查是否已达到最大连接点数量限制
+ */
+export function isMaxConnectionPointsReached(node: any, maxCount: number = 16): boolean {
+  return getCustomPortCount(node) >= maxCount
+}
+
+/**
+ * 检查新连接点位置是否与现有连接点重复
+ * @param node 节点
+ * @param relativeX 相对X坐标
+ * @param relativeY 相对Y坐标
+ * @param threshold 距离阈值（默认0.05，即5%）
+ * @returns 重复的连接点ID，如果没有重复则返回null
+ */
+export function findDuplicateConnectionPoint(
+  node: any,
+  relativeX: number,
+  relativeY: number,
+  threshold: number = 0.05
+): string | null {
+  const ports = node.getPorts()
+  const size = node.getSize()
+
+  for (const port of ports) {
+    if (!port.id?.startsWith('custom-')) continue
+
+    const portArgs = (port as any).args
+    if (!portArgs) continue
+
+    // 计算现有连接点的相对坐标
+    const existingRelativeX = (portArgs.x || 0) / size.width
+    const existingRelativeY = (portArgs.y || 0) / size.height
+
+    // 计算距离
+    const distance = Math.sqrt(
+      Math.pow(relativeX - existingRelativeX, 2) +
+      Math.pow(relativeY - existingRelativeY, 2)
+    )
+
+    if (distance < threshold) {
+      return port.id
+    }
+  }
+
+  return null
+}
+
+/**
+ * 检查新连接点位置是否有效（不重复且在限制内）
+ */
+export function isValidConnectionPointPosition(
+  node: any,
+  relativeX: number,
+  relativeY: number,
+  options?: {
+    maxCount?: number
+    duplicateThreshold?: number
+  }
+): { valid: boolean; reason?: 'duplicate' | 'max_reached' | 'invalid_position' } {
+  // 检查坐标范围
+  if (relativeX < 0 || relativeX > 1 || relativeY < 0 || relativeY > 1) {
+    return { valid: false, reason: 'invalid_position' }
+  }
+
+  // 检查数量限制
+  if (isMaxConnectionPointsReached(node, options?.maxCount || 16)) {
+    return { valid: false, reason: 'max_reached' }
+  }
+
+  // 检查重复位置
+  const duplicate = findDuplicateConnectionPoint(
+    node,
+    relativeX,
+    relativeY,
+    options?.duplicateThreshold
+  )
+  if (duplicate) {
+    return { valid: false, reason: 'duplicate' }
+  }
+
+  return { valid: true }
 }
 
 /**
@@ -576,6 +765,111 @@ export function removeCustomPort(node: any, portId: string): boolean {
     return true
   }
   return false
+}
+
+/**
+ * 批量删除所有自定义连接点
+ */
+export function removeAllCustomPorts(node: any): number {
+  const ports = node.getPorts()
+  const customPorts = ports.filter((p: any) => p.id?.startsWith('custom-'))
+  let removedCount = 0
+
+  customPorts.forEach((port: any) => {
+    if (removeCustomPort(node, port.id)) {
+      removedCount++
+    }
+  })
+
+  return removedCount
+}
+
+/**
+ * 检查点是否与现有连接点对齐
+ * @returns 对齐信息，包括是否水平对齐、垂直对齐，以及对齐的坐标
+ */
+export function checkAlignment(
+  node: any,
+  relativeX: number,
+  relativeY: number,
+  threshold: number = 0.02
+): {
+  horizontal: boolean
+  vertical: boolean
+  alignX?: number
+  alignY?: number
+} {
+  const ports = node.getPorts()
+  let horizontal = false
+  let vertical = false
+  let alignX: number | undefined
+  let alignY: number | undefined
+
+  for (const port of ports) {
+    if (!port.id?.startsWith('custom-')) continue
+
+    const portArgs = (port as any).args
+    if (!portArgs) continue
+
+    const size = node.getSize()
+    const portRelativeX = (portArgs.x || 0) / size.width
+    const portRelativeY = (portArgs.y || 0) / size.height
+
+    // 检查水平对齐（Y坐标相同）
+    if (Math.abs(relativeY - portRelativeY) < threshold) {
+      horizontal = true
+      alignY = portRelativeY
+    }
+
+    // 检查垂直对齐（X坐标相同）
+    if (Math.abs(relativeX - portRelativeX) < threshold) {
+      vertical = true
+      alignX = portRelativeX
+    }
+  }
+
+  return { horizontal, vertical, alignX, alignY }
+}
+
+/**
+ * 在边缘上均匀分布连接点
+ * @param node 节点
+ * @param edge 边缘位置
+ * @param count 连接点数量
+ * @returns 生成的连接点位置数组
+ */
+export function distributeConnectionPointsOnEdge(
+  node: any,
+  edge: 'top' | 'bottom' | 'left' | 'right',
+  count: number
+): Array<{ x: number; y: number }> {
+  if (count < 2) return []
+
+  const positions: Array<{ x: number; y: number }> = []
+  const padding = 0.1 // 两端留白10%
+  const availableSpace = 1 - 2 * padding
+  const step = availableSpace / (count - 1)
+
+  for (let i = 0; i < count; i++) {
+    const pos = padding + i * step
+
+    switch (edge) {
+      case 'top':
+        positions.push({ x: pos, y: 0 })
+        break
+      case 'bottom':
+        positions.push({ x: pos, y: 1 })
+        break
+      case 'left':
+        positions.push({ x: 0, y: pos })
+        break
+      case 'right':
+        positions.push({ x: 1, y: pos })
+        break
+    }
+  }
+
+  return positions
 }
 
 /**

@@ -26,6 +26,9 @@ export * from './ganttTheme'
 export * from './ganttExporter'
 export * from './ganttPerformance'
 export * from './ganttFilter'
+export * from './taskProgress'
+export * from './progressRenderer'
+export * from './virtualRenderer'
 
 // 导出新的解析器和验证器
 export * from './parser'

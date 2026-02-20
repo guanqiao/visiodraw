@@ -34,6 +34,11 @@ export interface X6EdgeConfig {
   attrs?: EdgeAttributes
   labels?: any[]
   data?: any
+  // X6 路由约束
+  routerArgs?: {
+    padding?: number
+    constraint?: 'horizontal' | 'vertical' | 'none'
+  }
 }
 
 export class ConnectorRenderer {
@@ -56,6 +61,8 @@ export class ConnectorRenderer {
         case 'bezier':
           return { name: 'normal' }
         case 'straight':
+          // 使用 normal router 配合 pathPoints 实现直线
+          return connector.pathPoints ? undefined : { name: 'normal' }
         default:
           return undefined
       }
@@ -73,12 +80,15 @@ export class ConnectorRenderer {
         case 'metro':
           return { name: 'rounded' }
         case 'straight':
+          // 直线不使用 connector，直接连接
+          return undefined
         default:
           return undefined
       }
     })()
 
-    return {
+    // 构建基础配置
+    const edgeConfig: X6EdgeConfig = {
       id: connector.id,
       source: {
         cell: connector.sourceShapeId,
@@ -94,6 +104,35 @@ export class ConnectorRenderer {
       labels: this.buildLabels(connector.labels),
       data: { fromStore: true },
     }
+
+    // 对于 straight 样式，添加路径点确保直线
+    if (style === 'straight' && connector.pathPoints && connector.pathPoints.length > 0) {
+      edgeConfig.router = {
+        name: 'normal',
+        args: {
+          points: connector.pathPoints,
+        },
+      }
+    }
+
+    // 应用路由约束（用于序列图等需要水平或垂直连线的场景）
+    if (connector.routingConstraint && connector.routingConstraint !== 'none') {
+      if (edgeConfig.router) {
+        edgeConfig.router.args = {
+          ...edgeConfig.router.args,
+          constraint: connector.routingConstraint,
+        }
+      } else {
+        edgeConfig.router = {
+          name: 'normal',
+          args: {
+            constraint: connector.routingConstraint,
+          },
+        }
+      }
+    }
+
+    return edgeConfig
   }
 
   /**

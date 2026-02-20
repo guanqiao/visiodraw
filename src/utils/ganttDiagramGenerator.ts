@@ -16,6 +16,19 @@ import { v4 as uuidv4 } from 'uuid'
 import { criticalPathCalculator, type TaskTimeData } from './gantt/criticalPath'
 import { workCalendar, WorkCalendar } from './gantt/workCalendar'
 
+/** 布局常量 */
+const LAYOUT_CONSTANTS = {
+  TASK_X_OFFSET: 2,            // 任务条x偏移
+  PROGRESS_BAR_HEIGHT: 4,      // 进度条高度
+  CORNER_RADIUS: 4,            // 圆角半径
+  HIGHLIGHT_PADDING: 2,        // 高亮边框内边距
+  HIGHLIGHT_STROKE_ADD: 4,     // 高亮边框宽度增加
+  LABEL_Y_OFFSET: 6,           // 标签y偏移
+  LABEL_HEIGHT: 20,            // 标签高度
+  LABEL_X: 10,                 // 标签x位置
+  PROGRESS_BAR_Y_OFFSET: 4,    // 进度条y偏移
+} as const
+
 export type TaskStatus = 'done' | 'active' | 'crit' | 'default'
 export type TaskType = 'task' | 'milestone' | 'section'
 
@@ -183,7 +196,116 @@ export class GanttDiagramGenerator {
   private criticalPathData: Map<string, TaskTimeData> = new Map()
   private currentCalendar: WorkCalendar = workCalendar
 
+  // 计算缓存
+  private layoutCache = new Map<string, {
+    data: ParsedGanttDiagram
+    result: GeneratedGanttDiagram
+    timestamp: number
+  }>()
+  private readonly CACHE_MAX_SIZE = 5
+  private readonly CACHE_TTL = 5 * 60 * 1000 // 5分钟
+
+  // 样式缓存
+  private styleCache = new Map<string, any>()
+
+  /**
+   * 获取任务样式（带缓存）
+   */
+  private getTaskStyle(task: GanttTask, isCritical: boolean): any {
+    const cacheKey = `${task.status}-${isCritical}`
+    const cached = this.styleCache.get(cacheKey)
+    if (cached) return cached
+
+    let style = this.styles.task[task.status] || this.styles.task.default
+    if (isCritical && task.status !== 'crit') {
+      style = { ...style, stroke: '#f5222d', strokeWidth: 2 }
+    }
+
+    this.styleCache.set(cacheKey, style)
+    return style
+  }
+
+  /**
+   * 释放资源，防止内存泄漏
+   * 在组件卸载或重新生成前调用
+   */
+  dispose(): void {
+    this.taskLayouts.clear()
+    this.criticalPathData.clear()
+    this.currentCalendar = workCalendar
+    this.totalDays = 0
+    this.currentView = 'day'
+    this.layoutCache.clear()
+    this.styleCache.clear()
+  }
+
+  /**
+   * 生成缓存键
+   */
+  private generateCacheKey(data: ParsedGanttDiagram): string {
+    // 基于关键属性生成缓存键
+    const keyParts = [
+      data.title || '',
+      data.tasks.length,
+      data.tasks.map(t => `${t.id}-${t.status}-${t.progress}`).join(','),
+      data.view || 'day',
+      data.showCriticalPath ? '1' : '0',
+    ]
+    return keyParts.join('|')
+  }
+
+  /**
+   * 检查缓存是否有效
+   */
+  private getCachedResult(key: string): GeneratedGanttDiagram | null {
+    const cached = this.layoutCache.get(key)
+    if (!cached) return null
+
+    const now = Date.now()
+    if (now - cached.timestamp > this.CACHE_TTL) {
+      // 缓存过期
+      this.layoutCache.delete(key)
+      return null
+    }
+
+    return cached.result
+  }
+
+  /**
+   * 保存结果到缓存
+   */
+  private setCachedResult(key: string, data: ParsedGanttDiagram, result: GeneratedGanttDiagram): void {
+    // 清理过期缓存
+    const now = Date.now()
+    for (const [k, v] of this.layoutCache.entries()) {
+      if (now - v.timestamp > this.CACHE_TTL) {
+        this.layoutCache.delete(k)
+      }
+    }
+
+    // 如果缓存已满，删除最旧的
+    if (this.layoutCache.size >= this.CACHE_MAX_SIZE) {
+      const oldestKey = this.layoutCache.keys().next().value
+      this.layoutCache.delete(oldestKey)
+    }
+
+    // 保存新缓存
+    this.layoutCache.set(key, {
+      data: JSON.parse(JSON.stringify(data)), // 深拷贝
+      result: JSON.parse(JSON.stringify(result)), // 深拷贝
+      timestamp: now,
+    })
+  }
+
   generate(data: ParsedGanttDiagram): GeneratedGanttDiagram {
+    // 检查缓存
+    const cacheKey = this.generateCacheKey(data)
+    const cached = this.getCachedResult(cacheKey)
+    if (cached) {
+      console.log('[Gantt] 使用缓存结果')
+      return cached
+    }
+
     const nodes: ShapeData[] = []
     const edges: Connector[] = []
 
@@ -536,22 +658,14 @@ export class GanttDiagramGenerator {
     // 检查是否为关键路径任务
     const isCritical = this.criticalPathData.get(task.id)?.isCritical
     
-    // 如果是关键路径任务，使用关键路径样式，否则使用任务状态样式
-    let style = this.styles.task[task.status] || this.styles.task.default
-    if (isCritical && task.status !== 'crit') {
-      // 关键路径任务使用特殊的边框样式
-      style = {
-        ...style,
-        stroke: '#f5222d',
-        strokeWidth: 2,
-      }
-    }
+    // 获取任务样式（使用缓存）
+    const style = this.getTaskStyle(task, !!isCritical)
 
     // 任务条形
     nodes.push({
       id: `task-${task.id}`,
       type: 'uml-gantt-task',
-      x: layout.x + 2,
+      x: layout.x + LAYOUT_CONSTANTS.TASK_X_OFFSET,
       y: layout.y,
       width: layout.width,
       height: layout.height,
@@ -561,7 +675,7 @@ export class GanttDiagramGenerator {
       strokeWidth: style.strokeWidth,
       fontSize: style.fontSize,
       color: style.color,
-      cornerRadius: 4,
+      cornerRadius: LAYOUT_CONSTANTS.CORNER_RADIUS,
       zIndex: 10,
     })
 
@@ -571,10 +685,10 @@ export class GanttDiagramGenerator {
       nodes.push({
         id: `task-progress-${task.id}`,
         type: 'uml-gantt-progress',
-        x: layout.x + 2,
-        y: layout.y + layout.height - 4,
+        x: layout.x + LAYOUT_CONSTANTS.TASK_X_OFFSET,
+        y: layout.y + layout.height - LAYOUT_CONSTANTS.PROGRESS_BAR_Y_OFFSET,
         width: progressWidth,
-        height: 4,
+        height: LAYOUT_CONSTANTS.PROGRESS_BAR_HEIGHT,
         text: '',
         fill: this.getProgressColor(task.status),
         stroke: 'transparent',
@@ -595,10 +709,10 @@ export class GanttDiagramGenerator {
     nodes.push({
       id: `task-label-${task.id}`,
       type: 'uml-label',
-      x: 10,
-      y: layout.y + 6,
+      x: LAYOUT_CONSTANTS.LABEL_X,
+      y: layout.y + LAYOUT_CONSTANTS.LABEL_Y_OFFSET,
       width: this.config.startX - 20,
-      height: 20,
+      height: LAYOUT_CONSTANTS.LABEL_HEIGHT,
       text: labelText,
       fill: 'transparent',
       stroke: 'transparent',
@@ -703,10 +817,10 @@ export class GanttDiagramGenerator {
     nodes.push({
       id: `milestone-label-${task.id}`,
       type: 'uml-label',
-      x: 10,
-      y: layout.y + 6,
+      x: LAYOUT_CONSTANTS.LABEL_X,
+      y: layout.y + LAYOUT_CONSTANTS.LABEL_Y_OFFSET,
       width: this.config.startX - 20,
-      height: 20,
+      height: LAYOUT_CONSTANTS.LABEL_HEIGHT,
       text: `◆ ${task.name}`,
       fill: 'transparent',
       stroke: 'transparent',
@@ -774,9 +888,9 @@ export class GanttDiagramGenerator {
           id: `critical-highlight-${task.id}`,
           type: 'uml-rect',
           x: layout.x,
-          y: layout.y - 2,
-          width: layout.width + 4,
-          height: layout.height + 4,
+          y: layout.y - LAYOUT_CONSTANTS.HIGHLIGHT_PADDING,
+          width: layout.width + LAYOUT_CONSTANTS.HIGHLIGHT_STROKE_ADD,
+          height: layout.height + LAYOUT_CONSTANTS.HIGHLIGHT_STROKE_ADD,
           text: '',
           fill: 'transparent',
           stroke: '#f5222d',

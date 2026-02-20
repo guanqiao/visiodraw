@@ -541,7 +541,6 @@ export const renderUmlClassGradient = (config: ShapeRenderConfig): Node => {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        refD: path,
         fillRule: 'evenodd',
       },
     },
@@ -834,6 +833,28 @@ export const renderUmlDestroyMarker = (config: ShapeRenderConfig): Node => {
 }
 
 /**
+ * 创建标记渲染器 - 绿色方块
+ */
+export const renderUmlCreateMarker = (config: ShapeRenderConfig): Node => {
+  const base = createBaseConfig(config)
+
+  return new Shape.Rect({
+    ...base,
+    attrs: {
+      ...base.attrs,
+      body: {
+        ...base.attrs.body,
+        fill: config.fill || '#52c41a',
+        stroke: config.stroke || '#237804',
+        strokeWidth: config.strokeWidth || 1.5,
+        rx: 2,
+        ry: 2,
+      },
+    },
+  })
+}
+
+/**
  * 创建标记标签渲染器
  */
 export const renderUmlCreateLabel = (config: ShapeRenderConfig): Node => {
@@ -955,6 +976,46 @@ export const renderUmlNoteConnection = (config: ShapeRenderConfig): Node => {
   })
 }
 
+/**
+ * 锚点节点渲染器 - 1x1像素透明节点
+ * 用于序列图消息边的精确连接
+ */
+export const renderUmlAnchor = (config: ShapeRenderConfig): Node => {
+  return new Shape.Rect({
+    id: config.id,
+    x: config.x,
+    y: config.y,
+    width: config.width,
+    height: config.height,
+    attrs: {
+      body: {
+        fill: 'transparent',
+        stroke: 'transparent',
+        strokeWidth: 0,
+      },
+    },
+    ports: {
+      groups: {
+        center: {
+          position: 'center',
+          attrs: {
+            circle: {
+              r: 1,
+              magnet: true,
+              fill: 'transparent',
+              stroke: 'transparent',
+            },
+          },
+        },
+      },
+      items: [
+        { id: 'center', group: 'center' },
+      ],
+    },
+    data: { fromStore: true, shapeType: 'uml-anchor' },
+  })
+}
+
 export const umlRenderers = {
   'uml-class': renderUmlClass,
   'uml-class-gradient': renderUmlClassGradient,
@@ -988,9 +1049,11 @@ export const umlRenderers = {
   'uml-database-participant': renderUmlDatabaseParticipant,
   'uml-reference': renderUmlReference,
   'uml-destroy-marker': renderUmlDestroyMarker,
+  'uml-create-marker': renderUmlCreateMarker,
   'uml-create-label': renderUmlCreateLabel,
   'uml-lifeline-marker': renderUmlLifelineMarker,
   'uml-lifeline-end': renderUmlLifelineEnd,
   'uml-message-marker': renderUmlMessageMarker,
   'uml-note-connection': renderUmlNoteConnection,
+  'uml-anchor': renderUmlAnchor,
 }

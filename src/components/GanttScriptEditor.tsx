@@ -1,8 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react'
-import { Modal, Input, Button, Alert, Space, Typography, Card, Tabs, Tooltip, message, Row, Col } from 'antd'
+import { Modal, Input, Button, Alert, Space, Typography, Card, Tabs, Tooltip, message, Row, Col, Checkbox } from 'antd'
 import { CodeOutlined, PlayCircleOutlined, CopyOutlined, ExportOutlined, EyeOutlined } from '@ant-design/icons'
 import { ganttDiagramGenerator, type ParsedGanttDiagram, type GanttTask, type GanttSection } from '@utils/ganttDiagramGenerator'
 import { ganttDiagramExporter } from '@utils/ganttDiagramExporter'
+import { workCalendar } from '@utils/gantt/workCalendar'
 import useX6GraphStore from '@stores/x6GraphStore'
 import mermaid from 'mermaid'
 
@@ -100,6 +101,8 @@ const GanttScriptEditor: React.FC<GanttScriptEditorProps> = ({ visible, onClose 
   const [exportedScript, setExportedScript] = useState('')
   const [previewSvg, setPreviewSvg] = useState('')
   const [isPreviewLoading, setIsPreviewLoading] = useState(false)
+  const [showCriticalPath, setShowCriticalPath] = useState(false)
+  const [useWorkCalendar, setUseWorkCalendar] = useState(false)
   const previewRef = useRef<HTMLDivElement>(null)
 
   const { nodes, edges, addNodes, addEdge, newGraph } = useX6GraphStore()
@@ -340,6 +343,12 @@ const GanttScriptEditor: React.FC<GanttScriptEditorProps> = ({ visible, onClose 
         throw new Error('解析失败')
       }
 
+      // 添加专业功能选项
+      parsed.showCriticalPath = showCriticalPath
+      if (useWorkCalendar) {
+        parsed.workCalendar = workCalendar
+      }
+
       // 生成图形
       const { nodes: generatedNodes, edges: generatedEdges } = ganttDiagramGenerator.generate(parsed)
 
@@ -440,6 +449,24 @@ const GanttScriptEditor: React.FC<GanttScriptEditorProps> = ({ visible, onClose 
                     <Tooltip title="关键路径">
                       <Button size="small" onClick={() => handleExample('critical')}>关键路径</Button>
                     </Tooltip>
+                  </Space>
+                </Card>
+
+                {/* 专业功能选项 */}
+                <Card size="small" title="专业功能">
+                  <Space direction="vertical">
+                    <Checkbox 
+                      checked={showCriticalPath}
+                      onChange={(e) => setShowCriticalPath(e.target.checked)}
+                    >
+                      显示关键路径 (CPM)
+                    </Checkbox>
+                    <Checkbox 
+                      checked={useWorkCalendar}
+                      onChange={(e) => setUseWorkCalendar(e.target.checked)}
+                    >
+                      使用工作日历（排除周末）
+                    </Checkbox>
                   </Space>
                 </Card>
 

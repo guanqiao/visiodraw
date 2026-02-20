@@ -126,8 +126,30 @@ export const umlShapes: ShapeCategory = {
 
     // ========== 时序图元素 (Sequence Diagram) ==========
     {
-      id: 'uml-lifeline',
+      id: 'uml-participant',
+      name: '参与者',
+      category: 'uml',
+      type: 'uml-participant',
+      icon: `<svg viewBox="0 0 40 40"><rect x="5" y="5" width="30" height="12" fill="#f0f5ff" stroke="#2f54eb" stroke-width="1.5"/><text x="20" y="14" text-anchor="middle" font-size="5" fill="#2f54eb">Participant</text></svg>`,
+      width: 100,
+      height: 40,
+      defaultProps: { fill: '#f0f5ff', stroke: '#2f54eb', strokeWidth: 2 },
+      tags: ['uml', 'participant', 'sequence-diagram'],
+    },
+    {
+      id: 'uml-lifeline-line',
       name: '生命线',
+      category: 'uml',
+      type: 'uml-lifeline-line',
+      icon: `<svg viewBox="0 0 40 40"><line x1="20" y1="5" x2="20" y2="35" stroke="#8c8c8c" stroke-width="1.5" stroke-dasharray="3,2"/></svg>`,
+      width: 1,
+      height: 200,
+      defaultProps: { fill: 'transparent', stroke: '#8c8c8c', strokeWidth: 1, strokeDasharray: '3,2' },
+      tags: ['uml', 'lifeline', 'sequence-diagram'],
+    },
+    {
+      id: 'uml-lifeline',
+      name: '生命线(组合)',
       category: 'uml',
       type: 'uml-lifeline',
       icon: `<svg viewBox="0 0 40 40"><rect x="10" y="3" width="20" height="8" fill="#f0f5ff" stroke="#2f54eb" stroke-width="1.5"/><line x1="20" y1="11" x2="20" y2="37" stroke="#2f54eb" stroke-width="1.5" stroke-dasharray="3,2"/><text x="20" y="9" text-anchor="middle" font-size="4" fill="#2f54eb">Object</text></svg>`,

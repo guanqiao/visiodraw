@@ -16,6 +16,16 @@ import {
 } from './layoutEngine'
 import { MermaidSequenceParser, type ParsedSequenceDiagram } from './mermaidSequenceParser'
 import { MermaidStyleParser, parseColorValue } from './mermaidStyleParser'
+import {
+  MERMAID_SHAPE_TYPE_MAP,
+  MERMAID_BRACKET_TYPE_MAP,
+  MERMAID_EDGE_STYLE_MAP,
+  DEFAULT_NODE_TYPE,
+  DEFAULT_EDGE_STYLE,
+  getMermaidShapeType,
+  getMermaidBracketType,
+  getMermaidEdgeStyle,
+} from './mermaidShapeConfig'
 
 export function detectDiagramType(code: string): DiagramType | null {
   const trimmedCode = code.trim().toLowerCase()
@@ -238,65 +248,13 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       continue
     }
 
-    const chainedEdgeMatch = line.match(/^(\w+)\s*(-->|---|-\.->|==>|\.->)\s*(?:\|([^|]+)\|)?\s*(\w+)\s*(-->|---|-\.->|==>|\.->)\s*(?:\|([^|]+)\|)?\s*(\w+)/)
-    if (chainedEdgeMatch) {
-      const [, sourceId, arrowType1, label1, midId, arrowType2, label2, targetId] = chainedEdgeMatch
-      
-      if (!nodeMap.has(sourceId)) {
-        const node = createActivityNode(sourceId, sourceId, direction, nodes.length, 'uml-action', styleParser)
-        nodes.push(node)
-        nodeMap.set(sourceId, node)
-        if (currentSubgraph) {
-          subgraphMap.get(currentSubgraph)?.nodes.push(sourceId)
-          nodeToSubgraph.set(sourceId, currentSubgraph)
-        }
-      }
-      
-      if (!nodeMap.has(midId)) {
-        const node = createActivityNode(midId, midId, direction, nodes.length, 'uml-action', styleParser)
-        nodes.push(node)
-        nodeMap.set(midId, node)
-        if (currentSubgraph) {
-          subgraphMap.get(currentSubgraph)?.nodes.push(midId)
-          nodeToSubgraph.set(midId, currentSubgraph)
-        }
-      }
-      
-      if (!nodeMap.has(targetId)) {
-        const node = createActivityNode(targetId, targetId, direction, nodes.length, 'uml-action', styleParser)
-        nodes.push(node)
-        nodeMap.set(targetId, node)
-        if (currentSubgraph) {
-          subgraphMap.get(currentSubgraph)?.nodes.push(targetId)
-          nodeToSubgraph.set(targetId, currentSubgraph)
-        }
-      }
-      
-      const edgeStyle1 = getEdgeStyle(arrowType1)
-      edges.push({
-        id: `edge-${edges.length}`,
-        source: sourceId,
-        target: midId,
-        label: label1?.trim(),
-        style: edgeStyle1.style,
-        lineStyle: edgeStyle1.lineStyle,
-      })
-      
-      const edgeStyle2 = getEdgeStyle(arrowType2)
-      edges.push({
-        id: `edge-${edges.length}`,
-        source: midId,
-        target: targetId,
-        label: label2?.trim(),
-        style: edgeStyle2.style,
-        lineStyle: edgeStyle2.lineStyle,
-      })
-      
+    const multiChainResult = parseMultiChainEdge(line, direction, nodes, edges, nodeMap, subgraphMap, nodeToSubgraph, currentSubgraph, styleParser)
+    if (multiChainResult) {
       continue
     }
 
     const nodeMatch = line.match(/^(\w+)\s*(\[|\(|\{|\(\(|\(\[|<|\[\[|\[\(|\{\{)\s*([^\]]*)\s*(\]|\)|\}|\)\)|\]\)|\]\]|\}\})?\s*(?:-->.*)?$/)
-    const newSyntaxMatch = line.match(/^(\w+)\s*@\{\s*shape:\s*\w+\s*\}\s*(?:-->.*)?$/)
+    const newSyntaxMatch = line.match(/^(\w+)\s*@\{\s*shape:\s*\w+\s*\}/)
 
     if (nodeMatch || newSyntaxMatch) {
       let nodeId: string
@@ -305,9 +263,10 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       let fullLine: string
 
       if (newSyntaxMatch) {
-        const match = line.match(/^(\w+)\s*@\{\s*shape:\s*(\w+)\s*\}(?:\s*:\s*(.+))?$/)
+        const match = line.match(/^(\w+)\s*@\{\s*shape:\s*(\w+)\s*\}(?::\s*(.+))?$/)
         if (match) {
-          [, nodeId, , text = ''] = match
+          nodeId = match[1]
+          text = match[3] || ''
           openBracket = ''
           fullLine = line
         } else {
@@ -351,20 +310,42 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       const subgraphNodes = subgraphNodeIds.map(id => nodeMap.get(id)).filter(Boolean) as TemplateNode[]
       
       if (subgraphNodes.length > 0) {
-        const padding = 30
-        const headerHeight = 30
+        const padding = 40
+        const headerHeight = 35
+        
+        const minX = Math.min(...subgraphNodes.map(n => n.x))
+        const maxX = Math.max(...subgraphNodes.map(n => n.x + (n.width || 100)))
+        const minY = Math.min(...subgraphNodes.map(n => n.y))
+        const maxY = Math.max(...subgraphNodes.map(n => n.y + (n.height || 60)))
+        
+        const swimlaneWidth = maxX - minX + padding * 2
+        const swimlaneHeight = maxY - minY + padding * 2 + headerHeight
+        
+        const labelWidth = 80
+        const isHorizontal = direction === 'LR' || direction === 'RL'
         
         nodes.push({
           id: subgraph.id,
-          type: 'uml-swimlane',
-          x: 0,
-          y: 0,
-          width: 200,
-          height: 150,
+          type: isHorizontal ? 'uml-swimlane-horizontal' : 'uml-swimlane-vertical',
+          x: minX - padding,
+          y: minY - padding - headerHeight,
+          width: isHorizontal ? swimlaneWidth : swimlaneWidth + labelWidth,
+          height: isHorizontal ? swimlaneHeight + labelWidth : swimlaneHeight + headerHeight,
           text: subgraph.title,
-          fill: '#f0f5ff',
-          stroke: '#2f54eb',
+          fill: '#fafafa',
+          stroke: '#d9d9d9',
           strokeWidth: 1,
+          data: {
+            nodeIds: subgraphNodeIds,
+            isSwimlane: true,
+          },
+        })
+        
+        subgraphNodes.forEach(node => {
+          node.data = {
+            ...node.data,
+            swimlaneId: subgraph.id,
+          }
         })
       }
     }
@@ -389,29 +370,109 @@ function getEdgeStyle(arrowType: string): {
   startMarker?: string;
   endMarker?: string;
 } {
-  switch (arrowType) {
-    case '-->':
-      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'arrow' }
-    case '---':
-      return { style: 'orthogonal', lineStyle: 'solid' }
-    case '-.->':
-    case '.->':
-      return { style: 'curved', lineStyle: 'dashed', endMarker: 'arrow' }
-    case '==>':
-      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'arrow', startMarker: 'arrow' }
-    case '<-->':
-      return { style: 'orthogonal', lineStyle: 'solid', startMarker: 'arrow', endMarker: 'arrow' }
-    case '~~~':
-      return { style: 'orthogonal', lineStyle: 'dashed' }
-    case '---o':
-    case 'o---':
-      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'circle' }
-    case '---x':
-    case 'x---':
-      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'cross' }
-    default:
-      return { style: 'orthogonal', lineStyle: 'solid', endMarker: 'arrow' }
+  const style = MERMAID_EDGE_STYLE_MAP[arrowType]
+  if (style) {
+    return style
   }
+  return DEFAULT_EDGE_STYLE
+}
+
+function parseMultiChainEdge(
+  line: string,
+  direction: string,
+  nodes: TemplateNode[],
+  edges: TemplateEdge[],
+  nodeMap: Map<string, TemplateNode>,
+  subgraphMap: Map<string, { id: string; title: string; nodes: string[] }>,
+  nodeToSubgraph: Map<string, string>,
+  currentSubgraph: string | null,
+  styleParser: MermaidStyleParser
+): boolean {
+  const arrowPattern = /(-->)|(---)|(-\.->)|(==>)|(\.->)|(--o)|(o--)|(--x)|(x--)|(-\.x)|(x\.-)|(-\.o)|(o\.-)|(<-->)|(~~~)/g
+  
+  const arrowMatches: Array<{ index: number; arrow: string }> = []
+  let arrowMatch
+  while ((arrowMatch = arrowPattern.exec(line)) !== null) {
+    for (let i = 1; i <= 15; i++) {
+      if (arrowMatch[i]) {
+        arrowMatches.push({ index: arrowMatch.index, arrow: arrowMatch[i] })
+        break
+      }
+    }
+  }
+  
+  if (arrowMatches.length === 0) {
+    return false
+  }
+  
+  const nodeIds: string[] = []
+  const labels: (string | undefined)[] = []
+  
+  let lastEnd = 0
+  arrowMatches.forEach((match, idx) => {
+    const beforeArrow = line.slice(lastEnd, match.index).trim()
+    const nodeMatch = beforeArrow.match(/(\w+)(?:\s*\|\s*([^|]+)\s*\|)?$/)
+    if (nodeMatch) {
+      if (nodeIds.length === 0 || idx === 0) {
+        nodeIds.push(nodeMatch[1])
+        labels.push(nodeMatch[2]?.trim())
+      }
+    }
+    
+    const afterArrow = line.slice(match.index + match.arrow.length)
+    const afterMatch = afterArrow.match(/^\s*(?:\|\s*([^|]+)\s*\|)?\s*(\w+)/)
+    if (afterMatch) {
+      labels.push(afterMatch[1]?.trim())
+      nodeIds.push(afterMatch[2])
+    }
+    
+    lastEnd = match.index + match.arrow.length
+  })
+  
+  if (nodeIds.length < 2) {
+    return false
+  }
+  
+  for (let i = 0; i < nodeIds.length - 1; i++) {
+    const sourceId = nodeIds[i]
+    const targetId = nodeIds[i + 1]
+    const arrowType = arrowMatches[Math.min(i, arrowMatches.length - 1)]?.arrow || '-->'
+    const label = labels[i + 1]
+    
+    if (!nodeMap.has(sourceId)) {
+      const node = createActivityNode(sourceId, sourceId, direction, nodes.length, 'uml-action', styleParser)
+      nodes.push(node)
+      nodeMap.set(sourceId, node)
+      if (currentSubgraph) {
+        subgraphMap.get(currentSubgraph)?.nodes.push(sourceId)
+        nodeToSubgraph.set(sourceId, currentSubgraph)
+      }
+    }
+    
+    if (!nodeMap.has(targetId)) {
+      const node = createActivityNode(targetId, targetId, direction, nodes.length, 'uml-action', styleParser)
+      nodes.push(node)
+      nodeMap.set(targetId, node)
+      if (currentSubgraph) {
+        subgraphMap.get(currentSubgraph)?.nodes.push(targetId)
+        nodeToSubgraph.set(targetId, currentSubgraph)
+      }
+    }
+    
+    const edgeStyle = getEdgeStyle(arrowType)
+    edges.push({
+      id: `edge-${edges.length}`,
+      source: sourceId,
+      target: targetId,
+      label: label,
+      style: edgeStyle.style,
+      lineStyle: edgeStyle.lineStyle,
+      startMarker: edgeStyle.startMarker,
+      endMarker: edgeStyle.endMarker,
+    })
+  }
+  
+  return true
 }
 
 function createActivityNode(
@@ -455,38 +516,7 @@ function getActivityNodeType(bracket: string, fullText: string = ''): string {
   const newSyntaxMatch = fullText.match(/@\{\s*shape:\s*(\w+)\s*\}/)
   if (newSyntaxMatch) {
     const shapeName = newSyntaxMatch[1].toLowerCase()
-    const shapeMap: Record<string, string> = {
-      'stadium': 'mermaid-stadium',
-      'cylinder': 'mermaid-cylinder',
-      'hexagon': 'mermaid-hexagon',
-      'parallelogram': 'mermaid-parallelogram-left',
-      'parallelogram-l': 'mermaid-parallelogram-left',
-      'parallelogram-r': 'mermaid-parallelogram-right',
-      'trapezoid': 'mermaid-trapezoid-top',
-      'trapezoid-top': 'mermaid-trapezoid-top',
-      'trapezoid-bottom': 'mermaid-trapezoid-bottom',
-      'subroutine': 'mermaid-subroutine',
-      'circle': 'mermaid-circle',
-      'doublecircle': 'mermaid-double-circle',
-      'asymmetric': 'mermaid-asymmetric',
-      'rhombus': 'mermaid-rhombus',
-      'diamond': 'mermaid-rhombus',
-      'rect': 'uml-action',
-      'rectangle': 'uml-action',
-      'roundrect': 'uml-initial',
-      'cloud': 'mermaid-cloud',
-      'banner': 'mermaid-banner',
-      'document': 'mermaid-document',
-      'delay': 'mermaid-delay',
-      'lightning': 'mermaid-lightning',
-      'lean-l': 'mermaid-lean-left',
-      'lean-r': 'mermaid-lean-right',
-      'divided': 'mermaid-divided-rect',
-      'lined-doc': 'mermaid-lined-document',
-      'stadium-end': 'mermaid-stadium-end',
-      'label': 'mermaid-label-rect',
-    }
-    return shapeMap[shapeName] || 'uml-action'
+    return MERMAID_SHAPE_TYPE_MAP[shapeName] || DEFAULT_NODE_TYPE
   }
 
   if (fullText.includes('([') && fullText.includes('])')) {
@@ -504,42 +534,40 @@ function getActivityNodeType(bracket: string, fullText: string = ''): string {
   if (fullText.includes('{{') && fullText.includes('}}')) {
     return 'mermaid-hexagon'
   }
-  if (fullText.includes('[\\') && fullText.includes('/]')) {
+  if (fullText.match(/\[\/[^\\]*\/\]/)) {
+    return 'mermaid-parallelogram-left'
+  }
+  if (fullText.match(/\[\\[^\/]*\\\]/)) {
+    return 'mermaid-parallelogram-right'
+  }
+  if (fullText.match(/\[\\[^\]]*\/\]/)) {
     return 'mermaid-trapezoid-top'
   }
-  if (fullText.includes('[/') && fullText.includes('\\]')) {
+  if (fullText.match(/\[\/[^\]]*\\\]/)) {
     return 'mermaid-trapezoid-bottom'
   }
-
-  switch (bracket) {
-    case '(':
-      return 'uml-initial'
-    case '([':
-      return 'mermaid-stadium'
-    case '{':
-      return 'mermaid-rhombus'
-    case '(((':
-      return 'mermaid-double-circle'
-    case '>':
-      return 'mermaid-asymmetric'
-    case '[/':
-      return 'mermaid-parallelogram-left'
-    case '[\\':
-      return 'mermaid-parallelogram-right'
-    case '((':
-      return 'mermaid-circle'
-    case '[[':
-      return 'mermaid-subroutine'
-    case '[(]':
-      return 'mermaid-cylinder'
-    case '{{':
-      return 'mermaid-hexagon'
-    default:
-      if (bracket === '[' || bracket?.startsWith('[')) {
-        return 'uml-action'
-      }
-      return 'uml-action'
+  if (fullText.includes('[(') && fullText.includes(')]')) {
+    return 'mermaid-cylinder'
   }
+  if (fullText.includes('((') && fullText.includes('))')) {
+    return 'mermaid-circle'
+  }
+  if (fullText.includes('[[(') && fullText.includes(')]]')) {
+    return 'mermaid-circle'
+  }
+  if (fullText.includes('((') && fullText.includes(')')) {
+    return 'mermaid-circle'
+  }
+
+  const bracketType = MERMAID_BRACKET_TYPE_MAP[bracket]
+  if (bracketType) {
+    return bracketType
+  }
+
+  if (bracket === '[' || bracket?.startsWith('[')) {
+    return 'uml-action'
+  }
+  return DEFAULT_NODE_TYPE
 }
 
 export function parseSequenceDiagram(code: string): MermaidParseResult {

@@ -154,14 +154,124 @@ export function createParallelFlowTemplate(options: TemplateGenerateOptions = {}
 
 /**
  * 泳道流程模板
+ * 包含三个泳道：用户、系统、数据库
  */
 export function createSwimlaneFlowTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  const laneWidth = 200
+  const laneHeight = 300
+  const poolWidth = laneWidth * 3
+  const poolHeight = laneHeight
+  const headerHeight = 40
+
   const nodes = [
-    createTemplateNode('start', 'uml-initial', '', 0, options),
-    createTemplateNode('userAction', 'uml-action', '用户操作', 1, options),
-    createTemplateNode('systemProcess', 'uml-action', '系统处理', 2, options),
-    createTemplateNode('dbSave', 'uml-action', '数据存储', 3, options),
-    createTemplateNode('end', 'uml-final', '', 4, options),
+    {
+      id: 'pool',
+      type: 'uml-swimlane-pool',
+      x: 50,
+      y: 50,
+      width: poolWidth,
+      height: poolHeight,
+      text: '订单处理流程',
+      fill: '#fafafa',
+      stroke: '#d9d9d9',
+      strokeWidth: 1.5,
+    },
+    {
+      id: 'lane-user',
+      type: 'uml-swimlane-vertical',
+      x: 50,
+      y: 50 + headerHeight,
+      width: laneWidth,
+      height: poolHeight - headerHeight,
+      text: '用户',
+      fill: '#e6f7ff',
+      stroke: '#1890ff',
+      strokeWidth: 1,
+    },
+    {
+      id: 'lane-system',
+      type: 'uml-swimlane-vertical',
+      x: 50 + laneWidth,
+      y: 50 + headerHeight,
+      width: laneWidth,
+      height: poolHeight - headerHeight,
+      text: '系统',
+      fill: '#f6ffed',
+      stroke: '#52c41a',
+      strokeWidth: 1,
+    },
+    {
+      id: 'lane-database',
+      type: 'uml-swimlane-vertical',
+      x: 50 + laneWidth * 2,
+      y: 50 + headerHeight,
+      width: laneWidth,
+      height: poolHeight - headerHeight,
+      text: '数据库',
+      fill: '#fff7e6',
+      stroke: '#fa8c16',
+      strokeWidth: 1,
+    },
+    {
+      id: 'start',
+      type: 'uml-initial',
+      x: 120,
+      y: 130,
+      width: 30,
+      height: 30,
+      text: '',
+      fill: '#52c41a',
+      stroke: '#52c41a',
+      strokeWidth: 2,
+    },
+    {
+      id: 'userAction',
+      type: 'uml-action',
+      x: 80,
+      y: 180,
+      width: 100,
+      height: 50,
+      text: '提交订单',
+      fill: '#e6f7ff',
+      stroke: '#1890ff',
+      strokeWidth: 2,
+    },
+    {
+      id: 'systemProcess',
+      type: 'uml-action',
+      x: 280,
+      y: 180,
+      width: 100,
+      height: 50,
+      text: '处理订单',
+      fill: '#f6ffed',
+      stroke: '#52c41a',
+      strokeWidth: 2,
+    },
+    {
+      id: 'dbSave',
+      type: 'uml-action',
+      x: 480,
+      y: 180,
+      width: 100,
+      height: 50,
+      text: '保存数据',
+      fill: '#fff7e6',
+      stroke: '#fa8c16',
+      strokeWidth: 2,
+    },
+    {
+      id: 'end',
+      type: 'uml-final',
+      x: 320,
+      y: 270,
+      width: 30,
+      height: 30,
+      text: '',
+      fill: '#f5222d',
+      stroke: '#f5222d',
+      strokeWidth: 2,
+    },
   ]
 
   const edges = [
@@ -174,14 +284,20 @@ export function createSwimlaneFlowTemplate(options: TemplateGenerateOptions = {}
   return {
     id: 'activity-swimlane-flow',
     name: '泳道流程',
-    description: '按角色划分的泳道流程',
+    description: '按角色划分的泳道流程，包含用户、系统、数据库三个泳道',
     type: 'activity',
     nodes,
     edges,
     mermaidCode: `flowchart TD
-    Start([开始]) --> UserAction[用户操作]
-    UserAction --> SystemProcess[系统处理]
-    SystemProcess --> DBSave[数据存储]
+    subgraph UserLane [用户]
+        Start([开始]) --> UserAction[提交订单]
+    end
+    subgraph SystemLane [系统]
+        UserAction --> SystemProcess[处理订单]
+    end
+    subgraph DBLane [数据库]
+        SystemProcess --> DBSave[保存数据]
+    end
     DBSave --> End([结束])`,
   }
 }

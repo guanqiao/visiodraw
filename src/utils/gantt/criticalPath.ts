@@ -64,7 +64,11 @@ export class CriticalPathCalculator {
     const graph = this.buildDependencyGraph(tasks, dependencies)
     
     // 拓扑排序
-    const sortedTasks = this.topologicalSort(tasks, graph)
+    const { sorted: sortedTasks, hasCycle } = this.topologicalSort(tasks, graph)
+    
+    if (hasCycle) {
+      console.warn('[CriticalPath] 存在循环依赖，关键路径计算可能不准确')
+    }
     
     // 计算最早时间（前向遍历）
     const earliestTimes = this.calculateEarliestTimes(sortedTasks, dependencies)
@@ -127,12 +131,62 @@ export class CriticalPathCalculator {
   }
 
   /**
+   * 检测循环依赖
+   */
+  private detectCycle(
+    tasks: GanttTask[],
+    graph: Map<string, string[]>
+  ): { hasCycle: boolean; cyclePath: string[] } {
+    const visited = new Set<string>()
+    const recursionStack = new Set<string>()
+    const path: string[] = []
+
+    const dfs = (taskId: string): boolean => {
+      visited.add(taskId)
+      recursionStack.add(taskId)
+      path.push(taskId)
+
+      const neighbors = graph.get(taskId) || []
+      for (const neighbor of neighbors) {
+        if (!visited.has(neighbor)) {
+          if (dfs(neighbor)) return true
+        } else if (recursionStack.has(neighbor)) {
+          // 发现环
+          const cycleStart = path.indexOf(neighbor)
+          return true
+        }
+      }
+
+      path.pop()
+      recursionStack.delete(taskId)
+      return false
+    }
+
+    for (const task of tasks) {
+      if (!visited.has(task.id)) {
+        if (dfs(task.id)) {
+          return { hasCycle: true, cyclePath: [...path] }
+        }
+      }
+    }
+
+    return { hasCycle: false, cyclePath: [] }
+  }
+
+  /**
    * 拓扑排序（Kahn算法）
    */
   private topologicalSort(
     tasks: GanttTask[],
     graph: Map<string, string[]>
-  ): GanttTask[] {
+  ): { sorted: GanttTask[]; hasCycle: boolean } {
+    // 先检测循环
+    const cycleCheck = this.detectCycle(tasks, graph)
+    if (cycleCheck.hasCycle) {
+      console.warn('[CriticalPath] 检测到循环依赖:', cycleCheck.cyclePath.join(' -> '))
+      return { sorted: [...tasks], hasCycle: true }
+    }
+
     const inDegree = new Map<string, number>()
     const result: GanttTask[] = []
     const queue: string[] = []
@@ -146,7 +200,11 @@ export class CriticalPathCalculator {
     })
     
     // 处理队列
-    while (queue.length > 0) {
+    let iterationCount = 0
+    const maxIterations = tasks.length * 2 // 安全限制
+    
+    while (queue.length > 0 && iterationCount < maxIterations) {
+      iterationCount++
       const taskId = queue.shift()!
       const task = tasks.find(t => t.id === taskId)
       if (task) {
@@ -166,12 +224,13 @@ export class CriticalPathCalculator {
       })
     }
     
-    // 如果有环，返回原始顺序
-    if (result.length !== tasks.length) {
-      return [...tasks]
+    // 如果迭代次数超过限制，说明有异常
+    if (iterationCount >= maxIterations) {
+      console.warn('[CriticalPath] 拓扑排序迭代次数超过限制，可能存在异常依赖')
+      return { sorted: [...tasks], hasCycle: false }
     }
     
-    return result
+    return { sorted: result, hasCycle: false }
   }
 
   /**

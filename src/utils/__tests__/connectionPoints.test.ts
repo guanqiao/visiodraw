@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   getRelativePosition,
   generateDefaultConnectionPoints,
@@ -18,6 +18,14 @@ import {
   isNearNodeEdge,
   getEdgePointFromMouse,
   createCustomConnectionPoint,
+  snapToEdge,
+  getCustomPortCount,
+  isMaxConnectionPointsReached,
+  removeAllCustomPorts,
+  findDuplicateConnectionPoint,
+  isValidConnectionPointPosition,
+  checkAlignment,
+  distributeConnectionPointsOnEdge,
 } from '../connectionPoints'
 import type { ConnectionPoint } from '../../types/connection'
 
@@ -498,6 +506,323 @@ describe('connectionPoints', () => {
     it('should have inward type by default', () => {
       const point = createCustomConnectionPoint(0.5, 0.5)
       expect(point.type).toBe('inward')
+    })
+  })
+
+  describe('snapToEdge', () => {
+    it('should snap to top edge', () => {
+      const result = snapToEdge(0.5, 0.05, 0.15)
+      expect(result.edge).toBe('top')
+      expect(result.y).toBe(0)
+      expect(result.x).toBe(0.5)
+    })
+
+    it('should snap to bottom edge', () => {
+      const result = snapToEdge(0.5, 0.95, 0.15)
+      expect(result.edge).toBe('bottom')
+      expect(result.y).toBe(1)
+      expect(result.x).toBe(0.5)
+    })
+
+    it('should snap to left edge', () => {
+      const result = snapToEdge(0.05, 0.5, 0.15)
+      expect(result.edge).toBe('left')
+      expect(result.x).toBe(0)
+      expect(result.y).toBe(0.5)
+    })
+
+    it('should snap to right edge', () => {
+      const result = snapToEdge(0.95, 0.5, 0.15)
+      expect(result.edge).toBe('right')
+      expect(result.x).toBe(1)
+      expect(result.y).toBe(0.5)
+    })
+
+    it('should not snap when outside threshold', () => {
+      const result = snapToEdge(0.5, 0.5, 0.15)
+      expect(result.edge).toBe('none')
+      expect(result.x).toBe(0.5)
+      expect(result.y).toBe(0.5)
+    })
+
+    it('should use default threshold', () => {
+      const result = snapToEdge(0.5, 0.1)
+      expect(result.edge).toBe('top')
+    })
+  })
+
+  describe('getCustomPortCount', () => {
+    it('should return correct count', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'top' },
+          { id: 'bottom' },
+          { id: 'custom-1' },
+          { id: 'custom-2' },
+        ],
+      }
+      expect(getCustomPortCount(mockNode)).toBe(2)
+    })
+
+    it('should return 0 when no custom ports', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'top' },
+          { id: 'bottom' },
+        ],
+      }
+      expect(getCustomPortCount(mockNode)).toBe(0)
+    })
+
+    it('should return 0 when no ports', () => {
+      const mockNode = {
+        getPorts: () => [],
+      }
+      expect(getCustomPortCount(mockNode)).toBe(0)
+    })
+  })
+
+  describe('isMaxConnectionPointsReached', () => {
+    it('should return true when max reached', () => {
+      const mockNode = {
+        getPorts: () => Array(16).fill(null).map((_, i) => ({ id: `custom-${i}` })),
+      }
+      expect(isMaxConnectionPointsReached(mockNode, 16)).toBe(true)
+    })
+
+    it('should return false when under max', () => {
+      const mockNode = {
+        getPorts: () => Array(10).fill(null).map((_, i) => ({ id: `custom-${i}` })),
+      }
+      expect(isMaxConnectionPointsReached(mockNode, 16)).toBe(false)
+    })
+
+    it('should use default max count', () => {
+      const mockNode = {
+        getPorts: () => Array(20).fill(null).map((_, i) => ({ id: `custom-${i}` })),
+      }
+      expect(isMaxConnectionPointsReached(mockNode)).toBe(true)
+    })
+  })
+
+  describe('removeAllCustomPorts', () => {
+    it('should remove all custom ports', () => {
+      const removedPorts: string[] = []
+      const mockNode = {
+        getPorts: () => [
+          { id: 'top' },
+          { id: 'custom-1' },
+          { id: 'custom-2' },
+        ],
+        getPort: (id: string) => ({ id }),
+        removePort: (id: string) => removedPorts.push(id),
+      }
+      const count = removeAllCustomPorts(mockNode)
+      expect(count).toBe(2)
+      expect(removedPorts).toContain('custom-1')
+      expect(removedPorts).toContain('custom-2')
+      expect(removedPorts).not.toContain('top')
+    })
+
+    it('should return 0 when no custom ports', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'top' },
+          { id: 'bottom' },
+        ],
+      }
+      const count = removeAllCustomPorts(mockNode)
+      expect(count).toBe(0)
+    })
+  })
+
+  describe('findDuplicateConnectionPoint', () => {
+    it('should find duplicate at same position', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'custom-1', args: { x: 50, y: 0 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const duplicate = findDuplicateConnectionPoint(mockNode, 0.5, 0, 0.05)
+      expect(duplicate).toBe('custom-1')
+    })
+
+    it('should not find duplicate when far enough', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'custom-1', args: { x: 50, y: 0 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const duplicate = findDuplicateConnectionPoint(mockNode, 0.8, 0.8, 0.05)
+      expect(duplicate).toBeNull()
+    })
+
+    it('should ignore non-custom ports', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'top', args: { x: 50, y: 0 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const duplicate = findDuplicateConnectionPoint(mockNode, 0.5, 0, 0.05)
+      expect(duplicate).toBeNull()
+    })
+
+    it('should return null when no ports', () => {
+      const mockNode = {
+        getPorts: () => [],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const duplicate = findDuplicateConnectionPoint(mockNode, 0.5, 0.5, 0.05)
+      expect(duplicate).toBeNull()
+    })
+  })
+
+  describe('isValidConnectionPointPosition', () => {
+    it('should return valid for good position', () => {
+      const mockNode = {
+        getPorts: () => [],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = isValidConnectionPointPosition(mockNode, 0.5, 0.5)
+      expect(result.valid).toBe(true)
+    })
+
+    it('should return invalid for out of bounds', () => {
+      const mockNode = {
+        getPorts: () => [],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = isValidConnectionPointPosition(mockNode, 1.5, 0.5)
+      expect(result.valid).toBe(false)
+      expect(result.reason).toBe('invalid_position')
+    })
+
+    it('should return invalid for duplicate', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'custom-1', args: { x: 50, y: 0 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = isValidConnectionPointPosition(mockNode, 0.5, 0)
+      expect(result.valid).toBe(false)
+      expect(result.reason).toBe('duplicate')
+    })
+
+    it('should return invalid for max reached', () => {
+      const mockNode = {
+        getPorts: () =>
+          Array(16)
+            .fill(null)
+            .map((_, i) => ({ id: `custom-${i}`, args: { x: i * 5, y: 0 } })),
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = isValidConnectionPointPosition(mockNode, 0.5, 0.5, { maxCount: 16 })
+      expect(result.valid).toBe(false)
+      expect(result.reason).toBe('max_reached')
+    })
+  })
+
+  describe('checkAlignment', () => {
+    it('should detect horizontal alignment', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'custom-1', args: { x: 50, y: 50 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = checkAlignment(mockNode, 0.3, 0.5, 0.03)
+      expect(result.horizontal).toBe(true)
+      expect(result.vertical).toBe(false)
+      expect(result.alignY).toBe(0.5)
+    })
+
+    it('should detect vertical alignment', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'custom-1', args: { x: 50, y: 50 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = checkAlignment(mockNode, 0.5, 0.3, 0.03)
+      expect(result.horizontal).toBe(false)
+      expect(result.vertical).toBe(true)
+      expect(result.alignX).toBe(0.5)
+    })
+
+    it('should detect both alignments', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'custom-1', args: { x: 50, y: 50 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = checkAlignment(mockNode, 0.5, 0.5, 0.03)
+      expect(result.horizontal).toBe(true)
+      expect(result.vertical).toBe(true)
+    })
+
+    it('should not detect alignment when far apart', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'custom-1', args: { x: 50, y: 50 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = checkAlignment(mockNode, 0.8, 0.8, 0.03)
+      expect(result.horizontal).toBe(false)
+      expect(result.vertical).toBe(false)
+    })
+
+    it('should ignore non-custom ports', () => {
+      const mockNode = {
+        getPorts: () => [
+          { id: 'top', args: { x: 50, y: 0 } },
+        ],
+        getSize: () => ({ width: 100, height: 100 }),
+      }
+      const result = checkAlignment(mockNode, 0.5, 0, 0.03)
+      expect(result.horizontal).toBe(false)
+      expect(result.vertical).toBe(false)
+    })
+  })
+
+  describe('distributeConnectionPointsOnEdge', () => {
+    it('should distribute on top edge', () => {
+      const mockNode = {}
+      const positions = distributeConnectionPointsOnEdge(mockNode, 'top', 3)
+      expect(positions).toHaveLength(3)
+      expect(positions[0].y).toBe(0)
+      expect(positions[1].y).toBe(0)
+      expect(positions[2].y).toBe(0)
+      expect(positions[0].x).toBeLessThan(positions[1].x)
+      expect(positions[1].x).toBeLessThan(positions[2].x)
+    })
+
+    it('should distribute on left edge', () => {
+      const mockNode = {}
+      const positions = distributeConnectionPointsOnEdge(mockNode, 'left', 4)
+      expect(positions).toHaveLength(4)
+      expect(positions[0].x).toBe(0)
+      expect(positions[1].x).toBe(0)
+      expect(positions[0].y).toBeLessThan(positions[1].y)
+    })
+
+    it('should return empty array for count less than 2', () => {
+      const mockNode = {}
+      const positions = distributeConnectionPointsOnEdge(mockNode, 'top', 1)
+      expect(positions).toHaveLength(0)
+    })
+
+    it('should include padding at both ends', () => {
+      const mockNode = {}
+      const positions = distributeConnectionPointsOnEdge(mockNode, 'bottom', 2)
+      expect(positions).toHaveLength(2)
+      expect(positions[0].x).toBe(0.1) // 10% padding
+      expect(positions[1].x).toBe(0.9) // 90% = 1 - 10%
     })
   })
 })
