@@ -100,7 +100,12 @@ export function generateTemplateThumbnail(
     id: c.id,
     source: c.source,
     target: c.target,
-    style: 'orthogonal' as const,
+    style: (c as any).style || 'orthogonal',
+    lineStyle: (c as any).lineStyle,
+    stroke: c.stroke,
+    strokeWidth: c.strokeWidth,
+    dashArray: (c as any).dashArray,
+    label: c.label,
   })) as TemplateEdge[]
 
   drawTemplateToCanvas(ctx, nodes, edges, opts.width, opts.height, opts.padding)

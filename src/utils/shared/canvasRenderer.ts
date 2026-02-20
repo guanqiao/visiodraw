@@ -453,10 +453,8 @@ export function drawShape(
   offsetY: number,
   options: ShapeRenderOptions = {}
 ): void {
-  // 跳过辅助节点（锚点、标记等）
-  if (shouldSkipNode(shape.type)) {
-    return
-  }
+  // 注意：辅助节点的过滤应该在调用方处理（如 drawTemplateToCanvas）
+  // 这里保留绘制逻辑，以便在需要时可以绘制所有节点
 
   const x = shape.x * scale + offsetX
   const y = shape.y * scale + offsetY
