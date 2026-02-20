@@ -1,5 +1,5 @@
 import { Node } from '@antv/x6'
-import { ShapeRenderConfig, ShapeRendererMap } from './types'
+import { ShapeRenderConfig, ShapeRendererMap, getPortGroups, getPortItems } from './types'
 import { baseRenderers } from './base'
 import { flowchartRenderers } from './flowchart'
 import { umlRenderers } from './uml'
@@ -163,14 +163,21 @@ export const renderShape = (type: string, config: ShapeRenderConfig): Node => {
   try {
     const cachedNode = globalShapeCache.get(type, config)
     if (cachedNode) {
-      cachedNode.setPosition(config.x, config.y)
-      ;(cachedNode as any).id = config.id
+      const clonedNode = cachedNode.clone() as Node
+      clonedNode.setPosition(config.x, config.y)
+      ;(clonedNode as any).id = config.id
       if (config.text) {
-        cachedNode.attr('label/text', config.text)
+        clonedNode.attr('label/text', config.text)
       }
-      cachedNode.setData({ fromStore: true, shapeType: type })
+      
+      clonedNode.setPorts({
+        groups: getPortGroups(),
+        items: getPortItems(),
+      })
+      
+      clonedNode.setData({ fromStore: true, shapeType: type })
       renderLogger.debug(`从缓存克隆: ${type}, id: ${config.id}`)
-      return cachedNode
+      return clonedNode
     }
 
     const node = renderer(configWithType)

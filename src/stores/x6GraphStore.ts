@@ -78,6 +78,7 @@ export interface X6GraphState {
 
   // Edge operations
   addEdge: (edge: Connector) => void
+  addEdges: (edges: Connector[]) => void
   updateEdge: (id: string, updates: Partial<Connector>) => void
   deleteEdge: (id: string) => void
   selectEdge: (id: string | null) => void
@@ -147,7 +148,7 @@ const useX6GraphStore = create<X6GraphState>()(
         const { nodes, graph } = get()
         const newNodes = [...nodes, node]
         set({ nodes: newNodes, isModified: true })
-        
+
         if (graph) {
           const x6Node = createX6Node(node)
           graph.addNode(x6Node)
@@ -158,11 +159,24 @@ const useX6GraphStore = create<X6GraphState>()(
         const { nodes, graph } = get()
         const updatedNodes = [...nodes, ...newNodes]
         set({ nodes: updatedNodes, isModified: true })
-        
+
         if (graph) {
           newNodes.forEach(node => {
             const x6Node = createX6Node(node)
             graph.addNode(x6Node)
+          })
+        }
+      },
+
+      addEdges: (newEdges) => {
+        const { edges, graph } = get()
+        const updatedEdges = [...edges, ...newEdges]
+        set({ edges: updatedEdges, isModified: true })
+
+        if (graph) {
+          newEdges.forEach(edge => {
+            const x6Edge = createX6Edge(edge)
+            graph.addEdge(x6Edge)
           })
         }
       },
@@ -223,10 +237,12 @@ const useX6GraphStore = create<X6GraphState>()(
             graph.removeCell(cell)
           }
           // 删除相关边
-          newEdges.forEach(edge => {
-            const edgeCell = graph.getCellById(edge.id)
-            if (edgeCell) {
-              graph.removeCell(edgeCell)
+          edges.forEach(edge => {
+            if (edge.sourceShapeId === id || edge.targetShapeId === id) {
+              const edgeCell = graph.getCellById(edge.id)
+              if (edgeCell) {
+                graph.removeCell(edgeCell)
+              }
             }
           })
         }
@@ -250,6 +266,15 @@ const useX6GraphStore = create<X6GraphState>()(
             const cell = graph.getCellById(id)
             if (cell) {
               graph.removeCell(cell)
+            }
+          })
+          // 删除相关边
+          edges.forEach(edge => {
+            if (idSet.has(edge.sourceShapeId) || idSet.has(edge.targetShapeId)) {
+              const edgeCell = graph.getCellById(edge.id)
+              if (edgeCell) {
+                graph.removeCell(edgeCell)
+              }
             }
           })
         }
@@ -663,6 +688,13 @@ const useX6GraphStore = create<X6GraphState>()(
       },
 
       newGraph: () => {
+        const { graph } = get()
+
+        // 清空 X6 Graph 实例中的所有 cells
+        if (graph) {
+          graph.clearCells()
+        }
+
         set({
           nodes: [],
           edges: [],
@@ -943,11 +975,22 @@ function createX6Edge(edge: Connector): Edge {
   // 处理路径点
   const vertices = edge.pathPoints?.map(p => ({ x: p.x, y: p.y }))
 
+  // 构建 router 配置，为 manhattan router 添加 padding 和 step
+  const routerConfig = router
+    ? {
+        name: router,
+        args:
+          router === 'manhattan'
+            ? { padding: 20, step: 10 }
+            : undefined,
+      }
+    : null
+
   return new Shape.Edge({
     id: edge.id,
     source: { cell: edge.sourceShapeId, port: edge.sourcePointId },
     target: { cell: edge.targetShapeId, port: edge.targetPointId },
-    router: router ? { name: router } : null,
+    router: routerConfig,
     connector,
     vertices,
     labels,

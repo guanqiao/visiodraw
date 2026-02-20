@@ -86,7 +86,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
   const [previewVisible, setPreviewVisible] = React.useState(false)
   const [importDialogVisible, setImportDialogVisible] = React.useState(false)
 
-  const { nodes, edges, addNodes, addEdge, newGraph } = useX6GraphStore()
+  const { nodes, edges, addNodes, addEdges, newGraph } = useX6GraphStore()
 
   // 应用模板
   const handleApplyTemplate = useCallback(
@@ -98,32 +98,30 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
       }
 
       if (template.connectors && template.connectors.length > 0) {
-        template.connectors.forEach((connector) => {
-          const convertedConnector = {
-            id: connector.id,
-            sourceShapeId: connector.source,
-            sourcePointId: 'bottom',
-            targetShapeId: connector.target,
-            targetPointId: 'top',
-            style: 'orthogonal' as const,
-            lineStyle: 'solid' as const,
-            startStyle: 'none' as const,
-            endStyle: 'arrow' as const,
-            stroke: '#333333',
-            strokeWidth: 2,
-            ...(connector.label && {
-              labels: [
-                { id: `${connector.id}-label`, text: connector.label, position: 0.5 },
-              ],
-            }),
-          }
-          addEdge(convertedConnector)
-        })
+        const convertedConnectors = template.connectors.map((connector) => ({
+          id: connector.id,
+          sourceShapeId: connector.source,
+          sourcePointId: 'bottom',
+          targetShapeId: connector.target,
+          targetPointId: 'top',
+          style: 'orthogonal' as const,
+          lineStyle: 'solid' as const,
+          startStyle: 'none' as const,
+          endStyle: 'arrow' as const,
+          stroke: '#333333',
+          strokeWidth: 2,
+          ...(connector.label && {
+            labels: [
+              { id: `${connector.id}-label`, text: connector.label, position: 0.5 },
+            ],
+          }),
+        }))
+        addEdges(convertedConnectors)
       }
 
       onClose()
     },
-    [newGraph, addNodes, addEdge, onClose]
+    [newGraph, addNodes, addEdges, onClose]
   )
 
   // 应用图表模板
@@ -138,12 +136,12 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
       }
 
       if (templateEdges.length > 0) {
-        templateEdges.forEach((edge) => addEdge(edge))
+        addEdges(templateEdges)
       }
 
       onClose()
     },
-    [newGraph, addNodes, addEdge, onClose]
+    [newGraph, addNodes, addEdges, onClose]
   )
 
   // 保存为模板

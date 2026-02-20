@@ -77,7 +77,11 @@ export class ShapeCache {
         }
         return clonedNode
       }
-      return entry.node
+      
+      // 如果没有 clone 方法，确保不返回原始节点，防止被污染
+      this.cache.delete(key)
+      this.misses++
+      return undefined
     }
 
     this.misses++
