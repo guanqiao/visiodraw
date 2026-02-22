@@ -57,11 +57,19 @@ export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[
   const sourceNode = nodes.find(n => n.id === edge.source)
   const targetNode = nodes.find(n => n.id === edge.target)
 
-  const { sourcePointId, targetPointId } = calculateConnectionPoints(
-    sourceNode,
-    targetNode,
-    edge.style
-  )
+  // 优先使用边中明确指定的连接点，否则自动计算
+  let sourcePointId = (edge.sourcePointId as string)
+  let targetPointId = (edge.targetPointId as string)
+  
+  if (!sourcePointId || !targetPointId) {
+    const calculated = calculateConnectionPoints(
+      sourceNode,
+      targetNode,
+      edge.style
+    )
+    sourcePointId = sourcePointId || calculated.sourcePointId
+    targetPointId = targetPointId || calculated.targetPointId
+  }
 
   const startMarker = edge.startMarker || 'none'
   const endMarker = edge.endMarker || 'arrow'
@@ -71,9 +79,10 @@ export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[
   // 获取标签位置信息
   const labelPosition = (edge.labelPosition as number) ?? 0.5
   const labelOffsetY = (edge.labelOffsetY as number) ?? -10
+  const labelOffsetX = (edge.labelOffsetX as number) ?? 0
 
   // 构建基础连接器配置
-  const connector: Connector = {
+  const connector: any = {
     id: edge.id,
     sourceShapeId: edge.source,
     sourcePointId,
@@ -89,12 +98,17 @@ export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[
       id: `${edge.id}-label`,
       text: edge.label,
       position: labelPosition,
-      offsetX: 0,
+      offsetX: labelOffsetX,
       offsetY: labelOffsetY,
       fontSize: 12,
       color: theme.textColor || '#333',
       backgroundColor: theme.edgeLabelBackground || '#fff',
     }] : undefined,
+  }
+  
+  // 添加自定义路径点
+  if (edge.pathPoints) {
+    connector.pathPoints = edge.pathPoints
   }
 
   // 对于 straight 样式的序列图边，添加水平路由约束

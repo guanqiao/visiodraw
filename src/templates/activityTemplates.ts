@@ -4,11 +4,11 @@
  */
 
 import type { DiagramTemplate, TemplateGenerateOptions } from '../types/diagramTemplate'
-import { createTemplateNode, createTemplateEdge } from '../utils/diagramTemplateBuilder'
+import { createTemplateNode, createTemplateEdge, getDefaultGenerateOptions } from '../utils/diagramTemplateBuilder'
 
 /**
  * 简单流程模板
- * 开始 -> 处理 -> 结束
+ * 开始 -&gt; 处理 -&gt; 结束
  */
 export function createSimpleFlowTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
   const nodes = [
@@ -30,30 +30,138 @@ export function createSimpleFlowTemplate(options: TemplateGenerateOptions = {}):
     nodes,
     edges,
     mermaidCode: `flowchart TD
-    Start([开始]) --> Process[处理]
-    Process --> End([结束])`,
+    Start([开始]) --&gt; Process[处理]
+    Process --&gt; End([结束])`,
   }
 }
 
 /**
  * 带判断的流程模板
- * 开始 -> 处理 -> 判断 -> (是)结束/(否)返回处理
+ * 开始 -&gt; 处理 -&gt; 判断 -&gt; (是)结束/(否)返回处理
  */
 export function createDecisionFlowTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
+  const opts = { ...getDefaultGenerateOptions(), ...options }
+  
   const nodes = [
-    createTemplateNode('start', 'uml-initial', '', 0, options),
-    createTemplateNode('input', 'uml-action', '输入数据', 1, options),
-    createTemplateNode('decision', 'uml-decision', '有效?', 2, options),
-    createTemplateNode('process', 'uml-action', '处理', 3, options),
-    createTemplateNode('end', 'uml-final', '', 4, options),
+    {
+      id: 'start',
+      type: 'uml-initial',
+      x: opts.startX + 45,
+      y: opts.startY,
+      width: 30,
+      height: 30,
+      fill: '#52c41a',
+      stroke: '#52c41a',
+      strokeWidth: 2,
+    },
+    {
+      id: 'input',
+      type: 'uml-action',
+      x: opts.startX + 60,
+      y: opts.startY + opts.spacing,
+      width: 120,
+      height: 60,
+      fill: '#e6f7ff',
+      stroke: '#1890ff',
+      strokeWidth: 2,
+      text: '输入数据',
+    },
+    {
+      id: 'decision',
+      type: 'uml-decision',
+      x: opts.startX + 90,
+      y: opts.startY + opts.spacing * 2,
+      width: 60,
+      height: 60,
+      fill: '#fff7e6',
+      stroke: '#fa8c16',
+      strokeWidth: 2,
+      text: '有效?',
+    },
+    {
+      id: 'process',
+      type: 'uml-action',
+      x: opts.startX + 60,
+      y: opts.startY + opts.spacing * 3,
+      width: 120,
+      height: 60,
+      fill: '#f6ffed',
+      stroke: '#52c41a',
+      strokeWidth: 2,
+      text: '处理',
+    },
+    {
+      id: 'end',
+      type: 'uml-final',
+      x: opts.startX + 45,
+      y: opts.startY + opts.spacing * 4,
+      width: 30,
+      height: 30,
+      fill: '#f5222d',
+      stroke: '#f5222d',
+      strokeWidth: 2,
+    },
   ]
 
   const edges = [
-    createTemplateEdge('start', 'input', undefined, 0),
-    createTemplateEdge('input', 'decision', undefined, 1),
-    createTemplateEdge('decision', 'process', '是', 2),
-    createTemplateEdge('decision', 'input', '否', 3),
-    createTemplateEdge('process', 'end', undefined, 4),
+    {
+      id: 'edge-0',
+      source: 'start',
+      target: 'input',
+      style: 'orthogonal',
+      lineStyle: 'solid',
+      sourcePointId: 'bottom',
+      targetPointId: 'top',
+    },
+    {
+      id: 'edge-1',
+      source: 'input',
+      target: 'decision',
+      style: 'orthogonal',
+      lineStyle: 'solid',
+      sourcePointId: 'bottom',
+      targetPointId: 'top',
+    },
+    {
+      id: 'edge-2',
+      source: 'decision',
+      target: 'process',
+      label: '是',
+      style: 'orthogonal',
+      lineStyle: 'solid',
+      sourcePointId: 'bottom',
+      targetPointId: 'top',
+      labelPosition: 0.5,
+      labelOffsetY: -10,
+    },
+    {
+      id: 'edge-3',
+      source: 'decision',
+      target: 'input',
+      label: '否',
+      style: 'orthogonal',
+      lineStyle: 'solid',
+      sourcePointId: 'left',
+      targetPointId: 'left',
+      labelPosition: 0.5,
+      labelOffsetY: 0,
+      labelOffsetX: -30,
+      pathPoints: [
+        { x: opts.startX + 90, y: opts.startY + opts.spacing * 2 + 30 },
+        { x: opts.startX + 20, y: opts.startY + opts.spacing * 2 + 30 },
+        { x: opts.startX + 20, y: opts.startY + opts.spacing + 30 },
+        { x: opts.startX + 60, y: opts.startY + opts.spacing + 30 },
+      ],
+    },
+    {
+      id: 'edge-4',
+      source: 'process',
+      target: 'end',
+      style: 'orthogonal',
+      lineStyle: 'solid',
+      sourcePointId: 'bottom',
+      targetPointId: 'top',
+    },
   ]
 
   return {
@@ -64,23 +172,23 @@ export function createDecisionFlowTemplate(options: TemplateGenerateOptions = {}
     nodes,
     edges,
     mermaidCode: `flowchart TD
-    Start([开始]) --> Input[输入数据]
-    Input --> Decision{有效?}
-    Decision -->|是| Process[处理]
-    Decision -->|否| Input
-    Process --> End([结束])`,
+    Start([开始]) --&gt; Input[输入数据]
+    Input --&gt; Decision{有效?}
+    Decision --&gt;|是| Process[处理]
+    Decision --&gt;|否| Input
+    Process --&gt; End([结束])`,
   }
 }
 
 /**
  * 带循环的流程模板
- * 开始 -> 初始化 -> 循环条件 -> 处理 -> 循环条件
+ * 开始 -&gt; 初始化 -&gt; 循环条件 -&gt; 处理 -&gt; 循环条件
  */
 export function createLoopFlowTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
   const nodes = [
     createTemplateNode('start', 'uml-initial', '', 0, options),
     createTemplateNode('init', 'uml-action', '初始化', 1, options),
-    createTemplateNode('condition', 'uml-decision', 'i < n?', 2, options),
+    createTemplateNode('condition', 'uml-decision', 'i &lt; n?', 2, options),
     createTemplateNode('process', 'uml-action', '处理', 3, options),
     createTemplateNode('increment', 'uml-action', 'i++', 4, options),
     createTemplateNode('end', 'uml-final', '', 5, options),
@@ -103,18 +211,18 @@ export function createLoopFlowTemplate(options: TemplateGenerateOptions = {}): D
     nodes,
     edges,
     mermaidCode: `flowchart TD
-    Start([开始]) --> Init[初始化]
-    Init --> Condition{i < n?}
-    Condition -->|是| Process[处理]
-    Condition -->|否| End([结束])
-    Process --> Increment[i++]
-    Increment --> Condition`,
+    Start([开始]) --&gt; Init[初始化]
+    Init --&gt; Condition{i &lt; n?}
+    Condition --&gt;|是| Process[处理]
+    Condition --&gt;|否| End([结束])
+    Process --&gt; Increment[i++]
+    Increment --&gt; Condition`,
   }
 }
 
 /**
  * 并行流程模板
- * 开始 -> 分叉 -> 并行处理A/并行处理B -> 汇合 -> 结束
+ * 开始 -&gt; 分叉 -&gt; 并行处理A/并行处理B -&gt; 汇合 -&gt; 结束
  */
 export function createParallelFlowTemplate(options: TemplateGenerateOptions = {}): DiagramTemplate {
   const nodes = [
@@ -143,12 +251,12 @@ export function createParallelFlowTemplate(options: TemplateGenerateOptions = {}
     nodes,
     edges,
     mermaidCode: `flowchart TD
-    Start([开始]) --> Fork[分叉]
-    Fork --> ProcessA[处理A]
-    Fork --> ProcessB[处理B]
-    ProcessA --> Join[汇合]
-    ProcessB --> Join
-    Join --> End([结束])`,
+    Start([开始]) --&gt; Fork[分叉]
+    Fork --&gt; ProcessA[处理A]
+    Fork --&gt; ProcessB[处理B]
+    ProcessA --&gt; Join[汇合]
+    ProcessB --&gt; Join
+    Join --&gt; End([结束])`,
   }
 }
 
@@ -290,15 +398,15 @@ export function createSwimlaneFlowTemplate(options: TemplateGenerateOptions = {}
     edges,
     mermaidCode: `flowchart TD
     subgraph UserLane [用户]
-        Start([开始]) --> UserAction[提交订单]
+        Start([开始]) --&gt; UserAction[提交订单]
     end
     subgraph SystemLane [系统]
-        UserAction --> SystemProcess[处理订单]
+        UserAction --&gt; SystemProcess[处理订单]
     end
     subgraph DBLane [数据库]
-        SystemProcess --> DBSave[保存数据]
+        SystemProcess --&gt; DBSave[保存数据]
     end
-    DBSave --> End([结束])`,
+    DBSave --&gt; End([结束])`,
   }
 }
 
