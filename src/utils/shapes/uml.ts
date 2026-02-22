@@ -985,8 +985,8 @@ export const renderUmlAnchor = (config: ShapeRenderConfig): Node => {
     id: config.id,
     x: config.x,
     y: config.y,
-    width: config.width,
-    height: config.height,
+    width: config.width || 1,
+    height: config.height || 1,
     attrs: {
       body: {
         fill: 'transparent',
@@ -997,7 +997,10 @@ export const renderUmlAnchor = (config: ShapeRenderConfig): Node => {
     ports: {
       groups: {
         center: {
-          position: 'center',
+          position: {
+            name: 'absolute',
+            args: { x: 0.5, y: 0.5 },
+          },
           attrs: {
             circle: {
               r: 1,

@@ -982,14 +982,14 @@ function createX6Edge(edge: Connector): Edge {
                           edge.lineStyle === 'dotted' ? '2,2' : undefined
 
   // 处理箭头样式
-  const getMarker = (style: string): { name: string; size?: number } | null => {
+  const getMarker = (style: string): { name: string; size?: number; fill?: string } | null => {
     switch (style) {
       case 'arrow':
       case 'classic':
         return { name: 'classic', size: 10 }
       case 'open-arrow':
       case 'open':
-        return { name: 'open', size: 10 }
+        return { name: 'classic', size: 10, fill: 'transparent' }
       case 'diamond':
         return { name: 'diamond', size: 10 }
       case 'circle':

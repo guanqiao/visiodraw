@@ -80,8 +80,19 @@ export const createGraph = (options: GraphInitOptions): Graph => {
         })
       },
       validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell }) {
-        // 允许自连线（sourceCell === targetCell）
-        return !!sourceMagnet && !!targetMagnet
+        if (!sourceMagnet || !targetMagnet) {
+          return false
+        }
+
+        if (sourceCell && targetCell && sourceCell.id === targetCell.id) {
+          const sourcePortId = sourceMagnet.getAttribute('port')
+          const targetPortId = targetMagnet.getAttribute('port')
+          if (sourcePortId === targetPortId) {
+            return false
+          }
+        }
+
+        return true
       },
     },
   })

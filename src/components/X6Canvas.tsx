@@ -208,12 +208,10 @@ const X6Canvas: React.FC = () => {
           })
         },
         validateConnection({ sourceMagnet, targetMagnet, sourceCell, targetCell, sourceView, targetView }) {
-          // 确保从连接点(magnet)开始
           if (!sourceMagnet || !targetMagnet) {
             return false
           }
 
-          // 获取源节点和目标节点
           const sourceNode = sourceView?.cell
           const targetNode = targetView?.cell
 
@@ -221,10 +219,14 @@ const X6Canvas: React.FC = () => {
             return false
           }
 
-          // 检查是否是同一类型的节点（某些情况下可能不允许）
-          // 这里可以根据业务需求添加更多验证
+          if (sourceNode.id === targetNode.id) {
+            const sourcePortId = sourceMagnet.getAttribute('port')
+            const targetPortId = targetMagnet.getAttribute('port')
+            if (sourcePortId === targetPortId) {
+              return false
+            }
+          }
 
-          // 检查是否已存在相同的连接（避免重复边）
           const existingEdges = graph.getEdges()
           const isDuplicate = existingEdges.some((edge) => {
             const edgeSource = edge.getSourceCell()
@@ -242,7 +244,6 @@ const X6Canvas: React.FC = () => {
             return false
           }
 
-          // 允许自连线（sourceCell === targetCell）
           return true
         },
       },

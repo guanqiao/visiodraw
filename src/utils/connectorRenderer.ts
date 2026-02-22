@@ -37,6 +37,7 @@ export interface X6EdgeConfig {
   attrs?: EdgeAttributes
   labels?: any[]
   data?: any
+  vertices?: Array<{ x: number; y: number }>
   // X6 路由约束
   routerArgs?: {
     padding?: number
@@ -110,12 +111,8 @@ export class ConnectorRenderer {
 
     // 对于 straight 样式，添加路径点确保直线
     if (style === 'straight' && connector.pathPoints && connector.pathPoints.length > 0) {
-      edgeConfig.router = {
-        name: 'normal',
-        args: {
-          points: connector.pathPoints,
-        },
-      }
+      // 使用 vertices 定义路径点，X6 会按顺序连接这些点
+      edgeConfig.vertices = connector.pathPoints
     }
 
     // 应用路由约束（用于序列图等需要水平或垂直连线的场景）
@@ -257,9 +254,10 @@ export class ConnectorRenderer {
         }
       case 'open-arrow':
         return {
-          name: 'open',
+          name: 'classic',
           width: 12,
           height: 12,
+          fill: 'transparent',
           stroke: theme.lineColor,
           strokeWidth: 2,
         }

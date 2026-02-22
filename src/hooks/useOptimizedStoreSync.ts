@@ -114,6 +114,7 @@ export function useOptimizedStoreSync(
         const nodesToAdd = batch.added
           .filter((nodeData) => !currentGraph.getCellById(nodeData.id))
           .map((nodeData) => createX6NodeFromData(nodeData))
+        
         if (nodesToAdd.length > 0) {
           currentGraph.addNodes(nodesToAdd)
         }

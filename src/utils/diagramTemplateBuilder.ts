@@ -101,9 +101,16 @@ export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[
   if (edge.style === 'straight') {
     connector.routingConstraint = 'horizontal'
     
-    // 如果有 yPosition 数据，使用 pathPoints 控制消息位置
     const yPosition = edge.data?.yPosition as number | undefined
-    if (yPosition !== undefined && sourceNode && targetNode) {
+    
+    // 如果源和目标都是锚点节点，直接使用它们的坐标作为路径点
+    if (sourceNode?.type === 'uml-anchor' && targetNode?.type === 'uml-anchor') {
+      connector.pathPoints = [
+        { x: sourceNode.x, y: sourceNode.y },
+        { x: targetNode.x, y: targetNode.y },
+      ]
+    } else if (yPosition !== undefined && sourceNode && targetNode) {
+      // 如果有 yPosition 数据，使用 pathPoints 控制消息位置
       const sourceX = sourceNode.x + (sourceNode.width || 1) / 2
       const targetX = targetNode.x + (targetNode.width || 1) / 2
       const messageY = sourceNode.y + yPosition
@@ -205,6 +212,7 @@ export function buildDiagramTemplate(template: DiagramTemplate): {
     ]
     return !auxiliaryTypes.includes(node.type)
   })
+  
   const nodes = filteredNodes.map(templateNodeToShapeData)
 
   // 使用过滤后的节点列表来转换边

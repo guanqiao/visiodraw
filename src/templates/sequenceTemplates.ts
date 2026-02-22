@@ -426,6 +426,7 @@ function createMessage(
       lineStyle: edge.lineStyle,
       startMarker: edge.startStyle,
       endMarker: edge.endStyle,
+      data: { yPosition: 0 },
     },
   }
 }
