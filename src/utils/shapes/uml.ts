@@ -464,21 +464,19 @@ export const renderUmlState = (config: ShapeRenderConfig): Node => {
 
 export const renderUmlInitialState = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
-  const cx = config.width / 2
-  const cy = config.height / 2
-  const r = Math.min(config.width, config.height) / 2 - 2
+  const r = Math.min(config.width, config.height) / 2
 
-  const path = `M${cx},${cy - r} A${r},${r} 0 1,1 ${cx},${cy + r} A${r},${r} 0 1,1 ${cx},${cy - r}`
-
-  return new Shape.Path({
+  return new Shape.Circle({
     ...base,
     attrs: {
       ...base.attrs,
       body: {
         ...base.attrs.body,
-        refD: path,
         fill: '#52c41a',
         stroke: '#52c41a',
+        r: r,
+        cx: r,
+        cy: r,
       },
     },
   })
@@ -486,24 +484,37 @@ export const renderUmlInitialState = (config: ShapeRenderConfig): Node => {
 
 export const renderUmlFinalState = (config: ShapeRenderConfig): Node => {
   const base = createBaseConfig(config)
-  const cx = config.width / 2
-  const cy = config.height / 2
-  const outerR = Math.min(config.width, config.height) / 2 - 2
+  const outerR = Math.min(config.width, config.height) / 2
   const innerR = outerR * 0.6
 
-  const path = `M${cx},${cy - outerR} A${outerR},${outerR} 0 1,1 ${cx},${cy + outerR} A${outerR},${outerR} 0 1,1 ${cx},${cy - outerR}
-    M${cx},${cy - innerR} A${innerR},${innerR} 0 1,1 ${cx},${cy + innerR} A${innerR},${innerR} 0 1,1 ${cx},${cy - innerR}`
-
-  return new Shape.Path({
+  return new Shape.Circle({
     ...base,
+    markup: [
+      {
+        tagName: 'circle',
+        selector: 'outerCircle',
+      },
+      {
+        tagName: 'circle',
+        selector: 'innerCircle',
+      },
+    ],
     attrs: {
-      ...base.attrs,
-      body: {
-        ...base.attrs.body,
-        refD: path,
-        fillRule: 'evenodd',
+      outerCircle: {
+        r: outerR,
+        cx: outerR,
+        cy: outerR,
         fill: '#f5222d',
         stroke: '#f5222d',
+        strokeWidth: 2,
+      },
+      innerCircle: {
+        r: innerR,
+        cx: outerR,
+        cy: outerR,
+        fill: '#f5222d',
+        stroke: '#f5222d',
+        strokeWidth: 0,
       },
     },
   })

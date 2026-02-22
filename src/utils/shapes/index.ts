@@ -9,6 +9,7 @@ import { cloudRenderers } from './cloud'
 import { renderDatabase } from './flowchart'
 import { cloudProviderRenderers } from './cloudProviders'
 import { mermaidRenderers } from './mermaidShapes'
+import { ganttRenderers } from './gantt'
 import { globalShapeCache } from '../rendering/ShapeCache'
 import { renderLogger, devWarn } from '../logger'
 
@@ -20,6 +21,7 @@ export * from './er'
 export * from './bpmn'
 export * from './cloud'
 export * from './cloudProviders'
+export * from './gantt'
 // 从mermaidShapes选择性导出，避免与base中的renderCircle冲突
 export {
   renderStadium,
@@ -149,6 +151,7 @@ export const shapeRenderers: ShapeRendererMap = {
   ...tencentRenderers,
   ...genericCloudRenderers,
   ...mermaidRenderers,
+  ...ganttRenderers,
 }
 
 export const renderShape = (type: string, config: ShapeRenderConfig): Node => {

@@ -986,10 +986,10 @@ function createX6Edge(edge: Connector): Edge {
     switch (style) {
       case 'arrow':
       case 'classic':
-        return { name: 'classic', size: 10 }
+        return { name: 'classic', size: 12 }
       case 'open-arrow':
       case 'open':
-        return { name: 'classic', size: 10, fill: 'transparent' }
+        return { name: 'classic', size: 12, fill: 'transparent' }
       case 'diamond':
         return { name: 'diamond', size: 10 }
       case 'circle':
@@ -997,7 +997,7 @@ function createX6Edge(edge: Connector): Edge {
         return { name: 'circle', size: 6 }
       case 'triangle':
       case 'block':
-        return { name: 'block', size: 10 }
+        return { name: 'block', size: 12 }
       default:
         return null
     }
@@ -1029,13 +1029,17 @@ function createX6Edge(edge: Connector): Edge {
   // 处理路径点
   const vertices = edge.pathPoints?.map(p => ({ x: p.x, y: p.y }))
 
-  // 构建 router 配置，为 manhattan router 添加 padding 和 step
+  // 构建 router 配置，为 manhattan router 添加优化参数
   const routerConfig = router
     ? {
         name: router,
         args:
           router === 'manhattan'
-            ? { padding: 20, step: 10 }
+            ? { 
+                padding: 15, 
+                step: 10,
+                maxDirectionChange: 2,
+              }
             : undefined,
       }
     : null

@@ -707,7 +707,7 @@ export function createMessageEdge(
     targetShapeId: targetId,
     targetPointId: 'default',
     stroke: getMessageColor(type),
-    strokeWidth: 1.5,
+    strokeWidth: 2,
     lineStyle: getMessageLineStyle(type),
     startStyle: 'none',
     endStyle: getMessageArrow(type),
