@@ -16,6 +16,9 @@ export interface EdgeAttributes {
     strokeDasharray?: string
     targetMarker?: any
     sourceMarker?: any
+    filter?: any
+    lineAnimations?: any[]
+    opacity?: number
   }
   label?: {
     text?: string
@@ -282,8 +285,11 @@ export class ConnectorRenderer {
           fill: label.color || '#333333',
         },
         rect: {
-          fill: label.backgroundColor || 'transparent',
-          stroke: 'none',
+          fill: label.backgroundColor || '#ffffff',
+          stroke: '#e8e8e8',
+          strokeWidth: 1,
+          rx: 4,
+          ry: 4,
         },
       },
       position: {
@@ -374,8 +380,11 @@ export class ConnectorRenderer {
           fill: label.color || '#333333',
         },
         rect: {
-          fill: label.backgroundColor || 'transparent',
-          stroke: 'none',
+          fill: label.backgroundColor || '#ffffff',
+          stroke: '#e8e8e8',
+          strokeWidth: 1,
+          rx: 4,
+          ry: 4,
         },
       },
       position: {

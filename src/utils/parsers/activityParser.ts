@@ -12,6 +12,123 @@ import {
   type ParserContext,
 } from './baseParser'
 
+const BRACKET_PAIRS: Record<string, { close: string; pattern: string }> = {
+  '[': { close: ']', pattern: '\\[([^\\]]*)\\]' },
+  '([': { close: '])', pattern: '\\(\\[([^\\]]*)\\]\\)' },
+  '(': { close: ')', pattern: '\\(([^)]*)\\)' },
+  '{': { close: '}', pattern: '\\{([^}]*)\\}' },
+  '((': { close: '))', pattern: '\\(\\(([^)]*)\\)\\)' },
+  '[[': { close: ']]', pattern: '\\[\\[([^\\]]*)\\]\\]' },
+  '[(': { close: ')]', pattern: '\\[\\(([^)]*)\\)\\]' },
+  '{{': { close: '}}', pattern: '\\{\\{([^}]*)\\}\\}' },
+  '>': { close: ']', pattern: '>([^\\]]*)\\]' },
+  '[/': { close: '/]', pattern: '\\[/([^/]*)/\\]' },
+  '[\\': { close: '\\]', pattern: '\\[\\\\([^\\\\]*)\\\\\\]' },
+}
+
+const ARROW_PATTERN = '(-->|---|-\\.->|==>|\\.->|<-->|~~~|---o|o---|---x|x---|-\\.x|x\\.-|-\\.o|o\\.-)'
+
+function parseNodeDefinition(nodeStr: string): { id: string; text: string; bracket: string } | null {
+  const simpleMatch = nodeStr.match(/^(\w+)$/)
+  if (simpleMatch) {
+    return { id: simpleMatch[1], text: simpleMatch[1], bracket: '' }
+  }
+
+  for (const [open, config] of Object.entries(BRACKET_PAIRS)) {
+    const regex = new RegExp(`^(\\w+)${config.pattern}$`)
+    const match = nodeStr.match(regex)
+    if (match) {
+      return { id: match[1], text: match[2] || '', bracket: open }
+    }
+  }
+
+  const bracketMatch = nodeStr.match(/^(\w+)([\[\(\{<].*)$/)
+  if (bracketMatch) {
+    return { id: bracketMatch[1], text: '', bracket: '' }
+  }
+
+  return null
+}
+
+function parseEdgeWithNodeDefinitions(
+  line: string,
+  ctx: ParserContext,
+  subgraphMap: Map<string, { id: string; title: string; nodes: string[] }>,
+  nodeToSubgraph: Map<string, string>,
+  currentSubgraph: string | null
+): boolean {
+  if (line.includes('@{shape:')) {
+    return false
+  }
+
+  const nodePattern = '(\\w+(?:\\([^)]*\\)|\\[[^\\]]*\\]|\\{[^}]*\\}|\\(\\([^)]*\\)\\)|\\[\\[[^\\]]*\\]\\]|\\[\\([^)]*\\)\\]|\\{\\{[^}]*\\}\\}|>[^\\]]*\\]|\\[/[^/]*/\\]|\\[\\\\[^\\\\]*\\\\\\])*)'
+  const edgeRegex = new RegExp(`^${nodePattern}\\s*${ARROW_PATTERN}\\s*(?:\\|([^|]+)\\|)?\\s*${nodePattern}$`)
+  
+  const match = line.match(edgeRegex)
+  if (!match) return false
+
+  const [, sourceNodeStr, arrowType, label, targetNodeStr] = match
+
+  const sourceNode = parseNodeDefinition(sourceNodeStr)
+  const targetNode = parseNodeDefinition(targetNodeStr)
+
+  if (!sourceNode || !targetNode) return false
+
+  if (!ctx.nodeMap.has(sourceNode.id)) {
+    const nodeType = getNodeTypeFromBracket(sourceNode.bracket, sourceNodeStr)
+    const node = createNode(sourceNode.id, sourceNode.text || sourceNode.id, nodeType, {
+      styleParser: ctx.styleParser,
+    })
+    ctx.nodes.push(node)
+    ctx.nodeMap.set(sourceNode.id, node)
+    if (currentSubgraph) {
+      subgraphMap.get(currentSubgraph)?.nodes.push(sourceNode.id)
+      nodeToSubgraph.set(sourceNode.id, currentSubgraph)
+    }
+  } else if (sourceNode.text) {
+    const existingNode = ctx.nodeMap.get(sourceNode.id)!
+    existingNode.text = sourceNode.text
+    existingNode.type = getNodeTypeFromBracket(sourceNode.bracket, sourceNodeStr)
+    const size = calculateNodeSize(existingNode.type, existingNode.text || '')
+    existingNode.width = size.width
+    existingNode.height = size.height
+  }
+
+  if (!ctx.nodeMap.has(targetNode.id)) {
+    const nodeType = getNodeTypeFromBracket(targetNode.bracket, targetNodeStr)
+    const node = createNode(targetNode.id, targetNode.text || targetNode.id, nodeType, {
+      styleParser: ctx.styleParser,
+    })
+    ctx.nodes.push(node)
+    ctx.nodeMap.set(targetNode.id, node)
+    if (currentSubgraph) {
+      subgraphMap.get(currentSubgraph)?.nodes.push(targetNode.id)
+      nodeToSubgraph.set(targetNode.id, currentSubgraph)
+    }
+  } else if (targetNode.text) {
+    const existingNode = ctx.nodeMap.get(targetNode.id)!
+    existingNode.text = targetNode.text
+    existingNode.type = getNodeTypeFromBracket(targetNode.bracket, targetNodeStr)
+    const size = calculateNodeSize(existingNode.type, existingNode.text || '')
+    existingNode.width = size.width
+    existingNode.height = size.height
+  }
+
+  const edgeStyle = getEdgeStyle(arrowType)
+  ctx.edges.push({
+    id: `edge-${ctx.edges.length}`,
+    source: sourceNode.id,
+    target: targetNode.id,
+    label: label?.trim(),
+    style: edgeStyle.style,
+    lineStyle: edgeStyle.lineStyle,
+    startMarker: edgeStyle.startMarker,
+    endMarker: edgeStyle.endMarker,
+  })
+
+  return true
+}
+
 export function parseActivityDiagram(code: string): MermaidParseResult {
   const ctx = createParserContext()
   const subgraphMap = new Map<string, { id: string; title: string; nodes: string[] }>()
@@ -75,7 +192,35 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
       continue
     }
 
-    const edgeMatch = line.match(/^(\w+)\s*(-->|---|-\.->|==>|\.->|<-->|~~~-|---o|o---|---x|x---)\s*(?:\|([^|]+)\|)?\s*(\w+)$/)
+    const newSyntaxMatch = line.match(/^(\w+)\s*@\{\s*shape:\s*\w+\s*\}/)
+    if (newSyntaxMatch) {
+      const match = line.match(/^(\w+)\s*@\{\s*shape:\s*(\w+)\s*\}(?::\s*(.+))?$/)
+      if (match) {
+        const nodeId = match[1]
+        const text = match[3] || ''
+        const fullLine = line
+
+        if (!ctx.nodeMap.has(nodeId)) {
+          const nodeType = getNodeTypeFromBracket('', fullLine)
+          const node = createNode(nodeId, text?.trim() || nodeId, nodeType, {
+            styleParser: ctx.styleParser,
+          })
+          ctx.nodes.push(node)
+          ctx.nodeMap.set(nodeId, node)
+          if (currentSubgraph) {
+            subgraphMap.get(currentSubgraph)?.nodes.push(nodeId)
+            nodeToSubgraph.set(nodeId, currentSubgraph)
+          }
+        }
+      }
+      continue
+    }
+
+    if (parseEdgeWithNodeDefinitions(line, ctx, subgraphMap, nodeToSubgraph, currentSubgraph)) {
+      continue
+    }
+
+    const edgeMatch = line.match(/^(\w+)\s*(-->|---|-\.->|==>|\.->|<-->|~~~|---o|o---|---x|x---)\s*(?:\|([^|]+)\|)?\s*(\w+)$/)
     if (edgeMatch) {
       const [, sourceId, arrowType, label, targetId] = edgeMatch
 
@@ -123,28 +268,10 @@ export function parseActivityDiagram(code: string): MermaidParseResult {
     }
 
     const nodeMatch = line.match(/^(\w+)\s*(\[|\(|\{|\(\(|\(\[|<|\[\[|\[\(|\{\{)\s*([^\]]*)\s*(\]|\)|\}|\)\)|\]\)|\]\]|\}\})?\s*(?:-->.*)?$/)
-    const newSyntaxMatch = line.match(/^(\w+)\s*@\{\s*shape:\s*\w+\s*\}/)
 
-    if (nodeMatch || newSyntaxMatch) {
-      let nodeId: string
-      let openBracket: string
-      let text: string
-      let fullLine: string
-
-      if (newSyntaxMatch) {
-        const match = line.match(/^(\w+)\s*@\{\s*shape:\s*(\w+)\s*\}(?::\s*(.+))?$/)
-        if (match) {
-          nodeId = match[1]
-          text = match[3] || ''
-          openBracket = ''
-          fullLine = line
-        } else {
-          continue
-        }
-      } else {
-        [, nodeId, openBracket, text] = nodeMatch!
-        fullLine = line
-      }
+    if (nodeMatch) {
+      const [, nodeId, openBracket, text] = nodeMatch!
+      const fullLine = line
 
       if (!ctx.nodeMap.has(nodeId)) {
         const nodeType = getNodeTypeFromBracket(openBracket, fullLine)

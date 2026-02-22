@@ -295,12 +295,12 @@ export class AnimationManager {
         opacity: 1,
       })
     
-    const parent = node.getMountedElement()
+    const parent = (node as any).getMountedElement?.()
     if (parent) {
       const svg = parent.ownerSVGElement
       if (svg) {
         ripple.appendTo(svg)
-        
+
         ripple.animate(duration, 0, 'now')
           .attr({ r: Math.max(bbox.width, bbox.height), opacity: 0 })
           .after(() => ripple.remove())

@@ -32,7 +32,7 @@ describe('GanttExporter', () => {
         duration: 5,
         dependencies: [],
         order: 0,
-        sectionId: 's1',
+        section: 's1',
       },
       {
         id: 't2',
@@ -44,7 +44,7 @@ describe('GanttExporter', () => {
         duration: 5,
         dependencies: ['t1'],
         order: 1,
-        sectionId: 's1',
+        section: 's1',
       },
       {
         id: 't3',
@@ -56,7 +56,7 @@ describe('GanttExporter', () => {
         duration: 5,
         dependencies: ['t2'],
         order: 2,
-        sectionId: 's2',
+        section: 's2',
       },
     ] as GanttTask[],
     startDate: new Date('2024-01-01'),

@@ -47,7 +47,7 @@ interface TemplateGalleryProps {
   onOpenMermaidImport?: () => void
 }
 
-const diagramTypeNames: Record<DiagramType, string> = {
+const diagramTypeNames: Partial<Record<DiagramType, string>> = {
   activity: '活动图',
   sequence: '序列图',
   state: '状态图',
@@ -86,62 +86,47 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
   const [previewVisible, setPreviewVisible] = React.useState(false)
   const [importDialogVisible, setImportDialogVisible] = React.useState(false)
 
-  const { nodes, edges, addNodes, addEdges, newGraph } = useX6GraphStore()
+  const { nodes, edges, addNodes, addEdges, newGraph, applyTemplate } = useX6GraphStore()
 
   // 应用模板
   const handleApplyTemplate = useCallback(
     (template: Template) => {
-      newGraph()
-
-      if (template.shapes && template.shapes.length > 0) {
-        addNodes(template.shapes)
-      }
-
-      if (template.connectors && template.connectors.length > 0) {
-        const convertedConnectors = template.connectors.map((connector) => ({
-          id: connector.id,
-          sourceShapeId: connector.source,
-          sourcePointId: 'bottom',
-          targetShapeId: connector.target,
-          targetPointId: 'top',
-          style: 'orthogonal' as const,
-          lineStyle: 'solid' as const,
-          startStyle: 'none' as const,
-          endStyle: 'arrow' as const,
-          stroke: '#333333',
-          strokeWidth: 2,
-          ...(connector.label && {
-            labels: [
-              { id: `${connector.id}-label`, text: connector.label, position: 0.5 },
-            ],
-          }),
-        }))
-        addEdges(convertedConnectors)
-      }
-
+      const templateShapes = template.shapes || []
+      const templateConnectors = template.connectors || []
+      
+      const convertedConnectors = templateConnectors.map((connector) => ({
+        id: connector.id,
+        sourceShapeId: connector.source,
+        sourcePointId: 'bottom',
+        targetShapeId: connector.target,
+        targetPointId: 'top',
+        style: 'orthogonal' as const,
+        lineStyle: 'solid' as const,
+        startStyle: 'none' as const,
+        endStyle: 'arrow' as const,
+        stroke: '#333333',
+        strokeWidth: 2,
+        ...(connector.label && {
+          labels: [
+            { id: `${connector.id}-label`, text: connector.label, position: 0.5, offsetX: 0, offsetY: -10 },
+          ],
+        }),
+      }))
+      
+      applyTemplate(templateShapes, convertedConnectors)
       onClose()
     },
-    [newGraph, addNodes, addEdges, onClose]
+    [applyTemplate, onClose]
   )
 
   // 应用图表模板
   const handleApplyDiagramTemplate = useCallback(
     (template: DiagramTemplate) => {
-      newGraph()
-
       const { nodes: templateNodes, edges: templateEdges } = buildDiagramTemplate(template)
-
-      if (templateNodes.length > 0) {
-        addNodes(templateNodes)
-      }
-
-      if (templateEdges.length > 0) {
-        addEdges(templateEdges)
-      }
-
+      applyTemplate(templateNodes, templateEdges)
       onClose()
     },
-    [newGraph, addNodes, addEdges, onClose]
+    [applyTemplate, onClose]
   )
 
   // 保存为模板
@@ -227,7 +212,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
       if ('nodes' in template) {
         return generateDiagramTemplateThumbnail(template)
       } else {
-        return generateTemplateThumbnail(template)
+        return generateTemplateThumbnail(template as Template)
       }
     })
   }, [])
@@ -237,7 +222,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
     return (
       <Tabs activeKey={activeDiagramTab} onChange={(key) => setActiveDiagramTab(key as DiagramType)}>
         {(Object.keys(diagramTypeNames) as DiagramType[]).map((type) => (
-          <TabPane tab={diagramTypeNames[type]} key={type}>
+          <TabPane tab={diagramTypeNames[type] || type} key={type}>
             <Row gutter={[16, 16]}>
               {diagramTemplatesByType[type].length > 0 ? (
                 diagramTemplatesByType[type].map((template) => (
@@ -255,7 +240,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
                 ))
               ) : (
                 <Col span={24}>
-                  <Empty description={`暂无${diagramTypeNames[type]}模板`} />
+                  <Empty description={`暂无${diagramTypeNames[type] || type}模板`} />
                 </Col>
               )}
             </Row>
@@ -439,7 +424,7 @@ const TemplateGallery: React.FC<TemplateGalleryProps> = ({
             if ('nodes' in previewTemplate) {
               handleApplyDiagramTemplate(previewTemplate)
             } else {
-              handleApplyTemplate(previewTemplate)
+              handleApplyTemplate(previewTemplate as Template)
             }
           }
         }}

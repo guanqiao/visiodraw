@@ -121,7 +121,7 @@ export class ProgressRenderer {
    * 创建进度条标记
    */
   private createProgressMarkup(percent: number, color: string): any[] {
-    const baseMarkup = [
+    const baseMarkup: any[] = [
       {
         tagName: 'rect',
         selector: 'body',

@@ -244,7 +244,6 @@ export const defaultConnectionPointsConfig: Record<string, ConnectionPointPositi
   'uml-attribute': ['top', 'bottom', 'left', 'right'],
   'uml-relationship': [],
   // 新增序列图元素
-  'uml-participant': ['top', 'bottom', 'left', 'right'],
   'uml-lifeline-line': ['top', 'bottom'],
   'uml-anchor': ['center'],
   // Legacy UML types (for backward compatibility)

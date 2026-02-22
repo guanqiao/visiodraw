@@ -377,7 +377,7 @@ function createCreateMarkers(
 function createAnchorNode(id: string, x: number, y: number): TemplateNode {
   return {
     id,
-    type: 'anchor',
+    type: 'uml-anchor',
     x,
     y,
     width: 1,
@@ -424,6 +424,7 @@ function createMessage(
       label: edge.labels?.[0]?.text || label,
       style: edge.style,
       lineStyle: edge.lineStyle,
+      startMarker: edge.startStyle,
       endMarker: edge.endStyle,
     },
   }
@@ -522,7 +523,7 @@ function createNoteConnector(
   // 创建两个锚点用于连接线
   const noteAnchor: TemplateNode = {
     id: sourceId,
-    type: 'anchor',
+    type: 'uml-anchor',
     x: noteX + DEFAULT_LAYOUT_CONFIG.noteWidth / 2,
     y: noteY + DEFAULT_LAYOUT_CONFIG.noteHeight / 2,
     width: 1,
@@ -535,7 +536,7 @@ function createNoteConnector(
 
   const targetAnchor: TemplateNode = {
     id: targetAnchorId,
-    type: 'anchor',
+    type: 'uml-anchor',
     x: targetX,
     y: targetY,
     width: 1,
@@ -552,7 +553,6 @@ function createNoteConnector(
     source: sourceId,
     target: targetAnchorId,
     label: '',
-    style: 'dashed',
     lineStyle: 'dashed',
     stroke: DEFAULT_STYLES.note.stroke,
     strokeWidth: 1,

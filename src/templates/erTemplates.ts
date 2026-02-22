@@ -1482,6 +1482,4 @@ export type {
   ErTemplateConfig,
   EntityConfig,
   RelationshipConfig,
-  EntityLayout,
-  ErTheme,
 }

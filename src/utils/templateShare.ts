@@ -297,7 +297,7 @@ export async function exportTemplateAsSvg(
           const startY = y + shapeHeight / 2 - ((lines.length - 1) * lineHeight) / 2
 
           textSvg = lines
-            .map((line, index) => {
+            .map((line: string, index: number) => {
               const truncated = line.length > 15 ? line.substring(0, 15) + '...' : line
               return `<text x="${x + shapeWidth / 2}" y="${startY + index * lineHeight}" text-anchor="middle" dominant-baseline="middle" fill="#333333" font-size="12">${escapeXml(truncated)}</text>`
             })

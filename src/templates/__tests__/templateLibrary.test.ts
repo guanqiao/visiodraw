@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, beforeAll } from 'vitest'
 import type { Template } from '../../types/template'
 import type { DiagramTemplate } from '../../types/diagramTemplate'

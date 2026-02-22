@@ -27,7 +27,6 @@ import type { DiagramTemplate } from '../types/diagramTemplate'
 import {
   generateTemplateThumbnail,
   generateDiagramTemplateThumbnail,
-  previewTemplate,
 } from '../utils/templateThumbnailGenerator'
 import { devError } from '../utils/logger'
 
@@ -57,7 +56,7 @@ const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
           padding: 20,
         })
       } else {
-        return generateTemplateThumbnail(template, {
+        return generateTemplateThumbnail(template as Template, {
           width: 800,
           height: 450,
           padding: 20,
@@ -89,17 +88,27 @@ const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
   const getNodeCount = () => {
     if (!template) return 0
     if ('nodes' in template) {
+      // 如果模板有 generate 函数，先调用它
+      if (template.generate) {
+        const generated = template.generate()
+        return generated?.nodes?.length || 0
+      }
       return template.nodes?.length || 0
     }
-    return template.shapes?.length || 0
+    return (template as Template).shapes?.length || 0
   }
 
   const getEdgeCount = () => {
     if (!template) return 0
     if ('nodes' in template) {
+      // 如果模板有 generate 函数，先调用它
+      if (template.generate) {
+        const generated = template.generate()
+        return generated.edges?.length || 0
+      }
       return template.edges?.length || 0
     }
-    return template.connectors?.length || 0
+    return (template as Template).connectors?.length || 0
   }
 
   const getTemplateType = () => {
@@ -127,7 +136,7 @@ const TemplatePreviewModal: React.FC<TemplatePreviewModalProps> = ({
         </Descriptions.Item>
 
         <Descriptions.Item label="类型">
-          <Tag color={getCategoryColor(type)}>{type}</Tag>
+          <Tag color={getCategoryColor(type || '')}>{type || '未知'}</Tag>
         </Descriptions.Item>
 
         <Descriptions.Item label="图表类型">

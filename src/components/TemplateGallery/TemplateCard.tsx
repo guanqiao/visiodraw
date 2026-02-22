@@ -45,8 +45,8 @@ export function getCachedThumbnail(
 ): string {
   const cacheKey =
     'id' in template && template.id
-      ? template.id
-      : `diagram-${(template as DiagramTemplate).name || (template as Template).name}`
+      ? `${template.id}-v2`
+      : `diagram-${(template as DiagramTemplate).name || (template as Template).name}-v2`
 
   if (thumbnailCache.has(cacheKey)) {
     return thumbnailCache.get(cacheKey)!
@@ -61,7 +61,8 @@ export function getCachedThumbnail(
     const thumbnail = generateFn()
     thumbnailCache.set(cacheKey, thumbnail)
     return thumbnail
-  } catch {
+  } catch (error) {
+    console.error('生成缩略图失败:', error)
     return ''
   }
 }

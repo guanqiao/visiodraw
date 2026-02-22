@@ -170,11 +170,6 @@ export const renderShape = (type: string, config: ShapeRenderConfig): Node => {
         clonedNode.attr('label/text', config.text)
       }
       
-      clonedNode.setPorts({
-        groups: getPortGroups(),
-        items: getPortItems(),
-      })
-      
       clonedNode.setData({ fromStore: true, shapeType: type })
       renderLogger.debug(`从缓存克隆: ${type}, id: ${config.id}`)
       return clonedNode

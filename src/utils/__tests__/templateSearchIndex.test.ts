@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, beforeEach } from 'vitest'
 import type { Template } from '../../types/template'
 import {

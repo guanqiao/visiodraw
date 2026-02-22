@@ -337,12 +337,12 @@ function generateVisioXml(template: Template): string {
     .join('\n')
 
   const connectorsXml = template.connectors
-    .map(
+    ?.map(
       (conn, index) => `
     <Connect ID="${index + 1}" FromSheet="${conn.sourceShapeId}" ToSheet="${conn.targetShapeId}"/>
   `
     )
-    .join('\n')
+    .join('\n') ?? ''
 
   return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <VisioDocument xmlns="http://schemas.microsoft.com/office/visio/2012/main">

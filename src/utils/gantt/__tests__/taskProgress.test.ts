@@ -243,14 +243,14 @@ describe('TaskProgressManager', () => {
             percent: 50,
             completedHours: 20,
             totalHours: 40,
-            lastUpdated: new Date().toISOString(),
+            lastUpdated: new Date(),
             note: '测试',
           },
         ],
         history: {
           task1: [
             {
-              date: new Date().toISOString(),
+              date: new Date(),
               oldPercent: 0,
               newPercent: 50,
               note: '初始化',

@@ -103,7 +103,7 @@ function createClassNode(
   name: string,
   members: string[] = [],
   annotations: string[] = []
-): MermaidParseResult['nodes'][0] {
+): NonNullable<MermaidParseResult['nodes']>[0] {
   let text = name
   if (annotations.length > 0) {
     text = `«${annotations[0]}»\n${text}`

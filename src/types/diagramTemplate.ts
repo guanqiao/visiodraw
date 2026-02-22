@@ -10,7 +10,7 @@ export type DiagramType = 'activity' | 'sequence' | 'state' | 'er' | 'class' | '
 export type LayoutDirection = 'vertical' | 'horizontal' | 'auto'
 
 /** 连接线样式 */
-export type EdgeStyle = 'straight' | 'orthogonal' | 'curved' | 'bezier'
+export type EdgeStyle = 'straight' | 'orthogonal' | 'curved' | 'bezier' | 'metro' | 'manhattan'
 
 /** 线条样式 */
 export type LineStyle = 'solid' | 'dashed' | 'dotted'
@@ -109,9 +109,11 @@ export interface DiagramTemplate {
   /** 图表类型 */
   type: DiagramType
   /** 模板节点列表 */
-  nodes: TemplateNode[]
+  nodes?: TemplateNode[]
   /** 模板边列表（可选） */
   edges?: TemplateEdge[]
+  /** 动态生成函数（可选） */
+  generate?: (options?: TemplateGenerateOptions) => { nodes: TemplateNode[]; edges: TemplateEdge[] }
   /** 布局配置（可选） */
   layout?: DiagramLayout
   /** 对应的 Mermaid 代码（可选） */
@@ -120,6 +122,10 @@ export interface DiagramTemplate {
   createdAt?: number
   /** 更新时间 */
   updatedAt?: number
+  /** 分类（可选，用于兼容旧模板） */
+  category?: string
+  /** 标签（可选，用于兼容旧模板） */
+  tags?: string[]
 }
 
 /**

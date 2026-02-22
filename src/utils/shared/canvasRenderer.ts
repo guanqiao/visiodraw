@@ -44,13 +44,18 @@ export function calculateBoundingBox(items: Positionable[]): BoundingBox {
   let maxX = -Infinity
   let maxY = -Infinity
 
+  // 对于非常小的节点（如锚点），使用最小尺寸以避免边界框计算错误
+  // 这对序列图很重要，因为锚点节点可能只有1px宽
   items.forEach((item) => {
-    const width = item.width || 60
-    const height = item.height || 40
+    const width = item.width != null && item.width > 0 ? item.width : 60
+    const height = item.height != null && item.height > 0 ? item.height : 40
+    // 为非常小的节点设置最小尺寸，确保边界框计算正确
+    const minWidth = Math.max(width, 10)
+    const minHeight = Math.max(height, 10)
     minX = Math.min(minX, item.x)
     minY = Math.min(minY, item.y)
-    maxX = Math.max(maxX, item.x + width)
-    maxY = Math.max(maxY, item.y + height)
+    maxX = Math.max(maxX, item.x + minWidth)
+    maxY = Math.max(maxY, item.y + minHeight)
   })
 
   return { minX, minY, maxX, maxY }
@@ -284,6 +289,7 @@ export function drawShapeByType(
       drawActor(ctx, x, y, width, height)
       break
     case 'uml-database-sequence':
+    case 'uml-database-participant':
       drawDatabase(ctx, x, y, width, height)
       break
     case 'uml-fragment':
@@ -293,6 +299,29 @@ export function drawShapeByType(
       drawNote(ctx, x, y, width, height)
       break
     case 'uml-activation':
+      drawRoundedRect(ctx, x, y, width, height, 2)
+      break
+    case 'uml-lifeline':
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineTo(x, y + height)
+      break
+    // 序列图辅助标记类型（虽然在缩略图中会被跳过，但还是补充完整）
+    case 'uml-lifeline-marker':
+    case 'uml-message-marker':
+      ctx.beginPath()
+      ctx.arc(x + width / 2, y + height / 2, Math.min(width, height) / 2, 0, Math.PI * 2)
+      ctx.closePath()
+      break
+    case 'uml-destroy-marker':
+    case 'uml-lifeline-end':
+      ctx.beginPath()
+      ctx.moveTo(x, y)
+      ctx.lineTo(x + width, y + height)
+      ctx.moveTo(x + width, y)
+      ctx.lineTo(x, y + height)
+      break
+    case 'uml-create-marker':
       drawRoundedRect(ctx, x, y, width, height, 2)
       break
     default:
@@ -478,7 +507,10 @@ export function drawShape(
   // 绘制形状
   drawShapeByType(ctx, shape.type, x, y, width, height)
 
-  ctx.fill()
+  // 生命线只需要描边，不需要填充
+  if (shape.type !== 'uml-lifeline') {
+    ctx.fill()
+  }
   ctx.stroke()
 
   // 重置虚线样式
@@ -528,12 +560,11 @@ export function drawConnector(
   offsetY: number,
   options: ConnectorRenderOptions = {}
 ): void {
-  const sourceShape = shapes.find(
-    (s) => s.id === connector.sourceShapeId || s.id === (connector as any).source
-  )
-  const targetShape = shapes.find(
-    (s) => s.id === connector.targetShapeId || s.id === (connector as any).target
-  )
+  const sourceShapeId = connector.sourceShapeId || (connector as any).source
+  const targetShapeId = connector.targetShapeId || (connector as any).target
+  
+  const sourceShape = shapes.find((s) => s.id === sourceShapeId)
+  const targetShape = shapes.find((s) => s.id === targetShapeId)
 
   if (!sourceShape || !targetShape) return
 
@@ -542,8 +573,8 @@ export function drawConnector(
   const targetX = (targetShape.x + (targetShape.width || 100) / 2) * scale + offsetX
   const targetY = (targetShape.y + (targetShape.height || 60) / 2) * scale + offsetY
 
-  const stroke = options.stroke || connector.stroke || '#666666'
-  const strokeWidth = options.strokeWidth || Math.max(1, 1.5 * scale)
+  const stroke = options.stroke || connector.stroke || (connector as any).stroke || '#666666'
+  const strokeWidth = options.strokeWidth || (connector as any).strokeWidth || Math.max(1, 1.5 * scale)
 
   ctx.strokeStyle = stroke
   ctx.lineWidth = strokeWidth
@@ -561,7 +592,7 @@ export function drawConnector(
   ctx.moveTo(sourceX, sourceY)
 
   // 判断连线样式
-  const style = (connector as any).style || connector.style
+  const style = connector.style || (connector as any).style
   if (style === 'straight') {
     // 直线连接（用于序列图消息）
     ctx.lineTo(targetX, targetY)
@@ -581,7 +612,8 @@ export function drawConnector(
   }
 
   // 绘制箭头
-  if (options.showArrow !== false) {
+  const endStyle = (connector as any).endStyle || (connector as any).endMarker
+  if (options.showArrow !== false && endStyle !== 'none') {
     const arrowSize = options.arrowSize || Math.max(6, 10 * scale)
     const angle = Math.atan2(targetY - sourceY, targetX - sourceX)
     const arrowAngle = Math.PI / 6

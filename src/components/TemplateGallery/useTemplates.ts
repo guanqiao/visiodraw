@@ -86,7 +86,7 @@ export function useTemplates(options: UseTemplatesOptions): UseTemplatesReturn {
     setDiagramTemplates(diagrams)
 
     // 构建搜索索引
-    const allTemplates = [...builtinTemplates, ...custom, ...diagrams]
+    const allTemplates = [...builtinTemplates, ...custom, ...diagrams as any]
     searchIndexRef.current = buildSearchIndex(allTemplates)
   }, [])
 
@@ -140,13 +140,13 @@ export function useTemplates(options: UseTemplatesOptions): UseTemplatesReturn {
 
     const results = searchWithIndex(searchIndexRef.current, searchText)
     return results
-      .map((r) => r.template as DiagramTemplate)
-      .filter((t) => 'type' in t)
+      .map((r) => r.template as unknown as DiagramTemplate)
+      .filter((t): t is DiagramTemplate => 'type' in t && 'nodes' in t)
   }, [diagramTemplates, searchText])
 
   // 按类型分组的图表模板
   const diagramTemplatesByType = useMemo(() => {
-    const result: Record<DiagramType, DiagramTemplate[]> = {
+    const result: Partial<Record<DiagramType, DiagramTemplate[]>> = {
       activity: [],
       sequence: [],
       state: [],
@@ -158,12 +158,13 @@ export function useTemplates(options: UseTemplatesOptions): UseTemplatesReturn {
     const source = searchText ? filteredDiagramTemplates : diagramTemplates
 
     source.forEach((template) => {
-      if (result[template.type]) {
-        result[template.type].push(template)
+      if (!result[template.type]) {
+        result[template.type] = []
       }
+      result[template.type]!.push(template)
     })
 
-    return result
+    return result as Record<DiagramType, DiagramTemplate[]>
   }, [diagramTemplates, filteredDiagramTemplates, searchText])
 
   return {

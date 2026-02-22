@@ -142,7 +142,7 @@ const SqlImportDialog: React.FC<SqlImportDialogProps> = ({
         const fkColumns = record.columns.filter(c => c.constraints.includes('fk'))
         return fkColumns.length > 0 ? (
           <Space direction="vertical" size={0}>
-            {record.foreignKeys.map((fk, idx) => (
+            {record.foreignKeys?.map((fk, idx) => (
               <Text key={idx} type="warning" style={{ fontSize: 11 }}>
                 {fk.column} → {fk.refTable}.{fk.refColumn}
               </Text>
@@ -157,7 +157,7 @@ const SqlImportDialog: React.FC<SqlImportDialogProps> = ({
       title: '索引',
       key: 'indexes',
       render: (_: unknown, record: ParsedSqlTable) => {
-        if (record.indexes.length === 0) {
+        if (!record.indexes || record.indexes.length === 0) {
           return <Text type="secondary">无</Text>
         }
         return (

@@ -8,7 +8,12 @@ export interface Connector {
   targetShapeId?: string
   source?: string
   target?: string
+  sourcePointId?: string
+  targetPointId?: string
   stroke?: string
   strokeWidth?: number
   style?: string
+  lineStyle?: string
+  startStyle?: string
+  endStyle?: string
 }

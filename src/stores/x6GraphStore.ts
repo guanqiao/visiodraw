@@ -6,6 +6,8 @@ import { renderShape } from '../utils/shapeRenderers'
 import useCanvasHistoryStore from './canvasHistoryStore'
 import { devLog, devError } from '../utils/logger'
 import dayjs from 'dayjs'
+import { globalShapeCache } from '../utils/rendering/ShapeCache'
+import { edgePathCache } from '../utils/edgePathCache'
 
 export interface ShapeData {
   id: string
@@ -106,6 +108,7 @@ export interface X6GraphState {
 
   // File operations
   newGraph: () => void
+  applyTemplate: (templateNodes: any[], templateEdges: any[]) => void
   exportToPng: () => Promise<string>
   exportToSvg: (options?: { transparent?: boolean; padding?: number }) => Promise<string>
   exportToJson: () => string
@@ -133,7 +136,7 @@ const useX6GraphStore = create<X6GraphState>()(
       gridEnabled: true,
       gridType: 'dot',
       gridSize: 10,
-      canvasBgColor: '#f0f2f5',
+      canvasBgColor: '#1e1e1e',
       snapToGrid: false,
       currentTool: 'select',
       isModified: false,
@@ -175,8 +178,12 @@ const useX6GraphStore = create<X6GraphState>()(
 
         if (graph) {
           newEdges.forEach(edge => {
-            const x6Edge = createX6Edge(edge)
-            graph.addEdge(x6Edge)
+            try {
+              const x6Edge = createX6Edge(edge)
+              graph.addEdge(x6Edge)
+            } catch (error) {
+              devError(`[addEdges] 添加边失败: ${edge.id}`, error)
+            }
           })
         }
       },
@@ -221,8 +228,14 @@ const useX6GraphStore = create<X6GraphState>()(
         const { nodes, edges, graph, selectedNodeIds } = get()
         const newNodes = nodes.filter((n) => n.id !== id)
         
-        // 删除相关的连接线
+        // 找出需要删除的相关边
+        const edgesToRemove = edges.filter(e => e.sourceShapeId === id || e.targetShapeId === id)
         const newEdges = edges.filter(e => e.sourceShapeId !== id && e.targetShapeId !== id)
+        
+        // 清理相关边的缓存
+        if (edgesToRemove.length > 0) {
+          edgePathCache.invalidateMultiple(edgesToRemove.map(e => e.id))
+        }
         
         set({
           nodes: newNodes,
@@ -237,12 +250,10 @@ const useX6GraphStore = create<X6GraphState>()(
             graph.removeCell(cell)
           }
           // 删除相关边
-          edges.forEach(edge => {
-            if (edge.sourceShapeId === id || edge.targetShapeId === id) {
-              const edgeCell = graph.getCellById(edge.id)
-              if (edgeCell) {
-                graph.removeCell(edgeCell)
-              }
+          edgesToRemove.forEach(edge => {
+            const edgeCell = graph.getCellById(edge.id)
+            if (edgeCell) {
+              graph.removeCell(edgeCell)
             }
           })
         }
@@ -252,7 +263,15 @@ const useX6GraphStore = create<X6GraphState>()(
         const { nodes, edges, graph, selectedNodeIds } = get()
         const idSet = new Set(ids)
         const newNodes = nodes.filter((n) => !idSet.has(n.id))
+        
+        // 找出需要删除的相关边
+        const edgesToRemove = edges.filter(e => idSet.has(e.sourceShapeId) || idSet.has(e.targetShapeId))
         const newEdges = edges.filter(e => !idSet.has(e.sourceShapeId) && !idSet.has(e.targetShapeId))
+        
+        // 清理相关边的缓存
+        if (edgesToRemove.length > 0) {
+          edgePathCache.invalidateMultiple(edgesToRemove.map(e => e.id))
+        }
         
         set({
           nodes: newNodes,
@@ -269,12 +288,10 @@ const useX6GraphStore = create<X6GraphState>()(
             }
           })
           // 删除相关边
-          edges.forEach(edge => {
-            if (idSet.has(edge.sourceShapeId) || idSet.has(edge.targetShapeId)) {
-              const edgeCell = graph.getCellById(edge.id)
-              if (edgeCell) {
-                graph.removeCell(edgeCell)
-              }
+          edgesToRemove.forEach(edge => {
+            const edgeCell = graph.getCellById(edge.id)
+            if (edgeCell) {
+              graph.removeCell(edgeCell)
             }
           })
         }
@@ -449,6 +466,10 @@ const useX6GraphStore = create<X6GraphState>()(
       deleteEdge: (id) => {
         const { edges, graph, selectedEdgeId } = get()
         const newEdges = edges.filter((e) => e.id !== id)
+        
+        // 清理该边的缓存
+        edgePathCache.invalidate(id)
+        
         set({
           edges: newEdges,
           selectedEdgeId: selectedEdgeId === id ? null : selectedEdgeId,
@@ -693,15 +714,48 @@ const useX6GraphStore = create<X6GraphState>()(
         // 清空 X6 Graph 实例中的所有 cells
         if (graph) {
           graph.clearCells()
+          graph.cleanSelection()
+          graph.centerContent()
         }
+
+        // 清理所有相关缓存
+        globalShapeCache.clear()
+        edgePathCache.clear()
 
         set({
           nodes: [],
           edges: [],
           selectedNodeIds: [],
           selectedEdgeId: null,
+          zoom: 1,
           isModified: false,
         })
+      },
+
+      applyTemplate: (templateNodes: any[], templateEdges: any[]) => {
+        const { graph } = get()
+
+        // 清理所有相关缓存
+        globalShapeCache.clear()
+        edgePathCache.clear()
+
+        // 更新 store 状态（useOptimizedStoreSync 会负责同步到 X6 graph）
+        set({
+          nodes: templateNodes,
+          edges: templateEdges,
+          selectedNodeIds: [],
+          selectedEdgeId: null,
+          zoom: 1,
+          isModified: true,
+        })
+
+        // 调整视图以适应内容
+        if (graph) {
+          setTimeout(() => {
+            graph.centerContent()
+            graph.zoomToFit({ padding: 40 })
+          }, 100)
+        }
       },
 
       exportToPng: async () => {

@@ -14,7 +14,14 @@
  * 4. 识别关键任务 (TF = 0)
  */
 
-import type { GanttTask, GanttDependency } from '../ganttDiagramGenerator'
+import type { GanttTask } from '../ganttDiagramGenerator'
+
+export interface GanttDependency {
+  id: string
+  sourceTaskId: string
+  targetTaskId: string
+  type?: 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish'
+}
 
 export interface TaskTimeData {
   taskId: string

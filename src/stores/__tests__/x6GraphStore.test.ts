@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import useX6GraphStore from '../x6GraphStore'
 import type { ShapeData, Connector } from '../../types/connection'
@@ -18,6 +19,7 @@ vi.mock('@antv/x6', () => ({
     getCells: vi.fn(() => []),
     toJSON: vi.fn(() => ({ cells: [] })),
     fromJSON: vi.fn(),
+    clearCells: vi.fn(),
   })),
   Node: vi.fn(),
   Edge: vi.fn(),

@@ -25,8 +25,8 @@ describe('GanttFilter', () => {
       duration: 9,
       dependencies: [],
       order: 0,
-      sectionId: 's1',
-      assignees: ['user1'],
+      section: 's1',
+      assignee: 'user1',
     },
     {
       id: 't2',
@@ -38,8 +38,8 @@ describe('GanttFilter', () => {
       duration: 10,
       dependencies: ['t1'],
       order: 1,
-      sectionId: 's1',
-      assignees: ['user2'],
+      section: 's1',
+      assignee: 'user2',
     },
     {
       id: 't3',
@@ -51,8 +51,8 @@ describe('GanttFilter', () => {
       duration: 5,
       dependencies: ['t2'],
       order: 2,
-      sectionId: 's2',
-      assignees: ['user1', 'user3'],
+      section: 's2',
+      assignee: 'user1',
     },
     {
       id: 't4',
@@ -64,7 +64,7 @@ describe('GanttFilter', () => {
       duration: 4,
       dependencies: [],
       order: 3,
-      sectionId: 's2',
+      section: 's2',
     },
   ]
 

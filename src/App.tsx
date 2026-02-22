@@ -118,6 +118,7 @@ const App: React.FC = () => {
     }
 
     const tables = erNodes.map(n => ({
+      id: n.id,
       name: n.text?.split('\n')[0] || 'untitled',
       columns: parseColumnsFromText(n.text || ''),
       foreignKeys: [],
@@ -213,7 +214,7 @@ const App: React.FC = () => {
     addNodes(nodesWithIds)
     
     tables.forEach((table, tableIndex) => {
-      table.foreignKeys.forEach(fk => {
+      table.foreignKeys?.forEach(fk => {
         const sourceNode = nodesWithIds[tableIndex]
         const targetNode = nodesWithIds.find(n => 
           n.text?.split('\n')[0]?.toLowerCase() === fk.refTable.toLowerCase()

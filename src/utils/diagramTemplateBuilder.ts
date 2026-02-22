@@ -7,18 +7,15 @@ import type {
 import type { ShapeData } from '../stores/x6GraphStore'
 import type { Connector, ConnectorEndStyle } from '../types/connection'
 import { getCurrentTheme } from './mermaidTheme'
+import { generateDefaultConnectionPoints } from './connectionPoints'
 
 /**
  * 检查是否为辅助节点（不应添加到主界面）
+ * 注意：只过滤纯装饰性节点，保留可能作为边连接点的节点
  */
 function isAuxiliaryNode(type: string): boolean {
   const auxiliaryTypes = [
-    'uml-anchor',
-    'uml-lifeline-marker',
-    'uml-lifeline-end',
     'uml-message-marker',
-    'uml-destroy-marker',
-    'uml-create-marker',
     'uml-create-label',
   ]
   return auxiliaryTypes.includes(type)
@@ -36,6 +33,7 @@ export function templateNodeToShapeData(node: TemplateNode): ShapeData {
     stroke: node.stroke || '#333333',
     strokeWidth: node.strokeWidth || 2,
     text: node.text,
+    connectionPoints: generateDefaultConnectionPoints(node.type),
   }
 
   // 添加可选属性
@@ -91,6 +89,7 @@ export function templateEdgeToConnector(edge: TemplateEdge, nodes: TemplateNode[
       id: `${edge.id}-label`,
       text: edge.label,
       position: labelPosition,
+      offsetX: 0,
       offsetY: labelOffsetY,
       fontSize: 12,
       color: theme.textColor || '#333',
@@ -194,11 +193,21 @@ export function buildDiagramTemplate(template: DiagramTemplate): {
     return { nodes: [], edges: [] }
   }
 
-  // 过滤掉辅助节点，转换为主界面可用的形状数据
-  const filteredNodes = templateNodes.filter(node => !isAuxiliaryNode(node.type))
+  // 只过滤掉真正的辅助标记节点，保留锚点节点
+  const filteredNodes = templateNodes.filter(node => {
+    const auxiliaryTypes = [
+      'uml-lifeline-marker',
+      'uml-lifeline-end',
+      'uml-message-marker',
+      'uml-destroy-marker',
+      'uml-create-marker',
+      'uml-create-label',
+    ]
+    return !auxiliaryTypes.includes(node.type)
+  })
   const nodes = filteredNodes.map(templateNodeToShapeData)
 
-  // 使用过滤后的节点列表来转换边，确保边引用的节点存在
+  // 使用过滤后的节点列表来转换边
   const edges = templateEdges?.map(edge => templateEdgeToConnector(edge, filteredNodes)) || []
 
   return { nodes, edges }

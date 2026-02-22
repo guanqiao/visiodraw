@@ -11,7 +11,7 @@ import useX6GraphStore from '@stores/x6GraphStore'
 import useClipboardStore from '@stores/clipboardStore'
 import useFormatPainterStore from '@stores/formatPainterStore'
 import { THEME_CHANGE_EVENT } from '@hooks/useTheme'
-// import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
+import { useOptimizedStoreSync } from '@hooks/useOptimizedStoreSync'
 import { useSelfLoopDrawing } from '@hooks/useSelfLoopDrawing'
 import { VirtualRenderer } from '@utils/rendering/VirtualRenderer'
 import { AnimationManager } from '@utils/rendering/AnimationManager'
@@ -1151,10 +1151,7 @@ const X6Canvas: React.FC = () => {
     })
 
     // Initialize AnimationManager for smooth animations
-    const animationManager = new AnimationManager(graph, {
-      duration: 300,
-      easing: 'easeOutCubic',
-    })
+    const animationManager = new AnimationManager(graph)
 
     // Initialize SmartRouter for intelligent edge routing
     const smartRouter = new SmartRouter(graph)
@@ -1185,11 +1182,11 @@ const X6Canvas: React.FC = () => {
     }
   }, [])
 
-  // 使用优化的 Store 同步 Hook - 已禁用，改用 x6GraphStore 直接操作
-  // useOptimizedStoreSync(graphRef.current, nodes, edges, {
-  //   debounceMs: 16, // 约 60fps
-  //   batchSize: 50,
-  // })
+  // 使用优化的 Store 同步 Hook
+  useOptimizedStoreSync(graphRef.current, nodes, edges, {
+    debounceMs: 16, // 约 60fps
+    batchSize: 50,
+  })
 
   // Handle theme changes - update canvas background and grid
   useEffect(() => {

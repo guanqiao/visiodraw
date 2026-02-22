@@ -350,9 +350,18 @@ export function createParticipantNode(
 ): ShapeData {
   const style = styles[type]
 
+  let nodeType: string
+  if (type === 'participant') {
+    nodeType = 'uml-participant'
+  } else if (type === 'actor') {
+    nodeType = 'uml-actor-sequence'
+  } else { // database
+    nodeType = 'uml-database-sequence'
+  }
+
   return {
     id: `participant-${id}`,
-    type: type === 'participant' ? 'uml-participant' : `uml-${type}-sequence`,
+    type: nodeType,
     x: layout.x,
     y: layout.y,
     width: layout.width,
@@ -709,6 +718,7 @@ export function createMessageEdge(
             id: `label-${id}`,
             text: messageLabel,
             position: labelPosition,
+            offsetX: 0,
             offsetY: labelOffsetY,
             fontSize: 12,
             color: '#333333',

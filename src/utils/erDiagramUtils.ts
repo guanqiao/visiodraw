@@ -19,7 +19,7 @@ export type EntityType = 'strong' | 'weak' | 'associative'
 export type CardinalityType = 'one' | 'many' | 'zero-or-one' | 'one-or-many' | 'zero-or-many'
 export type ParticipationType = 'total' | 'partial'
 export type LayoutAlgorithm = 'hierarchical' | 'grid' | 'force' | 'circular'
-export type LayoutDirection = 'vertical' | 'horizontal'
+export type LayoutDirection = 'vertical' | 'horizontal' | 'auto'
 
 export interface ErLayoutConfig {
   startX: number

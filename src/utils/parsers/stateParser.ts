@@ -87,7 +87,7 @@ export function parseStateDiagram(code: string): MermaidParseResult {
   }
 }
 
-function createStateNode(id: string, text: string, type: string = 'uml-state'): MermaidParseResult['nodes'][0] {
+function createStateNode(id: string, text: string, type: string = 'uml-state'): NonNullable<MermaidParseResult['nodes']>[0] {
   const size = calculateNodeSize(type, text)
   const colors = getNodeColors(type)
 

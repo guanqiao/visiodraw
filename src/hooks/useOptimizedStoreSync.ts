@@ -26,9 +26,15 @@ export function useOptimizedStoreSync(
   options: UseOptimizedStoreSyncOptions = {}
 ) {
   const { debounceMs = 16, batchSize = 50 } = options
+  const graphRef = useRef<Graph | null>(graph)
   const previousNodesRef = useRef<NodeData[]>([])
   const previousEdgesRef = useRef<EdgeData[]>([])
   const isProcessingRef = useRef(false)
+
+  // 同步 graph 到 ref
+  useEffect(() => {
+    graphRef.current = graph
+  }, [graph])
 
   // 检测是否是清空操作
   const isClearingNodes = previousNodesRef.current.length > 0 && nodes.length === 0
@@ -44,6 +50,20 @@ export function useOptimizedStoreSync(
       previousEdgesRef.current = []
     }
   }, [graph, isClearingNodes, isClearingEdges])
+
+  // 当 nodes 变为空数组时，重置 previousNodesRef（处理 newGraph 被调用的情况）
+  useEffect(() => {
+    if (nodes.length === 0) {
+      previousNodesRef.current = []
+    }
+  }, [nodes])
+
+  // 当 edges 变为空数组时，重置 previousEdgesRef（处理 newGraph 被调用的情况）
+  useEffect(() => {
+    if (edges.length === 0) {
+      previousEdgesRef.current = []
+    }
+  }, [edges])
 
   /**
    * 创建 X6 节点
@@ -76,24 +96,27 @@ export function useOptimizedStoreSync(
    */
   const processNodeChanges = useCallback(
     (batch: ReturnType<typeof createNodeChangeBatch>) => {
-      if (!graph) return
+      const currentGraph = graphRef.current
+      if (!currentGraph) return
 
       // 处理删除
       if (batch.removed.length > 0) {
         const cellsToRemove = batch.removed
-          .map((id) => graph.getCellById(id))
+          .map((id) => currentGraph.getCellById(id))
           .filter(Boolean)
         if (cellsToRemove.length > 0) {
-          graph.removeCells(cellsToRemove)
+          currentGraph.removeCells(cellsToRemove)
         }
       }
 
-      // 批量添加节点
+      // 批量添加节点（跳过已存在的节点）
       if (batch.added.length > 0) {
-        const nodesToAdd = batch.added.map((nodeData) =>
-          createX6NodeFromData(nodeData)
-        )
-        graph.addNodes(nodesToAdd)
+        const nodesToAdd = batch.added
+          .filter((nodeData) => !currentGraph.getCellById(nodeData.id))
+          .map((nodeData) => createX6NodeFromData(nodeData))
+        if (nodesToAdd.length > 0) {
+          currentGraph.addNodes(nodesToAdd)
+        }
       }
 
       // 批量更新节点 - 按变更类型分组
@@ -106,7 +129,7 @@ export function useOptimizedStoreSync(
       const attrUpdates: Array<{ node: X6Node; attrs: any }> = []
 
       for (const { node, changes } of batch.updated) {
-        const existingNode = graph.getCellById(node.id) as X6Node
+        const existingNode = currentGraph.getCellById(node.id) as X6Node
         if (!existingNode) continue
 
         if (changes.positionChanged) {
@@ -140,7 +163,7 @@ export function useOptimizedStoreSync(
       }
 
       // 执行批量更新
-      graph.batchUpdate(() => {
+      currentGraph.batchUpdate(() => {
         // 批量更新位置
         for (const { node, x, y } of positionUpdates) {
           node.position(x, y)
@@ -157,7 +180,7 @@ export function useOptimizedStoreSync(
         }
       })
     },
-    [graph, createX6NodeFromData]
+    [createX6NodeFromData]
   )
 
   /**
@@ -168,7 +191,8 @@ export function useOptimizedStoreSync(
       currentEdges: EdgeData[],
       previousEdges: EdgeData[]
     ) => {
-      if (!graph) return
+      const currentGraph = graphRef.current
+      if (!currentGraph) return
 
       const previousMap = new Map(previousEdges.map((e) => [e.id, e]))
       const currentIds = new Set(currentEdges.map((e) => e.id))
@@ -198,26 +222,28 @@ export function useOptimizedStoreSync(
       }
 
       // 批量处理
-      graph.batchUpdate(() => {
+      currentGraph.batchUpdate(() => {
         // 删除边
         if (removedIds.length > 0) {
           const cellsToRemove = removedIds
-            .map((id) => graph.getCellById(id))
+            .map((id) => currentGraph.getCellById(id))
             .filter(Boolean)
           if (cellsToRemove.length > 0) {
-            graph.removeCells(cellsToRemove)
+            currentGraph.removeCells(cellsToRemove)
           }
         }
 
-        // 添加边
+        // 添加边（跳过已存在的边）
         for (const edge of addedEdges) {
-          const x6EdgeConfig = ConnectorRenderer.toX6Edge(edge)
-          graph.addEdge(x6EdgeConfig)
+          if (!currentGraph.getCellById(edge.id)) {
+            const x6EdgeConfig = ConnectorRenderer.toX6Edge(edge)
+            currentGraph.addEdge(x6EdgeConfig)
+          }
         }
 
         // 更新边
         for (const { edge } of updatedEdges) {
-          const existingEdge = graph.getCellById(edge.id) as X6Edge
+          const existingEdge = currentGraph.getCellById(edge.id) as X6Edge
           if (existingEdge) {
             ConnectorRenderer.updateEdgeStyle(existingEdge, edge.style)
             ConnectorRenderer.updateEdgeMarkers(
@@ -230,17 +256,42 @@ export function useOptimizedStoreSync(
               strokeWidth: edge.strokeWidth,
               lineStyle: edge.lineStyle,
             })
+            if (edge.labels && edge.labels.length > 0) {
+              edge.labels.forEach((label, index) => {
+                ConnectorRenderer.updateEdgeLabel(existingEdge, label, index)
+              })
+            }
           }
         }
       })
     },
-    [graph]
+    []
   )
 
   /**
    * 判断边是否有变化
    */
   function hasEdgeChanged(oldEdge: EdgeData, newEdge: EdgeData): boolean {
+    const labelsChanged = (() => {
+      const oldLabels = oldEdge.labels
+      const newLabels = newEdge.labels
+      if (!oldLabels && !newLabels) return false
+      if (!oldLabels || !newLabels) return true
+      if (oldLabels.length !== newLabels.length) return true
+      for (let i = 0; i < oldLabels.length; i++) {
+        if (oldLabels[i].text !== newLabels[i].text ||
+            oldLabels[i].position !== newLabels[i].position ||
+            oldLabels[i].offsetX !== newLabels[i].offsetX ||
+            oldLabels[i].offsetY !== newLabels[i].offsetY ||
+            oldLabels[i].fontSize !== newLabels[i].fontSize ||
+            oldLabels[i].color !== newLabels[i].color ||
+            oldLabels[i].backgroundColor !== newLabels[i].backgroundColor) {
+          return true
+        }
+      }
+      return false
+    })()
+
     return (
       oldEdge.sourceShapeId !== newEdge.sourceShapeId ||
       oldEdge.sourcePointId !== newEdge.sourcePointId ||
@@ -251,14 +302,16 @@ export function useOptimizedStoreSync(
       oldEdge.endStyle !== newEdge.endStyle ||
       oldEdge.stroke !== newEdge.stroke ||
       oldEdge.strokeWidth !== newEdge.strokeWidth ||
-      oldEdge.lineStyle !== newEdge.lineStyle
+      oldEdge.lineStyle !== newEdge.lineStyle ||
+      labelsChanged
     )
   }
 
   // 使用防抖优化节点同步
   const debouncedNodeSync = useCallback(
     debounce((currentNodes: NodeData[]) => {
-      if (!graph || isProcessingRef.current) return
+      const currentGraph = graphRef.current
+      if (!currentGraph || isProcessingRef.current) return
 
       isProcessingRef.current = true
       try {
@@ -279,7 +332,7 @@ export function useOptimizedStoreSync(
         isProcessingRef.current = false
       }
     }, debounceMs),
-    [graph, processNodeChanges, batchSize, debounceMs]
+    [processNodeChanges, batchSize, debounceMs]
   )
 
   /**
@@ -290,7 +343,8 @@ export function useOptimizedStoreSync(
       batch: ReturnType<typeof createNodeChangeBatch>,
       size: number
     ) => {
-      if (!graph) return
+      const currentGraph = graphRef.current
+      if (!currentGraph) return
 
       // 先处理删除和添加
       processNodeChanges({
@@ -324,24 +378,20 @@ export function useOptimizedStoreSync(
 
       processNextChunk()
     },
-    [graph, processNodeChanges]
+    [processNodeChanges]
   )
 
   // 节点同步
   useEffect(() => {
     // 如果是清空操作，已经在上面的 useEffect 中处理了
-    if (isClearingNodes || isClearingEdges) {
-      return
-    }
+    if (isClearingNodes || isClearingEdges) return
     debouncedNodeSync(nodes)
   }, [nodes, debouncedNodeSync, isClearingNodes, isClearingEdges])
 
   // 边同步（边变更频率较低，不需要防抖）
   useEffect(() => {
     // 如果是清空操作，已经在上面的 useEffect 中处理了
-    if (isClearingNodes || isClearingEdges) {
-      return
-    }
+    if (isClearingNodes || isClearingEdges) return
     if (!graph) return
     processEdgeChanges(edges, previousEdgesRef.current)
     previousEdgesRef.current = edges

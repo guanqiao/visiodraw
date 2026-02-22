@@ -58,10 +58,11 @@ function drawTemplateToCanvas(
 
 /**
  * 检查是否在缩略图中跳过该节点
+ * 注意：对于序列图，我们保留锚点节点以确保边能够正确绘制
  */
 function shouldSkipNodeInThumbnail(type: string): boolean {
   const skipTypes = [
-    'uml-anchor',
+    'anchor',
     'uml-lifeline-marker',
     'uml-lifeline-end',
     'uml-message-marker',
@@ -100,11 +101,12 @@ export function generateTemplateThumbnail(
     id: c.id,
     source: c.source,
     target: c.target,
-    style: (c as any).style || 'orthogonal',
+    style: (c as any).style || (c as any).lineStyle || 'orthogonal',
     lineStyle: (c as any).lineStyle,
     stroke: c.stroke,
     strokeWidth: c.strokeWidth,
     dashArray: (c as any).dashArray,
+    endMarker: (c as any).endStyle,
     label: c.label,
   })) as TemplateEdge[]
 
@@ -164,7 +166,7 @@ export function generateThumbnailAsync(
         if ('nodes' in template) {
           resolve(generateDiagramTemplateThumbnail(template, options))
         } else {
-          resolve(generateTemplateThumbnail(template, options))
+          resolve(generateTemplateThumbnail(template as Template, options))
         }
       } catch (error) {
         reject(error)
